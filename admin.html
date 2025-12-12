@@ -1,0 +1,2556 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin – Pet Funny</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    :root {
+      --turquesa: #01ADB7;
+      --coral: #F9A197;
+      --escuro: #222222;
+      --cinza-claro: #f4f4f4;
+      --branco: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      Roboto, sans-serif;
+      background: radial-gradient(circle at top, #ffffff 0, #f4f7f8 40%, #e9f5f6 100%);
+      color: var(--escuro);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ============ HEADER GLOBAL (LOGO) ============ */
+
+    .top-brand {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      padding: 12px 16px 6px;
+    }
+
+    .top-brand img {
+      max-width: 220px;
+      height: auto;
+      display: block;
+    }
+
+    /* ============ LOGIN ============ */
+
+    #loginScreen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px 16px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--branco);
+      border-radius: 20px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.12);
+      padding: 22px 20px 18px;
+    }
+
+    .login-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #16363c;
+    }
+
+    .login-subtitle {
+      font-size: 13px;
+      color: #607d8b;
+      margin-bottom: 16px;
+    }
+
+    .login-field {
+      margin-bottom: 10px;
+    }
+
+    .login-label {
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #455a64;
+    }
+
+    .login-input {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid #d4dde0;
+      padding: 8px 10px;
+      font-size: 13px;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+      font-family: inherit;
+    }
+
+    .login-input:focus {
+      outline: none;
+      border-color: var(--turquesa);
+      box-shadow: 0 0 0 2px rgba(1, 173, 183, 0.16);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, var(--turquesa), var(--coral));
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s;
+      white-space: nowrap;
+    }
+
+    .btn:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: 0 5px 12px rgba(0,0,0,0.18);
+    }
+
+    .btn-light {
+      background: #edf3f4;
+      color: #333;
+      box-shadow: none;
+      text-transform: none;
+      letter-spacing: 0.04em;
+    }
+
+    .btn-danger {
+      background: #c62828;
+      box-shadow: 0 8px 16px rgba(198, 40, 40, 0.25);
+    }
+
+    .btn-secondary {
+      background: #eceff1;
+      color: #333;
+      box-shadow: none;
+      text-transform: none;
+      letter-spacing: 0.04em;
+    }
+
+    .btn-small {
+      font-size: 10px;
+      padding: 4px 8px;
+      box-shadow: none;
+    }
+
+    .login-footer-hint {
+      font-size: 11px;
+      color: #90a4ae;
+      margin-top: 10px;
+    }
+
+    .login-error {
+      font-size: 12px;
+      color: #c62828;
+      margin-top: 6px;
+    }
+
+    /* ============ ADMIN APP ============ */
+
+    #adminApp {
+      flex: 1;
+      display: none;
+      padding: 12px 16px 16px;
+    }
+
+    .container {
+      max-width: 1120px;
+      width: 100%;
+      margin: 0 auto;
+      background: var(--branco);
+      border-radius: 24px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+      padding: 20px 20px 24px;
+    }
+
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .logo-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .logo-title {
+      font-family: "GoodDog Cool", "Comic Sans MS", system-ui, sans-serif;
+      font-size: 28px;
+      letter-spacing: 0.03em;
+      color: var(--turquesa);
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #777;
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .filters-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    input[type="date"],
+    input[type="text"],
+    input[type="time"],
+    select,
+    textarea {
+      padding: 7px 9px;
+      border-radius: 10px;
+      border: 1px solid #d7dde0;
+      font-size: 13px;
+      min-width: 120px;
+      font-family: inherit;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--turquesa);
+      box-shadow: 0 0 0 2px rgba(1, 173, 183, 0.18);
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 8px 0 4px;
+      color: #444;
+    }
+
+    .section-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 8px 0 4px;
+    }
+
+    /* Tabs */
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #e1e7ea;
+      padding-bottom: 4px;
+    }
+
+    .tab-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #607d8b;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab-btn.active {
+      background: rgba(1,173,183,0.1);
+      color: #015d63;
+      font-weight: 600;
+    }
+
+    .tab-view {
+      display: none;
+    }
+
+    .tab-view.active {
+      display: block;
+    }
+
+    .form-panel {
+      margin-top: 8px;
+      margin-bottom: 12px;
+      background: #f7fbfc;
+      border-radius: 16px;
+      padding: 10px 12px;
+      border: 1px solid #e0edf0;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .form-row-2 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #555;
+    }
+
+    textarea {
+      min-height: 48px;
+      resize: vertical;
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .error-msg {
+      font-size: 12px;
+      color: #c62828;
+      margin-top: 4px;
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 12px 0 8px;
+      font-size: 12px;
+    }
+
+    .stats-item {
+      background: #f7fbfc;
+      border-radius: 14px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stats-label {
+      color: #555;
+    }
+
+    .stats-value {
+      font-weight: 700;
+      color: var(--turquesa);
+    }
+
+    .table-wrapper {
+      margin-top: 10px;
+      border-radius: 16px;
+      border: 1px solid #e3eaec;
+      overflow: hidden;
+      background: #fdfefe;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    thead {
+      background: #f2f7f8;
+    }
+
+    th,
+    td {
+      padding: 7px 8px;
+      text-align: left;
+      border-bottom: 1px solid #ecf1f3;
+    }
+
+    th {
+      font-weight: 600;
+      color: #555;
+      white-space: nowrap;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #fafdfd;
+    }
+
+    tbody tr:hover {
+      background: #eef7f8;
+    }
+
+    .td-mimo {
+      font-weight: 600;
+      color: var(--turquesa);
+    }
+
+    .td-obs {
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .td-status {
+      font-weight: 600;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      display: inline-block;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-agendado { background: #fff3cd; color: #856404; }
+    .status-confirmado { background: #e3f2fd; color: #1565c0; }
+    .status-recebido { background: #ede7f6; color: #4527a0; }
+    .status-em-servico { background: #fff8e1; color: #ef6c00; }
+    .status-concluido { background: #e8f5e9; color: #2e7d32; }
+    .status-entregue { background: #e0f7fa; color: #006064; }
+    .status-cancelado { background: #ffebee; color: #c62828; }
+
+    .actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .empty {
+      padding: 18px;
+      text-align: center;
+      font-size: 13px;
+      color: #777;
+    }
+
+    .footer {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .two-cols {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .subcard {
+      background: #f7fbfc;
+      border-radius: 16px;
+      padding: 10px 10px 12px;
+      border: 1px solid #e1e8eb;
+    }
+
+    .subcard-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #37474f;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .subtable-wrapper {
+      margin-top: 6px;
+      border-radius: 10px;
+      border: 1px solid #dde5e8;
+      background: #ffffff;
+      overflow: hidden;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .subtable-wrapper table {
+      font-size: 11px;
+    }
+
+    .badge-mini {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(1,173,183,0.1);
+      color: #015d63;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-selected {
+      background: rgba(249,161,151,0.15);
+      color: #c04a36;
+    }
+
+    @media (max-width: 900px) {
+      .form-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .form-row-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .two-cols {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .header {
+        align-items: flex-start;
+      }
+      .filters {
+        width: 100%;
+      }
+      .form-row,
+      .form-row-2 {
+        grid-template-columns: 1fr;
+      }
+      .table-wrapper {
+        overflow-x: auto;
+      }
+      .container {
+        padding: 16px 14px 18px;
+      }
+    }
+
+    /* ============ RODAPÉ GLOBAL (MESMO DA ROLETA) ============ */
+
+    .site-footer {
+      border-top: 1px solid #dde5e8;
+      padding: 12px 16px 16px;
+      background: transparent;
+    }
+
+    .footer-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .footer-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .footer-logo {
+      max-width: 140px;
+      height: auto;
+    }
+
+    .footer-info {
+      font-size: 12px;
+      color: #455a64;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .footer-info strong {
+      font-size: 13px;
+      color: #263238;
+    }
+
+    .footer-bottom {
+      font-size: 11px;
+      color: #78909c;
+      text-align: center;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGO PET FUNNY NO TOPO -->
+<header class="top-brand">
+  <img src="pet-funny-logo.svg" alt="Pet Funny" />
+</header>
+
+<!-- TELA DE LOGIN -->
+<section id="loginScreen">
+  <div class="login-card">
+    <div class="login-title">Área Administrativa – Pet Funny</div>
+    <div class="login-subtitle">
+      Acesse com o usuário e senha da equipe para ver agenda, clientes e pets.
+    </div>
+
+    <div class="login-field">
+      <div class="login-label">Usuário</div>
+      <input
+        type="text"
+        id="loginUser"
+        class="login-input"
+        placeholder="adminpetfunny"
+      />
+    </div>
+
+    <div class="login-field">
+      <div class="login-label">Senha</div>
+      <input
+        type="password"
+        id="loginPass"
+        class="login-input"
+        placeholder="••••••••"
+      />
+    </div>
+
+    <button id="btnLogin" class="btn" style="margin-top: 8px;">
+      Entrar no painel
+    </button>
+
+    <div id="loginError" class="login-error hidden">
+      Usuário ou senha incorretos. Tente novamente.
+    </div>
+
+    <div class="login-footer-hint">
+      Usuário: <strong>adminpetfunny</strong> • Senha: <strong>admin2605</strong>
+    </div>
+  </div>
+</section>
+
+<!-- ADMIN APP (SÓ APARECE APÓS LOGIN) -->
+<div id="adminApp">
+  <div class="container">
+    <!-- TOPO DO PAINEL -->
+    <div class="header">
+      <div class="logo-block">
+        <div class="logo-title">Pet Funny</div>
+        <div class="logo-sub">Painel de Agendamentos, Clientes &amp; Pets</div>
+      </div>
+
+      <div class="filters">
+        <div class="filters-group">
+          <span style="font-size:13px;">Data:</span>
+          <input type="date" id="filtroData" />
+          <button class="btn btn-light" id="btnHoje">Hoje</button>
+          <button class="btn btn-light" id="btnLimparFiltro">Limpar filtro</button>
+        </div>
+
+        <div class="filters-group">
+          <span style="font-size:13px;">Pesquisar:</span>
+          <input type="text" id="filtroBusca" placeholder="Nome, pet ou telefone" />
+        </div>
+
+        <button class="btn btn-light" id="btnExportarCSV">
+          Exportar CSV
+        </button>
+
+        <!-- NOVO: BOTÃO SAIR -->
+        <button class="btn btn-danger btn-small" id="btnLogout">
+          Sair
+        </button>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="tab-agenda">
+        <span>📅</span> Agenda &amp; Mimos
+      </button>
+      <button class="tab-btn" data-tab="tab-clientes">
+        <span>👤</span> Clientes &amp; Pets
+      </button>
+      <button class="tab-btn" data-tab="tab-dashboard">
+        <span>📊</span> Dashboard
+      </button>
+    </div>
+
+    <!-- TAB: AGENDA -->
+    <section id="tab-agenda" class="tab-view active">
+
+      <div class="section-title-row">
+        <div class="section-title">Agendamentos do dia</div>
+        <button class="btn btn-light" id="btnNovoAgendamento">
+          + Novo agendamento
+        </button>
+      </div>
+
+      <!-- formulário começa escondido -->
+      <div class="form-panel hidden" id="formPanel">
+        <input type="hidden" id="bookingId" />
+        <input type="hidden" id="bookingOriginalStatus" />
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="formPhone">Telefone (WhatsApp)</label>
+            <input type="text" id="formPhone" placeholder="(16) 9 9999-9999" />
+          </div>
+          <div class="form-group">
+            <label for="formNome">Tutor(a)</label>
+            <input type="text" id="formNome" placeholder="Nome do tutor" />
+          </div>
+          <div class="form-group">
+            <label for="formPetSelect">Pet</label>
+            <select id="formPetSelect">
+              <option value="">Selecione o pet...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="formPrize">Mimo (Roleta)</label>
+            <select id="formPrize">
+              <option value="Tosa Higiênica">Tosa Higiênica</option>
+              <option value="Hidratação">Hidratação</option>
+              <option value="Foto e Vídeo Profissional">Foto e Vídeo Profissional</option>
+              <option value="Patinhas impecáveis">Patinhas impecáveis</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="formService">Serviço</label>
+            <select id="formService">
+              <option value="">Selecione...</option>
+              <option value="Banho">Banho</option>
+              <option value="Banho com Hidratação">Banho com Hidratação</option>
+              <option value="Banho + Tosa">Banho + Tosa</option>
+              <option value="Banho + Tosa Higiênica">Banho + Tosa Higiênica</option>
+              <option value="Banho + Tosa Específica da Raça">Banho + Tosa Específica da Raça</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="formDate">Data</label>
+            <input type="date" id="formDate" />
+          </div>
+          <div class="form-group">
+            <label for="formTime">Horário</label>
+            <input type="time" id="formTime" />
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="formStatus">Status</label>
+            <select id="formStatus">
+              <option value="agendado">Agendado</option>
+              <option value="confirmado">Confirmado</option>
+              <option value="recebido">Recebido</option>
+              <option value="em serviço">Em serviço</option>
+              <option value="concluído">Concluído</option>
+              <option value="entregue">Entregue</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="formNotes">Observações</label>
+          <textarea id="formNotes" placeholder="Ex: porte, comportamento, cuidados especiais..."></textarea>
+        </div>
+
+        <div id="formError" class="error-msg" style="display:none;"></div>
+
+        <div class="form-actions">
+          <button class="btn btn-secondary" id="btnCancelarEdicao">Limpar / cancelar</button>
+          <button class="btn" id="btnSalvar">Salvar</button>
+        </div>
+      </div>
+
+      <!-- ESTATÍSTICAS -->
+      <div class="stats">
+        <div class="stats-item">
+          <span class="stats-label">Total de agendamentos:</span>
+          <span class="stats-value" id="statTotal">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Tosa Higiênica:</span>
+          <span class="stats-value" id="statTosa">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Hidratação:</span>
+          <span class="stats-value" id="statHidratacao">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Foto/Vídeo:</span>
+          <span class="stats-value" id="statFotoVideo">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Patinhas impecáveis:</span>
+          <span class="stats-value" id="statPatinhas">0</span>
+        </div>
+      </div>
+
+      <!-- TABELA AGENDA -->
+      <div class="table-wrapper">
+        <table>
+          <thead>
+          <tr>
+            <th>Data</th>
+            <th>Hora</th>
+            <th>Tutor(a)</th>
+            <th>Pet</th>
+            <th>Telefone</th>
+            <th>Serviço</th>
+            <th>Mimo</th>
+            <th>Status</th>
+            <th>Última notificação</th>
+            <th>Obs.</th>
+            <th>Ações</th>
+          </tr>
+          </thead>
+          <tbody id="tbodyAgenda"></tbody>
+        </table>
+        <div id="estadoVazio" class="empty" style="display:none;">
+          Nenhum agendamento encontrado para o filtro atual.
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: CLIENTES & PETS -->
+    <section id="tab-clientes" class="tab-view">
+      <div class="section-title">Clientes &amp; Pets</div>
+      <div class="two-cols">
+        <!-- CLIENTES -->
+        <div class="subcard">
+          <div class="subcard-title">
+            <span>Clientes</span>
+            <span id="badgeClienteSelecionado" class="badge-mini badge-selected hidden">
+              Cliente selecionado
+            </span>
+            <button class="btn btn-secondary btn-small" id="btnNovoCliente">
+              + Novo cliente
+            </button>
+          </div>
+
+          <!-- FORM DE CLIENTE OCULTO POR PADRÃO -->
+          <div id="clienteFormBlock" class="hidden">
+            <div class="form-group">
+              <label for="cliPhone">Telefone (WhatsApp)</label>
+              <input type="text" id="cliPhone" placeholder="(16) 9 9999-9999" />
+            </div>
+            <div class="form-group">
+              <label for="cliName">Nome do tutor</label>
+              <input type="text" id="cliName" placeholder="Nome completo" />
+            </div>
+            <div id="cliError" class="error-msg" style="display:none;"></div>
+            <div class="form-actions">
+              <button class="btn btn-secondary btn-small" id="btnCliLimpar">Limpar</button>
+              <button class="btn btn-small" id="btnCliSalvar">Salvar / Atualizar</button>
+            </div>
+          </div>
+
+          <div class="subtable-wrapper" style="margin-top:10px;">
+            <table>
+              <thead>
+              <tr>
+                <th>ID</th>
+                <th>Tutor</th>
+                <th>Telefone</th>
+                <th>Pets</th>
+                <th>Ações</th>
+              </tr>
+              </thead>
+              <tbody id="tbodyClientes"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PETS DO CLIENTE SELECIONADO (começa oculto) -->
+        <div class="subcard hidden" id="petsCard">
+          <div class="subcard-title">
+            <span>Pets do cliente selecionado</span>
+            <button class="btn btn-secondary btn-small" id="btnNovoPet">+ Novo pet</button>
+          </div>
+          <div class="form-group">
+            <label for="petName">Nome do pet</label>
+            <input type="text" id="petName" placeholder="Nome do pet" />
+          </div>
+          <div class="form-group">
+            <label for="petBreed">Raça</label>
+            <select id="petBreed"></select>
+          </div>
+          <div class="form-group">
+            <label for="petInfo">Mais informações</label>
+            <textarea id="petInfo" placeholder="Porte, comportamento, medicação, etc."></textarea>
+          </div>
+          <div id="petError" class="error-msg" style="display:none;"></div>
+          <div class="form-actions">
+            <button class="btn btn-secondary btn-small" id="btnPetLimpar">Limpar</button>
+            <button class="btn btn-small" id="btnPetSalvar">Salvar pet</button>
+          </div>
+
+          <div class="subtable-wrapper" style="margin-top:10px;">
+            <table>
+              <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Raça</th>
+                <th>Info</th>
+                <th>Ações</th>
+              </tr>
+              </thead>
+              <tbody id="tbodyPets"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: DASHBOARD -->
+    <section id="tab-dashboard" class="tab-view">
+      <div class="section-title-row">
+        <div class="section-title">Dashboard de Indicadores</div>
+      </div>
+
+      <!-- FILTROS DO DASHBOARD -->
+      <div class="form-panel" id="dashboardFilters">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="dashPeriod">Período</label>
+            <select id="dashPeriod">
+              <option value="today">Hoje</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="month">Mês atual</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </div>
+          <div class="form-group dash-custom-range hidden" id="dashCustomRange">
+            <label>Período personalizado</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <input type="date" id="dashStart" />
+              <input type="date" id="dashEnd" />
+              <button class="btn btn-small" id="dashApply">Aplicar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs PRINCIPAIS -->
+      <div class="stats">
+        <div class="stats-item">
+          <span class="stats-label">Agendamentos no período:</span>
+          <span class="stats-value" id="dashTotalBookings">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Clientes únicos no período:</span>
+          <span class="stats-value" id="dashUniqueCustomers">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Total de clientes cadastrados:</span>
+          <span class="stats-value" id="dashTotalCustomers">0</span>
+        </div>
+      </div>
+
+      <!-- STATUS DOS AGENDAMENTOS -->
+      <div class="section-title" style="margin-top:12px;">Status dos agendamentos</div>
+      <div class="stats">
+        <div class="stats-item">
+          <span class="stats-label">Agendado:</span>
+          <span class="stats-value" id="dashStatusAgendado">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Confirmado:</span>
+          <span class="stats-value" id="dashStatusConfirmado">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Recebido:</span>
+          <span class="stats-value" id="dashStatusRecebido">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Em serviço:</span>
+          <span class="stats-value" id="dashStatusEmServico">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Concluído:</span>
+          <span class="stats-value" id="dashStatusConcluido">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Entregue:</span>
+          <span class="stats-value" id="dashStatusEntregue">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Cancelado:</span>
+          <span class="stats-value" id="dashStatusCancelado">0</span>
+        </div>
+      </div>
+
+      <!-- DISTRIBUIÇÃO DOS MIMOS -->
+      <div class="section-title" style="margin-top:12px;">Mimos da Roleta no período</div>
+      <div class="stats">
+        <div class="stats-item">
+          <span class="stats-label">Tosa Higiênica:</span>
+          <span class="stats-value" id="dashPrizeTosa">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Hidratação:</span>
+          <span class="stats-value" id="dashPrizeHidratacao">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Foto/Vídeo Profissional:</span>
+          <span class="stats-value" id="dashPrizeFotoVideo">0</span>
+        </div>
+        <div class="stats-item">
+          <span class="stats-label">Patinhas impecáveis:</span>
+          <span class="stats-value" id="dashPrizePatinhas">0</span>
+        </div>
+      </div>
+
+      <!-- GRÁFICOS -->
+      <div class="section-title" style="margin-top:20px;">Visão Gráfica</div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center;margin-top:10px;">
+        <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
+          <canvas id="chartStatus" style="max-width:460px;"></canvas>
+        </div>
+
+        <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
+          <canvas id="chartPrizes" style="max-width:380px;"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <div>Dados via API (<code>/api/customers</code>, <code>/api/pets</code>, <code>/api/bookings</code>). Exportação CSV feita no navegador.</div>
+      <div>Pet Funny • Admin CRUD &amp; Status</div>
+    </div>
+  </div>
+</div>
+
+<!-- RODAPÉ GLOBAL (MESMO DA ROLETA) -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-top">
+      <img src="pet-funny-logo.svg" alt="Pet Funny" class="footer-logo" />
+      <div class="footer-info">
+        <strong>Pet Funny • Banho &amp; Tosa</strong>
+        <span>Rua Virgílio de Carvalho Neves Neto, 794 – Ribeirão Preto / SP</span>
+        <span>Horário: Seg–Sex: 07:30 às 17:30 • Sábado: 07:30 às 13:00</span>
+        <span>WhatsApp: (16) 98153-5338</span>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      © 2024 Pet Funny • Roleta de Mimos. Todos os direitos reservados.
+    </div>
+  </div>
+</footer>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  const API_BASE_URL = 'http://localhost:4000';
+
+  /* ========= CONTROLE DE SESSÃO (30 MIN) ========= */
+  const SESSION_KEY = 'pf_admin_session';
+  const SESSION_DURATION_MS = 30 * 60 * 1000; // 30 minutos
+  let sessionTimerId = null;
+  let appInitialized = false;
+
+  function setSession() {
+    const expiresAt = Date.now() + SESSION_DURATION_MS;
+    const session = {
+      user: 'adminpetfunny',
+      expiresAt
+    };
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    } catch (_) {}
+  }
+
+  function clearSession() {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch (_) {}
+  }
+
+  function getSession() {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data.expiresAt || Date.now() > data.expiresAt) {
+        clearSession();
+        return null;
+      }
+      return data;
+    } catch (_) {
+      clearSession();
+      return null;
+    }
+  }
+
+  function handleSessionExpired() {
+    if (sessionTimerId) {
+      clearInterval(sessionTimerId);
+      sessionTimerId = null;
+    }
+    clearSession();
+    adminApp.style.display = 'none';
+    loginScreen.classList.remove('hidden');
+    alert('Sua sessão expirou. Faça login novamente.');
+  }
+
+  function startSessionTimer() {
+    if (sessionTimerId) {
+      clearInterval(sessionTimerId);
+    }
+    sessionTimerId = setInterval(() => {
+      const s = getSession();
+      if (!s) {
+        handleSessionExpired();
+      }
+    }, 30000); // verifica a cada 30s
+  }
+
+  async function initApp() {
+    if (appInitialized) {
+      try {
+        await renderTabela();
+        await loadDashboard();
+      } catch (_) {}
+      return;
+    }
+    appInitialized = true;
+    try {
+      await renderTabela();
+      await loadClientes();
+      await loadDashboard();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function enterAdminMode() {
+    loginError.classList.add('hidden');
+    loginScreen.classList.add('hidden');
+    adminApp.style.display = 'block';
+    setSession();
+    startSessionTimer();
+    initApp();
+  }
+
+  function doLogout() {
+    clearSession();
+    if (sessionTimerId) {
+      clearInterval(sessionTimerId);
+      sessionTimerId = null;
+    }
+    limparForm();
+    limparClienteForm();
+    adminApp.style.display = 'none';
+    loginScreen.classList.remove('hidden');
+  }
+
+  function tryAutoLogin() {
+    const s = getSession();
+    if (s) {
+      adminApp.style.display = 'block';
+      loginScreen.classList.add('hidden');
+      startSessionTimer();
+      initApp();
+    } else {
+      loginScreen.classList.remove('hidden');
+      adminApp.style.display = 'none';
+    }
+  }
+
+  // ===== LOGIN =====
+  const loginScreen = document.getElementById('loginScreen');
+  const adminApp = document.getElementById('adminApp');
+  const loginUser = document.getElementById('loginUser');
+  const loginPass = document.getElementById('loginPass');
+  const btnLogin = document.getElementById('btnLogin');
+  const loginError = document.getElementById('loginError');
+  const btnLogout = document.getElementById('btnLogout');
+
+  btnLogin.addEventListener('click', () => {
+    const u = loginUser.value.trim();
+    const p = loginPass.value.trim();
+
+    if (u === 'adminpetfunny' && p === 'admin2605') {
+      enterAdminMode();
+    } else {
+      loginError.classList.remove('hidden');
+    }
+  });
+
+  [loginUser, loginPass].forEach(el => {
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') btnLogin.click();
+    });
+  });
+
+  btnLogout.addEventListener('click', () => {
+    if (confirm('Deseja sair do painel?')) {
+      doLogout();
+    }
+  });
+
+  // ===== API HELPERS =====
+  async function apiGet(path, params) {
+    const url = new URL(API_BASE_URL + path);
+    if (params) {
+      Object.keys(params).forEach(k => {
+        const v = params[k];
+        if (v !== undefined && v !== null && v !== '') {
+          url.searchParams.append(k, v);
+        }
+      });
+    }
+    const resp = await fetch(url.toString());
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
+    return data;
+  }
+
+  async function apiPost(path, body) {
+    const resp = await fetch(API_BASE_URL + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    return data;
+  }
+
+  async function apiPut(path, body) {
+    const resp = await fetch(API_BASE_URL + path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao atualizar.');
+    return data;
+  }
+
+  async function apiDelete(path) {
+    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao apagar.');
+    return data;
+  }
+
+  function sanitizePhone(phone) {
+    return (phone || '').replace(/\D/g, '');
+  }
+
+  function formatTelefone(phone) {
+    const digits = (phone || '').replace(/\D/g, '');
+    if (digits.length === 11) {
+      return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    }
+    if (digits.length === 10) {
+      return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    }
+    return phone || '-';
+  }
+
+  // ===== MÁSCARA TELEFONE (99) 9 9999-9999 =====
+  function applyPhoneMask(input) {
+    if (!input) return;
+    let value = input.value.replace(/\D/g, '');
+
+    if (value.length > 11) value = value.slice(0, 11);
+
+    let formatted = value;
+
+    if (value.length > 0) {
+      formatted = `(${value.slice(0, 2)}`;
+    }
+    if (value.length >= 3) {
+      formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)}`;
+    }
+    if (value.length >= 4) {
+      formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)} ${value.slice(3, 7)}`;
+    }
+    if (value.length >= 8) {
+      formatted =
+        `(${value.slice(0, 2)}) ${value.slice(2, 3)} ` +
+        `${value.slice(3, 7)}-${value.slice(7, 11)}`;
+    }
+
+    input.value = formatted;
+  }
+
+  function formatDataBr(dataIso) {
+    const parts = (dataIso || '').split('-');
+    if (parts.length === 3) return parts[2] + '/' + parts[1] + '/' + parts[0];
+    return dataIso || '-';
+  }
+
+  function formatDateTimeBr(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '-';
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const ano = d.getFullYear();
+    const hora = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes}/${ano} ${hora}:${min}`;
+  }
+
+  function toISODateOnly(date) {
+    const ano = date.getFullYear();
+    const mes = String(date.getMonth() + 1).padStart(2, '0');
+    const dia = String(date.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  }
+
+  function getPeriodRange(periodValue) {
+    const hoje = new Date();
+    let start = null;
+    let end = null;
+
+    if (periodValue === 'today') {
+      start = toISODateOnly(hoje);
+      end = toISODateOnly(hoje);
+    } else if (periodValue === '7') {
+      const d = new Date();
+      d.setDate(d.getDate() - 6);
+      start = toISODateOnly(d);
+      end = toISODateOnly(hoje);
+    } else if (periodValue === '30') {
+      const d = new Date();
+      d.setDate(d.getDate() - 29);
+      start = toISODateOnly(d);
+      end = toISODateOnly(hoje);
+    } else if (periodValue === 'month') {
+      const dStart = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      start = toISODateOnly(dStart);
+      end = toISODateOnly(hoje);
+    }
+    // 'custom' é tratado na função loadDashboard
+    return { start, end };
+  }
+
+  function classStatus(status) {
+    const s = (status || '').toLowerCase();
+    if (s === 'agendado') return 'status-agendado';
+    if (s === 'confirmado') return 'status-confirmado';
+    if (s === 'recebido') return 'status-recebido';
+    if (s === 'em serviço') return 'status-em-servico';
+    if (s === 'concluído' || s === 'concluido') return 'status-concluido';
+    if (s === 'entregue') return 'status-entregue';
+    if (s === 'cancelado') return 'status-cancelado';
+    return 'status-agendado';
+  }
+
+  // Mensagem por status
+  function buildStatusMessage(status, nome, petLabel, service, dataBR, time, prize) {
+    const s = (status || '').toLowerCase();
+    const cabecalho = `Oi ${nome}! Aqui é do Pet Funny 🐾\n\n`;
+    let corpo = '';
+
+    switch (s) {
+      case 'agendado':
+        corpo =
+          `Acabamos de registrar o agendamento do(a) *${petLabel}* ` +
+          `para *${service}* em *${dataBR} às ${time}*.\n\n` +
+          `Mimo da campanha Roleta de Mimos: *${prize}*.\n\n` +
+          `Quando estiver próximo do dia, te avisamos por aqui. 💚`;
+        break;
+      case 'confirmado':
+        corpo =
+          `Seu agendamento do(a) *${petLabel}* para *${service}* ` +
+          `em *${dataBR} às ${time}* foi *CONFIRMADO* ✅\n\n` +
+          `Mimo garantido: *${prize}*.\n\n` +
+          `Qualquer alteração é só avisar a gente aqui no WhatsApp.`;
+        break;
+      case 'recebido':
+        corpo =
+          `O(a) *${petLabel}* já está aqui com a gente para *${service}* 🐶✨\n\n` +
+          `Estamos cuidando dele(a) com muito carinho.\n\n` +
+          `Mimo da vez: *${prize}*.\n\n` +
+          `Assim que estiver tudo pronto, te avisamos por aqui.`;
+        break;
+      case 'em serviço':
+        corpo =
+          `Estamos cuidando do(a) *${petLabel}* agora mesmo no *${service}* 🛁✂️\n\n` +
+          `Mimo aplicado: *${prize}*.\n\n` +
+          `Daqui a pouco ele(a) estará pronto(a) para ser buscado(a).`;
+        break;
+      case 'concluído':
+        corpo =
+          `O serviço do(a) *${petLabel}* (*${service}*) foi *CONCLUÍDO* ✅\n\n` +
+          `Mimo aplicado: *${prize}*.\n\n` +
+          `Quando quiser, já pode vir buscar o(a) seu(sua) peludo(a).`;
+        break;
+      case 'entregue':
+        corpo =
+          `O(a) *${petLabel}* já foi entregue e esperamos que você tenha gostado do resultado ✨\n\n` +
+          `Serviço: *${service}*\n` +
+          `Mimo da Roleta: *${prize}*.\n\n` +
+          `Obrigada por confiar no Pet Funny! 💚`;
+        break;
+      case 'cancelado':
+        corpo =
+          `Seu agendamento do(a) *${petLabel}* para *${service}* ` +
+          `em *${dataBR} às ${time}* foi *CANCELADO* ❌\n\n` +
+          `Se quiser remarcar, é só mandar uma mensagem por aqui que encontramos um novo horário pra vocês.`;
+        break;
+      default:
+        corpo =
+          `O status do agendamento do(a) *${petLabel}* para *${service}* ` +
+          `em *${dataBR} às ${time}* foi atualizado para: *${status.toUpperCase()}*.\n\n` +
+          `Mimo da campanha Roleta de Mimos: *${prize}*.\n\n` +
+          `Qualquer dúvida, é só chamar aqui no WhatsApp 💚`;
+    }
+
+    return cabecalho + corpo;
+  }
+
+  // ===== TABS =====
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabViews = document.querySelectorAll('.tab-view');
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tabId = btn.getAttribute('data-tab');
+      tabViews.forEach(view => {
+        view.classList.toggle('active', view.id === tabId);
+      });
+    });
+  });
+
+  // ===== CAMPOS AGENDA =====
+  const filtroData = document.getElementById('filtroData');
+  const filtroBusca = document.getElementById('filtroBusca');
+  const btnHoje = document.getElementById('btnHoje');
+  const btnLimparFiltro = document.getElementById('btnLimparFiltro');
+  const btnExportarCSV = document.getElementById('btnExportarCSV');
+  const btnNovoAgendamento = document.getElementById('btnNovoAgendamento');
+
+  const tbodyAgenda = document.getElementById('tbodyAgenda');
+  const estadoVazio = document.getElementById('estadoVazio');
+
+  const statTotal = document.getElementById('statTotal');
+  const statTosa = document.getElementById('statTosa');
+  const statHidratacao = document.getElementById('statHidratacao');
+  const statFotoVideo = document.getElementById('statFotoVideo');
+  const statPatinhas = document.getElementById('statPatinhas');
+
+  const formPanel = document.getElementById('formPanel');
+
+  const bookingId = document.getElementById('bookingId');
+  const bookingOriginalStatus = document.getElementById('bookingOriginalStatus');
+  const formPhone = document.getElementById('formPhone');
+  const formNome = document.getElementById('formNome');
+  const formPetSelect = document.getElementById('formPetSelect');
+  const formPrize = document.getElementById('formPrize');
+  const formService = document.getElementById('formService');
+  const formDate = document.getElementById('formDate');
+  const formTime = document.getElementById('formTime');
+  const formStatus = document.getElementById('formStatus');
+  const formNotes = document.getElementById('formNotes');
+  const formError = document.getElementById('formError');
+  const btnSalvar = document.getElementById('btnSalvar');
+  const btnCancelarEdicao = document.getElementById('btnCancelarEdicao');
+
+  // ===== DASHBOARD =====
+  const dashPeriod = document.getElementById('dashPeriod');
+  const dashCustomRange = document.getElementById('dashCustomRange');
+  const dashStart = document.getElementById('dashStart');
+  const dashEnd = document.getElementById('dashEnd');
+  const dashApply = document.getElementById('dashApply');
+
+  const dashTotalBookings = document.getElementById('dashTotalBookings');
+  const dashUniqueCustomers = document.getElementById('dashUniqueCustomers');
+  const dashTotalCustomers = document.getElementById('dashTotalCustomers');
+
+  const dashStatusAgendado = document.getElementById('dashStatusAgendado');
+  const dashStatusConfirmado = document.getElementById('dashStatusConfirmado');
+  const dashStatusRecebido = document.getElementById('dashStatusRecebido');
+  const dashStatusEmServico = document.getElementById('dashStatusEmServico');
+  const dashStatusConcluido = document.getElementById('dashStatusConcluido');
+  const dashStatusEntregue = document.getElementById('dashStatusEntregue');
+  const dashStatusCancelado = document.getElementById('dashStatusCancelado');
+
+  const dashPrizeTosa = document.getElementById('dashPrizeTosa');
+  const dashPrizeHidratacao = document.getElementById('dashPrizeHidratacao');
+  const dashPrizeFotoVideo = document.getElementById('dashPrizeFotoVideo');
+  const dashPrizePatinhas = document.getElementById('dashPrizePatinhas');
+
+  let ultimaLista = [];
+  let clientesCache = [];
+  let clienteSelecionadoId = null;
+  let petsCache = [];
+  let petEditIdLocal = null;
+
+  function setEditMode(isEdit) {
+    formPhone.disabled = isEdit;
+    formNome.disabled = isEdit;
+    formPetSelect.disabled = isEdit;
+    formPrize.disabled = isEdit;
+  }
+
+  function mostrarFormAgenda() {
+    formPanel.classList.remove('hidden');
+  }
+
+  function esconderFormAgenda() {
+    formPanel.classList.add('hidden');
+  }
+
+  async function fetchBookings() {
+    const params = {};
+    if (filtroData.value) params.date = filtroData.value;
+    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
+    const data = await apiGet('/api/bookings', params);
+    return data.bookings || [];
+  }
+
+  function atualizaEstatisticas(lista) {
+    const total = lista.length;
+    let tosa = 0;
+    let hidratacao = 0;
+    let fotoVideo = 0;
+    let patinhas = 0;
+
+    lista.forEach(a => {
+      switch (a.prize) {
+        case 'Tosa Higiênica': tosa++; break;
+        case 'Hidratação': hidratacao++; break;
+        case 'Foto e Vídeo Profissional': fotoVideo++; break;
+        case 'Patinhas impecáveis': patinhas++; break;
+      }
+    });
+
+    statTotal.textContent = total;
+    statTosa.textContent = tosa;
+    statHidratacao.textContent = hidratacao;
+    statFotoVideo.textContent = fotoVideo;
+    statPatinhas.textContent = patinhas;
+  }
+
+  async function loadDashboard() {
+    // 1) Descobre o período selecionado
+    let period = dashPeriod ? dashPeriod.value : 'today';
+    let { start, end } = getPeriodRange(period);
+
+    if (period === 'custom') {
+      start = dashStart.value || null;
+      end = dashEnd.value || null;
+      // se o usuário escolher custom e não preencher as datas, não faz nada
+      if (!start || !end) {
+        return;
+      }
+    }
+
+    let bookings = [];
+    let totalCustomers = 0;
+
+    // 2) Busca TODOS os agendamentos da API (sem filtro)
+    try {
+      const data = await apiGet('/api/bookings');
+      bookings = data.bookings || [];
+    } catch (e) {
+      console.error('Erro ao carregar bookings para dashboard:', e);
+      bookings = [];
+    }
+
+    // 3) Filtra por período no front usando o campo date (YYYY-MM-DD)
+    if (start || end) {
+      bookings = bookings.filter(b => {
+        const d = b.date;
+        if (!d) return false;
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        return true;
+      });
+    }
+
+    // 4) Busca total de clientes cadastrados
+    try {
+      const cData = await apiGet('/api/customers');
+      totalCustomers = (cData.customers || []).length;
+    } catch (e) {
+      console.error('Erro ao carregar customers para dashboard:', e);
+      totalCustomers = 0;
+    }
+
+    // 5) KPIs principais
+    const uniqueCustomersSet = new Set();
+    bookings.forEach(b => {
+      const cid = b.customer_id || b.customerId;
+      if (cid != null) uniqueCustomersSet.add(cid);
+    });
+
+    dashTotalBookings.textContent = bookings.length;
+    dashUniqueCustomers.textContent = uniqueCustomersSet.size;
+    dashTotalCustomers.textContent = totalCustomers;
+
+    // 6) Contagem de status
+    const statusCounts = {
+      agendado: 0,
+      confirmado: 0,
+      recebido: 0,
+      'em serviço': 0,
+      concluido: 0,
+      concluído: 0,
+      entregue: 0,
+      cancelado: 0
+    };
+
+    const prizeCounts = {
+      'Tosa Higiênica': 0,
+      'Hidratação': 0,
+      'Foto e Vídeo Profissional': 0,
+      'Patinhas impecáveis': 0
+    };
+
+    bookings.forEach(b => {
+      const s = (b.status || 'agendado').toLowerCase();
+      if (statusCounts.hasOwnProperty(s)) {
+        statusCounts[s]++;
+      }
+
+      const p = b.prize || '';
+      if (prizeCounts.hasOwnProperty(p)) {
+        prizeCounts[p]++;
+      }
+    });
+
+    dashStatusAgendado.textContent = statusCounts['agendado'] || 0;
+    dashStatusConfirmado.textContent = statusCounts['confirmado'] || 0;
+    dashStatusRecebido.textContent = statusCounts['recebido'] || 0;
+    dashStatusEmServico.textContent = statusCounts['em serviço'] || 0;
+    dashStatusConcluido.textContent =
+      (statusCounts['concluido'] || 0) + (statusCounts['concluído'] || 0);
+    dashStatusEntregue.textContent = statusCounts['entregue'] || 0;
+    dashStatusCancelado.textContent = statusCounts['cancelado'] || 0;
+
+    dashPrizeTosa.textContent = prizeCounts['Tosa Higiênica'] || 0;
+    dashPrizeHidratacao.textContent = prizeCounts['Hidratação'] || 0;
+    dashPrizeFotoVideo.textContent = prizeCounts['Foto e Vídeo Profissional'] || 0;
+    dashPrizePatinhas.textContent = prizeCounts['Patinhas impecáveis'] || 0;
+
+    // 7) Atualiza gráficos
+    renderCharts(bookings);
+  }
+
+  let statusChart = null;
+  let prizeChart = null;
+
+  function renderCharts(bookings) {
+    const statusCounts = {
+      agendado: 0,
+      confirmado: 0,
+      recebido: 0,
+      'em serviço': 0,
+      concluido: 0,
+      concluído: 0,
+      entregue: 0,
+      cancelado: 0
+    };
+
+    const prizeCounts = {
+      'Tosa Higiênica': 0,
+      'Hidratação': 0,
+      'Foto e Vídeo Profissional': 0,
+      'Patinhas impecáveis': 0
+    };
+
+    bookings.forEach(b => {
+      const s = (b.status || '').toLowerCase();
+      if (statusCounts.hasOwnProperty(s)) statusCounts[s]++;
+
+      const p = b.prize || null;
+      if (prizeCounts[p] != null) prizeCounts[p]++;
+    });
+
+    const ctxStatusEl = document.getElementById('chartStatus');
+    const ctxPrizesEl = document.getElementById('chartPrizes');
+    if (!ctxStatusEl || !ctxPrizesEl) return;
+
+    const ctxStatus = ctxStatusEl.getContext('2d');
+    const ctxPrizes = ctxPrizesEl.getContext('2d');
+
+    if (statusChart) statusChart.destroy();
+    if (prizeChart) prizeChart.destroy();
+
+    statusChart = new Chart(ctxStatus, {
+      type: 'bar',
+      data: {
+        labels: ['Agendado','Confirmado','Recebido','Em serviço','Concluído','Entregue','Cancelado'],
+        datasets: [{
+          label: 'Agendamentos',
+          data: [
+            statusCounts['agendado'],
+            statusCounts['confirmado'],
+            statusCounts['recebido'],
+            statusCounts['em serviço'],
+            statusCounts['concluido'] + statusCounts['concluído'],
+            statusCounts['entregue'],
+            statusCounts['cancelado']
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, precision: 0 }
+        }
+      }
+    });
+
+    prizeChart = new Chart(ctxPrizes, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(prizeCounts),
+        datasets: [{
+          data: Object.values(prizeCounts)
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+  }
+
+  async function loadPetsForCustomer(customerId) {
+    const data = await apiGet('/api/pets', { customer_id: customerId });
+    const pets = (data.pets || []);
+    formPetSelect.innerHTML = '<option value="">Selecione o pet...</option>';
+    pets.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.breed ? `${p.name} (${p.breed})` : p.name;
+      formPetSelect.appendChild(opt);
+    });
+    return pets;
+  }
+
+  function preencherFormEdicao(booking) {
+    bookingId.value = booking.id;
+    bookingOriginalStatus.value = booking.status || 'agendado';
+
+    formPhone.value = booking.phone || '';
+    formNome.value = booking.customer_name || '';
+    formPrize.value = booking.prize || 'Tosa Higiênica';
+    formService.value = booking.service || '';
+    formDate.value = booking.date || '';
+    formTime.value = booking.time || '';
+    formStatus.value = booking.status || 'agendado';
+    formNotes.value = booking.notes || '';
+    formError.style.display = 'none';
+
+    formPetSelect.innerHTML = '<option value="">Selecione o pet...</option>';
+
+    setEditMode(true);
+
+    const customerId = booking.customer_id || booking.customerId;
+    const bookingPetId = booking.pet_id || booking.petId;
+    const bookingPetName = booking.pet_name || booking.petName;
+
+    if (customerId) {
+      loadPetsForCustomer(customerId)
+        .then(() => {
+          let selected = false;
+
+          if (bookingPetId != null) {
+            formPetSelect.value = String(bookingPetId);
+            if (formPetSelect.value === String(bookingPetId)) {
+              selected = true;
+            }
+          }
+
+          if (!selected && bookingPetName) {
+            const nomeLower = bookingPetName.toLowerCase();
+            for (const opt of formPetSelect.options) {
+              if (opt.textContent.toLowerCase().startsWith(nomeLower)) {
+                formPetSelect.value = opt.value;
+                selected = true;
+                break;
+              }
+            }
+          }
+
+          if (!selected && bookingPetName) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = bookingPetName;
+            formPetSelect.appendChild(opt);
+            formPetSelect.value = '';
+          }
+        })
+        .catch(() => {
+          if (bookingPetName) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = bookingPetName;
+            formPetSelect.appendChild(opt);
+            formPetSelect.value = '';
+          }
+        });
+    } else if (bookingPetName) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = bookingPetName;
+      formPetSelect.appendChild(opt);
+      formPetSelect.value = '';
+    }
+
+    mostrarFormAgenda();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function renderTabela() {
+    try {
+      const lista = await fetchBookings();
+      ultimaLista = lista;
+
+      tbodyAgenda.innerHTML = '';
+      if (!lista.length) {
+        estadoVazio.style.display = 'block';
+      } else {
+        estadoVazio.style.display = 'none';
+      }
+
+      lista.forEach(a => {
+        const tr = document.createElement('tr');
+
+        const tdData = document.createElement('td');
+        tdData.textContent = formatDataBr(a.date);
+
+        const tdHora = document.createElement('td');
+        tdHora.textContent = a.time || '-';
+
+        const tdTutor = document.createElement('td');
+        tdTutor.textContent = a.customer_name || '-';
+
+        const tdPet = document.createElement('td');
+        tdPet.textContent = a.pet_name || '-';
+
+        const tdTel = document.createElement('td');
+        tdTel.textContent = formatTelefone(a.phone);
+
+        const tdServ = document.createElement('td');
+        tdServ.textContent = a.service || '-';
+
+        const tdMimo = document.createElement('td');
+        tdMimo.textContent = a.prize || '-';
+        tdMimo.className = 'td-mimo';
+
+        const tdStatus = document.createElement('td');
+        const spanStatus = document.createElement('span');
+        const labelStatus = (a.status || 'agendado');
+        spanStatus.textContent = labelStatus;
+        spanStatus.className = 'td-status ' + classStatus(labelStatus);
+        tdStatus.appendChild(spanStatus);
+
+        const tdNotif = document.createElement('td');
+        tdNotif.textContent = a.last_notification_at
+          ? formatDateTimeBr(a.last_notification_at)
+          : '-';
+
+        const tdObs = document.createElement('td');
+        tdObs.textContent = a.notes || '';
+        tdObs.className = 'td-obs';
+
+        const tdAcoes = document.createElement('td');
+        const divActions = document.createElement('div');
+        divActions.className = 'actions';
+
+        const btnEditar = document.createElement('button');
+        btnEditar.textContent = 'Editar';
+        btnEditar.className = 'btn btn-small btn-secondary';
+        btnEditar.addEventListener('click', () => preencherFormEdicao(a));
+
+        const btnExcluir = document.createElement('button');
+        btnExcluir.textContent = 'Excluir';
+        btnExcluir.className = 'btn btn-small btn-danger';
+        btnExcluir.addEventListener('click', async () => {
+          if (!confirm('Deseja realmente excluir este agendamento?')) return;
+          try {
+            await apiDelete('/api/bookings/' + a.id);
+            await renderTabela();
+            await loadDashboard();
+          } catch (e) {
+            alert(e.message);
+          }
+        });
+
+        divActions.appendChild(btnEditar);
+        divActions.appendChild(btnExcluir);
+        tdAcoes.appendChild(divActions);
+
+        tr.appendChild(tdData);
+        tr.appendChild(tdHora);
+        tr.appendChild(tdTutor);
+        tr.appendChild(tdPet);
+        tr.appendChild(tdTel);
+        tr.appendChild(tdServ);
+        tr.appendChild(tdMimo);
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdNotif);
+        tr.appendChild(tdObs);
+        tr.appendChild(tdAcoes);
+
+        tbodyAgenda.appendChild(tr);
+      });
+
+      atualizaEstatisticas(lista);
+    } catch (e) {
+      tbodyAgenda.innerHTML = '';
+      estadoVazio.style.display = 'block';
+      estadoVazio.textContent = 'Erro ao carregar agendamentos: ' + e.message;
+      statTotal.textContent = '0';
+      statTosa.textContent = '0';
+      statHidratacao.textContent = '0';
+      statFotoVideo.textContent = '0';
+      statPatinhas.textContent = '0';
+    }
+  }
+
+  function limparForm() {
+    bookingId.value = '';
+    bookingOriginalStatus.value = 'agendado';
+    formPhone.value = '';
+    formNome.value = '';
+    formPetSelect.innerHTML = '<option value="">Selecione o pet...</option>';
+    formPrize.value = 'Tosa Higiênica';
+    formService.value = '';
+    formDate.value = '';
+    formTime.value = '';
+    formStatus.value = 'agendado';
+    formNotes.value = '';
+    formError.style.display = 'none';
+    formError.textContent = '';
+
+    setEditMode(false);
+  }
+
+  async function salvarAgendamento() {
+    formError.style.display = 'none';
+    formError.textContent = '';
+
+    const id = bookingId.value || null;
+    const originalStatus = bookingOriginalStatus.value || 'agendado';
+
+    const rawPhone = formPhone.value.trim();
+    const phone = sanitizePhone(rawPhone);
+    const nome = formNome.value.trim();
+    const petId = formPetSelect.value;
+    const prize = formPrize.value;
+    const service = formService.value;
+    const date = formDate.value;
+    const time = formTime.value;
+    const status = formStatus.value;
+    const notes = formNotes.value.trim();
+
+    if (!date || !time || !prize || !service) {
+      formError.textContent = 'Data, horário, serviço e mimo são obrigatórios.';
+      formError.style.display = 'block';
+      return;
+    }
+
+    if (!phone || phone.length < 10 || !nome) {
+      formError.textContent = 'Preencha telefone (com DDD) e nome do tutor.';
+      formError.style.display = 'block';
+      return;
+    }
+
+    try {
+      // garante cliente
+      let customer;
+      try {
+        const lookup = await apiPost('/api/customers/lookup', { phone });
+        if (lookup.exists && lookup.customer) {
+          customer = lookup.customer;
+        }
+      } catch (_) {}
+
+      if (!customer) {
+        const cRes = await apiPost('/api/customers', {
+          phone,
+          name: nome
+        });
+        customer = cRes.customer;
+      }
+
+      let petIdNum = petId ? parseInt(petId, 10) : null;
+
+      const body = {
+        customer_id: customer.id,
+        pet_id: petIdNum,
+        date,
+        time,
+        service,
+        prize,
+        notes,
+        status
+      };
+
+      let precisaWhats = false;
+      let urlWhats = null;
+
+      if (id && status !== originalStatus) {
+        const dataBR = formatDataBr(date);
+        const petLabel = formPetSelect.options[formPetSelect.selectedIndex]
+          ? formPetSelect.options[formPetSelect.selectedIndex].textContent
+          : 'seu pet';
+
+        const msg = buildStatusMessage(
+          status,
+          nome,
+          petLabel,
+          service,
+          dataBR,
+          time,
+          prize
+        );
+
+        let fullPhone = phone;
+        if (!(fullPhone.startsWith('55') && fullPhone.length > 11)) {
+          fullPhone = '55' + fullPhone;
+        }
+
+        urlWhats = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
+        precisaWhats = true;
+
+        body.last_notification_at = new Date().toISOString();
+      }
+
+      if (!id) {
+        await apiPost('/api/bookings', body);
+      } else {
+        await apiPut('/api/bookings/' + id, body);
+      }
+
+      if (precisaWhats && urlWhats) {
+        window.open(urlWhats, '_blank');
+      }
+
+      limparForm();
+      esconderFormAgenda();
+      await renderTabela();
+      await loadDashboard();
+    } catch (e) {
+      formError.textContent = e.message;
+      formError.style.display = 'block';
+    }
+  }
+
+  function exportarCSV() {
+    if (!ultimaLista.length) {
+      alert('Não há agendamentos para exportar no filtro atual.');
+      return;
+    }
+
+    const linhas = [];
+    linhas.push([
+      'ID',
+      'Data',
+      'Hora',
+      'Tutor',
+      'Pet',
+      'Telefone',
+      'Serviço',
+      'Mimo',
+      'Status',
+      'Última Notificação',
+      'Observações'
+    ].join(';'));
+
+    ultimaLista.forEach(a => {
+      const cols = [
+        a.id,
+        formatDataBr(a.date),
+        a.time || '',
+        (a.customer_name || '').replace(/;/g, ','),
+        (a.pet_name || '').replace(/;/g, ','),
+        formatTelefone(a.phone),
+        (a.service || '').replace(/;/g, ','),
+        (a.prize || '').replace(/;/g, ','),
+        (a.status || 'agendado'),
+        a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '',
+        (a.notes || '').replace(/[\r\n]+/g, ' ').replace(/;/g, ',')
+      ];
+      linhas.push(cols.join(';'));
+    });
+
+    const csv = linhas.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+
+    a.download = `agenda_petfunny_${ano}-${mes}-${dia}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  filtroData.addEventListener('change', async () => {
+    await renderTabela();
+    await loadDashboard();
+  });
+
+  filtroBusca.addEventListener('input', () => {
+    clearTimeout(window.__filtroTimer);
+    window.__filtroTimer = setTimeout(async () => {
+      await renderTabela();
+      await loadDashboard();
+    }, 150);
+  });
+
+  btnHoje.addEventListener('click', async () => {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    filtroData.value = `${ano}-${mes}-${dia}`;
+    await renderTabela();
+    await loadDashboard();
+  });
+
+  btnLimparFiltro.addEventListener('click', async () => {
+    filtroData.value = '';
+    filtroBusca.value = '';
+    await renderTabela();
+    await loadDashboard();
+  });
+
+  btnExportarCSV.addEventListener('click', exportarCSV);
+  btnSalvar.addEventListener('click', salvarAgendamento);
+  btnCancelarEdicao.addEventListener('click', () => {
+    limparForm();
+    esconderFormAgenda();
+  });
+
+  if (dashPeriod) {
+    dashPeriod.addEventListener('change', () => {
+      const val = dashPeriod.value;
+      if (val === 'custom') {
+        dashCustomRange.classList.remove('hidden');
+      } else {
+        dashCustomRange.classList.add('hidden');
+        loadDashboard();
+      }
+    });
+  }
+
+  if (dashApply) {
+    dashApply.addEventListener('click', (e) => {
+      e.preventDefault();
+      loadDashboard();
+    });
+  }
+
+  btnNovoAgendamento.addEventListener('click', () => {
+    limparForm();
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    formDate.value = `${ano}-${mes}-${dia}`;
+    mostrarFormAgenda();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  formPhone.addEventListener('input', () => {
+    applyPhoneMask(formPhone);
+  });
+
+  formPhone.addEventListener('blur', async () => {
+    const phoneDigits = sanitizePhone(formPhone.value.trim());
+    if (!phoneDigits) return;
+    try {
+      const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
+      if (lookup.exists && lookup.customer) {
+        formNome.value = lookup.customer.name || '';
+        await loadPetsForCustomer(lookup.customer.id);
+      }
+    } catch (_) {}
+  });
+
+  // ===== CLIENTES & PETS =====
+  const cliPhone = document.getElementById('cliPhone');
+  const cliName = document.getElementById('cliName');
+  const cliError = document.getElementById('cliError');
+  const btnCliLimpar = document.getElementById('btnCliLimpar');
+  const btnCliSalvar = document.getElementById('btnCliSalvar');
+  const tbodyClientes = document.getElementById('tbodyClientes');
+
+  const clienteFormBlock = document.getElementById('clienteFormBlock');
+  const btnNovoCliente = document.getElementById('btnNovoCliente');
+
+  const petName = document.getElementById('petName');
+  const petBreed = document.getElementById('petBreed');
+  const petInfo = document.getElementById('petInfo');
+  const petError = document.getElementById('petError');
+  const btnPetLimpar = document.getElementById('btnPetLimpar');
+  const btnPetSalvar = document.getElementById('btnPetSalvar');
+  const btnNovoPet = document.getElementById('btnNovoPet');
+  const tbodyPets = document.getElementById('tbodyPets');
+  const badgeClienteSelecionado = document.getElementById('badgeClienteSelecionado');
+  const petsCard = document.getElementById('petsCard');
+
+  const racas = [
+    'SRD (Sem Raça Definida)',
+    'Poodle',
+    'Shih Tzu',
+    'Lhasa Apso',
+    'Labrador Retriever',
+    'Golden Retriever',
+    'Yorkshire Terrier',
+    'Bulldog Francês',
+    'Bulldog Inglês',
+    'Spitz Alemão (Lulu da Pomerânia)',
+    'Beagle',
+    'Border Collie',
+    'Boxer',
+    'Dachshund (Salsicha)',
+    'Maltês',
+    'Pinscher',
+    'Pastor Alemão',
+    'Rottweiler',
+    'Pitbull',
+    'Pug',
+    'Cocker Spaniel',
+    'Schnauzer',
+    'Husky Siberiano',
+    'Akita',
+    'Chihuahua',
+    'Outro (informar nas observações)'
+  ];
+
+  cliPhone.addEventListener('input', () => {
+    applyPhoneMask(cliPhone);
+  });
+
+  racas.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r;
+    opt.textContent = r;
+    petBreed.appendChild(opt);
+  });
+
+  async function loadClientes() {
+    const data = await apiGet('/api/customers');
+    clientesCache = data.customers || [];
+    renderClientes();
+  }
+
+  function renderClientes() {
+    tbodyClientes.innerHTML = '';
+    clientesCache.forEach(c => {
+      const tr = document.createElement('tr');
+      const tdId = document.createElement('td');
+      const tdNome = document.createElement('td');
+      const tdTel = document.createElement('td');
+      const tdPetsCount = document.createElement('td');
+      const tdAcoes = document.createElement('td');
+
+      tdId.textContent = c.id;
+      tdNome.textContent = c.name || '-';
+      tdTel.textContent = formatTelefone(c.phone);
+      tdPetsCount.innerHTML = c.pets_count
+        ? `<span class="badge-mini">${c.pets_count} pet(s)</span>`
+        : '-';
+
+      const divActions = document.createElement('div');
+      divActions.className = 'actions';
+
+      const btnSel = document.createElement('button');
+      btnSel.textContent = 'Selecionar';
+      btnSel.className = 'btn btn-small btn-secondary';
+      btnSel.addEventListener('click', async () => {
+        clienteSelecionadoId = c.id;
+
+        badgeClienteSelecionado.classList.remove('hidden');
+        clienteFormBlock.classList.remove('hidden');
+
+        petsCard.classList.remove('hidden');
+
+        cliPhone.value = formatTelefone(c.phone);
+        cliName.value = c.name || '';
+
+        limparPetsForm();
+        await loadPetsForClienteTab(c.id);
+      });
+
+      const btnDel = document.createElement('button');
+      btnDel.textContent = 'Excluir';
+      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.addEventListener('click', async () => {
+        if (!confirm('Excluir este cliente? (Os pets relacionados também poderão ser afetados)')) return;
+        try {
+          await apiDelete('/api/customers/' + c.id);
+          if (clienteSelecionadoId === c.id) {
+            clienteSelecionadoId = null;
+            badgeClienteSelecionado.classList.add('hidden');
+            petsCard.classList.add('hidden');
+            limparClienteForm();
+            limparPetsForm();
+            tbodyPets.innerHTML = '';
+          }
+          await loadClientes();
+          await loadDashboard();
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+
+      divActions.appendChild(btnSel);
+      divActions.appendChild(btnDel);
+      tdAcoes.appendChild(divActions);
+
+      tr.appendChild(tdId);
+      tr.appendChild(tdNome);
+      tr.appendChild(tdTel);
+      tr.appendChild(tdPetsCount);
+      tr.appendChild(tdAcoes);
+
+      tbodyClientes.appendChild(tr);
+    });
+  }
+
+  function limparClienteForm() {
+    cliPhone.value = '';
+    cliName.value = '';
+    cliError.style.display = 'none';
+
+    clienteSelecionadoId = null;
+    badgeClienteSelecionado.classList.add('hidden');
+
+    clienteFormBlock.classList.add('hidden');
+    petsCard.classList.add('hidden');
+
+    tbodyPets.innerHTML = '';
+    limparPetsForm();
+  }
+
+  async function salvarCliente() {
+    cliError.style.display = 'none';
+    const phoneDigits = sanitizePhone(cliPhone.value.trim());
+    const name = cliName.value.trim();
+
+    if (!phoneDigits || phoneDigits.length < 10 || !name) {
+      cliError.textContent = 'Preencha telefone (com DDD) e nome do tutor.';
+      cliError.style.display = 'block';
+      return;
+    }
+
+    try {
+      const data = await apiPost('/api/customers', {
+        phone: phoneDigits,
+        name
+      });
+      clienteSelecionadoId = data.customer.id;
+      badgeClienteSelecionado.classList.remove('hidden');
+      petsCard.classList.remove('hidden');
+      await loadClientes();
+      await loadPetsForClienteTab(clienteSelecionadoId);
+      await loadDashboard();
+    } catch (e) {
+      cliError.textContent = e.message;
+      cliError.style.display = 'block';
+    }
+  }
+
+  async function loadPetsForClienteTab(customerId) {
+    const data = await apiGet('/api/pets', { customer_id: customerId });
+    petsCache = data.pets || [];
+    renderPets();
+  }
+
+  function renderPets() {
+    tbodyPets.innerHTML = '';
+    petsCache.forEach(p => {
+      const tr = document.createElement('tr');
+      const tdId = document.createElement('td');
+      const tdNome = document.createElement('td');
+      const tdRaca = document.createElement('td');
+      const tdInfo = document.createElement('td');
+      const tdAcoes = document.createElement('td');
+
+      tdId.textContent = p.id;
+      tdNome.textContent = p.name;
+      tdRaca.textContent = p.breed || '-';
+      tdInfo.textContent = p.info || '-';
+
+      const divActions = document.createElement('div');
+      divActions.className = 'actions';
+
+      const btnEdit = document.createElement('button');
+      btnEdit.textContent = 'Editar';
+      btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.addEventListener('click', () => {
+        petEditIdLocal = p.id;
+        petName.value = p.name;
+        petBreed.value = p.breed || 'SRD (Sem Raça Definida)';
+        petInfo.value = p.info || '';
+      });
+
+      const btnDel = document.createElement('button');
+      btnDel.textContent = 'Excluir';
+      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.addEventListener('click', async () => {
+        if (!confirm('Excluir este pet?')) return;
+        try {
+          await apiDelete('/api/pets/' + p.id);
+          await loadPetsForClienteTab(clienteSelecionadoId);
+          await loadClientes();
+          await loadDashboard();
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+
+      divActions.appendChild(btnEdit);
+      divActions.appendChild(btnDel);
+      tdAcoes.appendChild(divActions);
+
+      tr.appendChild(tdId);
+      tr.appendChild(tdNome);
+      tr.appendChild(tdRaca);
+      tr.appendChild(tdInfo);
+      tr.appendChild(tdAcoes);
+
+      tbodyPets.appendChild(tr);
+    });
+  }
+
+  function limparPetsForm() {
+    petEditIdLocal = null;
+    petName.value = '';
+    petBreed.value = 'SRD (Sem Raça Definida)';
+    petInfo.value = '';
+    petError.style.display = 'none';
+  }
+
+  async function salvarPet() {
+    petError.style.display = 'none';
+    if (!clienteSelecionadoId) {
+      petError.textContent = 'Selecione um cliente na lista ao lado antes de cadastrar o pet.';
+      petError.style.display = 'block';
+      return;
+    }
+
+    const name = petName.value.trim();
+    const breed = petBreed.value;
+    const info = petInfo.value.trim();
+
+    if (!name || !breed) {
+      petError.textContent = 'Informe nome e raça do pet.';
+      petError.style.display = 'block';
+      return;
+    }
+
+    try {
+      if (!petEditIdLocal) {
+        await apiPost('/api/pets', {
+          customer_id: clienteSelecionadoId,
+          name,
+          breed,
+          info
+        });
+      } else {
+        await apiPut('/api/pets/' + petEditIdLocal, {
+          name,
+          breed,
+          info
+        });
+      }
+      limparPetsForm();
+      await loadPetsForClienteTab(clienteSelecionadoId);
+      await loadClientes();
+      await loadDashboard();
+    } catch (e) {
+      petError.textContent = e.message;
+      petError.style.display = 'block';
+    }
+  }
+
+  btnCliLimpar.addEventListener('click', limparClienteForm);
+  btnCliSalvar.addEventListener('click', salvarCliente);
+
+  btnPetLimpar.addEventListener('click', limparPetsForm);
+  btnPetSalvar.addEventListener('click', salvarPet);
+
+  btnNovoPet.addEventListener('click', () => {
+    limparPetsForm();
+  });
+
+  btnNovoCliente.addEventListener('click', () => {
+    clienteSelecionadoId = null;
+    badgeClienteSelecionado.classList.add('hidden');
+
+    cliPhone.value = '';
+    cliName.value = '';
+    cliError.style.display = 'none';
+    clienteFormBlock.classList.remove('hidden');
+
+    petsCard.classList.add('hidden');
+    tbodyPets.innerHTML = '';
+    limparPetsForm();
+  });
+
+  // Inicialização com tentativa de auto-login
+  tryAutoLogin();
+</script>
+</body>
+</html>
