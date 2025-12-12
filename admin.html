@@ -14,15 +14,10 @@
       --branco: #ffffff;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-      Roboto, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: radial-gradient(circle at top, #ffffff 0, #f4f7f8 40%, #e9f5f6 100%);
       color: var(--escuro);
       min-height: 100vh;
@@ -30,27 +25,18 @@
       flex-direction: column;
     }
 
-    .hidden {
-      display: none !important;
-    }
+    .hidden { display: none !important; }
 
-    /* ============ HEADER GLOBAL (LOGO) ============ */
-
+    /* HEADER GLOBAL (LOGO) */
     .top-brand {
       width: 100%;
       display: flex;
       justify-content: center;
       padding: 12px 16px 6px;
     }
+    .top-brand img { max-width: 220px; height: auto; display: block; }
 
-    .top-brand img {
-      max-width: 220px;
-      height: auto;
-      display: block;
-    }
-
-    /* ============ LOGIN ============ */
-
+    /* LOGIN */
     #loginScreen {
       flex: 1;
       display: flex;
@@ -58,7 +44,6 @@
       justify-content: center;
       padding: 20px 16px 16px;
     }
-
     .login-card {
       width: 100%;
       max-width: 400px;
@@ -67,31 +52,10 @@
       box-shadow: 0 18px 40px rgba(0,0,0,0.12);
       padding: 22px 20px 18px;
     }
-
-    .login-title {
-      font-size: 20px;
-      font-weight: 700;
-      margin-bottom: 4px;
-      color: #16363c;
-    }
-
-    .login-subtitle {
-      font-size: 13px;
-      color: #607d8b;
-      margin-bottom: 16px;
-    }
-
-    .login-field {
-      margin-bottom: 10px;
-    }
-
-    .login-label {
-      font-size: 12px;
-      font-weight: 500;
-      margin-bottom: 4px;
-      color: #455a64;
-    }
-
+    .login-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: #16363c; }
+    .login-subtitle { font-size: 13px; color: #607d8b; margin-bottom: 16px; }
+    .login-field { margin-bottom: 10px; }
+    .login-label { font-size: 12px; font-weight: 500; margin-bottom: 4px; color: #455a64; }
     .login-input {
       width: 100%;
       border-radius: 12px;
@@ -101,7 +65,6 @@
       transition: border-color 0.12s ease, box-shadow 0.12s ease;
       font-family: inherit;
     }
-
     .login-input:focus {
       outline: none;
       border-color: var(--turquesa);
@@ -127,12 +90,10 @@
       transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s;
       white-space: nowrap;
     }
-
     .btn:active {
       transform: translateY(1px) scale(0.98);
       box-shadow: 0 5px 12px rgba(0,0,0,0.18);
     }
-
     .btn-light {
       background: #edf3f4;
       color: #333;
@@ -140,12 +101,10 @@
       text-transform: none;
       letter-spacing: 0.04em;
     }
-
     .btn-danger {
       background: #c62828;
       box-shadow: 0 8px 16px rgba(198, 40, 40, 0.25);
     }
-
     .btn-secondary {
       background: #eceff1;
       color: #333;
@@ -153,32 +112,13 @@
       text-transform: none;
       letter-spacing: 0.04em;
     }
+    .btn-small { font-size: 10px; padding: 4px 8px; box-shadow: none; }
 
-    .btn-small {
-      font-size: 10px;
-      padding: 4px 8px;
-      box-shadow: none;
-    }
+    .login-footer-hint { font-size: 11px; color: #90a4ae; margin-top: 10px; }
+    .login-error { font-size: 12px; color: #c62828; margin-top: 6px; }
 
-    .login-footer-hint {
-      font-size: 11px;
-      color: #90a4ae;
-      margin-top: 10px;
-    }
-
-    .login-error {
-      font-size: 12px;
-      color: #c62828;
-      margin-top: 6px;
-    }
-
-    /* ============ ADMIN APP ============ */
-
-    #adminApp {
-      flex: 1;
-      display: none;
-      padding: 12px 16px 16px;
-    }
+    /* ADMIN APP */
+    #adminApp { flex: 1; display: none; padding: 12px 16px 16px; }
 
     .container {
       max-width: 1120px;
@@ -199,19 +139,13 @@
       margin-bottom: 10px;
     }
 
-    .logo-block {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
+    .logo-block { display: flex; flex-direction: column; gap: 2px; }
     .logo-title {
       font-family: "GoodDog Cool", "Comic Sans MS", system-ui, sans-serif;
       font-size: 28px;
       letter-spacing: 0.03em;
       color: var(--turquesa);
     }
-
     .logo-sub {
       font-size: 11px;
       text-transform: uppercase;
@@ -219,25 +153,10 @@
       color: #777;
     }
 
-    .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
+    .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .filters-group { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 
-    .filters-group {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-    }
-
-    input[type="date"],
-    input[type="text"],
-    input[type="time"],
-    select,
-    textarea {
+    input[type="date"], input[type="text"], input[type="time"], select, textarea {
       padding: 7px 9px;
       border-radius: 10px;
       border: 1px solid #d7dde0;
@@ -245,22 +164,13 @@
       min-width: 120px;
       font-family: inherit;
     }
-
-    input:focus,
-    select:focus,
-    textarea:focus {
+    input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--turquesa);
       box-shadow: 0 0 0 2px rgba(1, 173, 183, 0.18);
     }
 
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      margin: 8px 0 4px;
-      color: #444;
-    }
-
+    .section-title { font-size: 14px; font-weight: 600; margin: 8px 0 4px; color: #444; }
     .section-title-row {
       display: flex;
       align-items: center;
@@ -270,7 +180,6 @@
     }
 
     /* Tabs */
-
     .tabs {
       display: flex;
       gap: 8px;
@@ -278,7 +187,6 @@
       border-bottom: 1px solid #e1e7ea;
       padding-bottom: 4px;
     }
-
     .tab-btn {
       border: none;
       background: transparent;
@@ -291,20 +199,13 @@
       align-items: center;
       gap: 6px;
     }
-
     .tab-btn.active {
       background: rgba(1,173,183,0.1);
       color: #015d63;
       font-weight: 600;
     }
-
-    .tab-view {
-      display: none;
-    }
-
-    .tab-view.active {
-      display: block;
-    }
+    .tab-view { display: none; }
+    .tab-view.active { display: block; }
 
     .form-panel {
       margin-top: 8px;
@@ -314,59 +215,16 @@
       padding: 10px 12px;
       border: 1px solid #e0edf0;
     }
+    .form-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+    .form-row-2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+    .form-group { display: flex; flex-direction: column; gap: 3px; }
+    label { font-size: 12px; font-weight: 500; color: #555; }
+    textarea { min-height: 48px; resize: vertical; }
 
-    .form-row {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 8px;
-    }
+    .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+    .error-msg { font-size: 12px; color: #c62828; margin-top: 4px; }
 
-    .form-row-2 {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    label {
-      font-size: 12px;
-      font-weight: 500;
-      color: #555;
-    }
-
-    textarea {
-      min-height: 48px;
-      resize: vertical;
-    }
-
-    .form-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 4px;
-    }
-
-    .error-msg {
-      font-size: 12px;
-      color: #c62828;
-      margin-top: 4px;
-    }
-
-    .stats {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin: 12px 0 8px;
-      font-size: 12px;
-    }
-
+    .stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; font-size: 12px; }
     .stats-item {
       background: #f7fbfc;
       border-radius: 14px;
@@ -375,15 +233,8 @@
       align-items: center;
       gap: 6px;
     }
-
-    .stats-label {
-      color: #555;
-    }
-
-    .stats-value {
-      font-weight: 700;
-      color: var(--turquesa);
-    }
+    .stats-label { color: #555; }
+    .stats-value { font-weight: 700; color: var(--turquesa); }
 
     .table-wrapper {
       margin-top: 10px;
@@ -392,49 +243,16 @@
       overflow: hidden;
       background: #fdfefe;
     }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead { background: #f2f7f8; }
+    th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid #ecf1f3; }
+    th { font-weight: 600; color: #555; white-space: nowrap; }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
+    tbody tr:nth-child(even) { background: #fafdfd; }
+    tbody tr:hover { background: #eef7f8; }
 
-    thead {
-      background: #f2f7f8;
-    }
-
-    th,
-    td {
-      padding: 7px 8px;
-      text-align: left;
-      border-bottom: 1px solid #ecf1f3;
-    }
-
-    th {
-      font-weight: 600;
-      color: #555;
-      white-space: nowrap;
-    }
-
-    tbody tr:nth-child(even) {
-      background: #fafdfd;
-    }
-
-    tbody tr:hover {
-      background: #eef7f8;
-    }
-
-    .td-mimo {
-      font-weight: 600;
-      color: var(--turquesa);
-    }
-
-    .td-obs {
-      max-width: 220px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+    .td-mimo { font-weight: 600; color: var(--turquesa); }
+    .td-obs { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .td-status {
       font-weight: 600;
@@ -454,18 +272,8 @@
     .status-entregue { background: #e0f7fa; color: #006064; }
     .status-cancelado { background: #ffebee; color: #c62828; }
 
-    .actions {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .empty {
-      padding: 18px;
-      text-align: center;
-      font-size: 13px;
-      color: #777;
-    }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .empty { padding: 18px; text-align: center; font-size: 13px; color: #777; }
 
     .footer {
       margin-top: 12px;
@@ -477,20 +285,13 @@
       gap: 8px;
     }
 
-    .two-cols {
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 12px;
-      margin-top: 8px;
-    }
-
+    .two-cols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; margin-top: 8px; }
     .subcard {
       background: #f7fbfc;
       border-radius: 16px;
       padding: 10px 10px 12px;
       border: 1px solid #e1e8eb;
     }
-
     .subcard-title {
       font-size: 13px;
       font-weight: 600;
@@ -511,10 +312,7 @@
       max-height: 260px;
       overflow-y: auto;
     }
-
-    .subtable-wrapper table {
-      font-size: 11px;
-    }
+    .subtable-wrapper table { font-size: 11px; }
 
     .badge-mini {
       display: inline-flex;
@@ -528,51 +326,27 @@
       font-weight: 600;
       text-transform: uppercase;
     }
-
-    .badge-selected {
-      background: rgba(249,161,151,0.15);
-      color: #c04a36;
-    }
+    .badge-selected { background: rgba(249,161,151,0.15); color: #c04a36; }
 
     @media (max-width: 900px) {
-      .form-row {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .form-row-2 {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .two-cols {
-        grid-template-columns: 1fr;
-      }
+      .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .form-row-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .two-cols { grid-template-columns: 1fr; }
     }
-
     @media (max-width: 640px) {
-      .header {
-        align-items: flex-start;
-      }
-      .filters {
-        width: 100%;
-      }
-      .form-row,
-      .form-row-2 {
-        grid-template-columns: 1fr;
-      }
-      .table-wrapper {
-        overflow-x: auto;
-      }
-      .container {
-        padding: 16px 14px 18px;
-      }
+      .header { align-items: flex-start; }
+      .filters { width: 100%; }
+      .form-row, .form-row-2 { grid-template-columns: 1fr; }
+      .table-wrapper { overflow-x: auto; }
+      .container { padding: 16px 14px 18px; }
     }
 
-    /* ============ RODAPÉ GLOBAL (MESMO DA ROLETA) ============ */
-
+    /* RODAPÉ GLOBAL */
     .site-footer {
       border-top: 1px solid #dde5e8;
       padding: 12px 16px 16px;
       background: transparent;
     }
-
     .footer-inner {
       max-width: 1120px;
       margin: 0 auto;
@@ -580,7 +354,6 @@
       flex-direction: column;
       gap: 8px;
     }
-
     .footer-top {
       display: flex;
       align-items: center;
@@ -588,12 +361,7 @@
       gap: 12px;
       flex-wrap: wrap;
     }
-
-    .footer-logo {
-      max-width: 140px;
-      height: auto;
-    }
-
+    .footer-logo { max-width: 140px; height: auto; }
     .footer-info {
       font-size: 12px;
       color: #455a64;
@@ -601,28 +369,16 @@
       flex-direction: column;
       gap: 2px;
     }
-
-    .footer-info strong {
-      font-size: 13px;
-      color: #263238;
-    }
-
-    .footer-bottom {
-      font-size: 11px;
-      color: #78909c;
-      text-align: center;
-      margin-top: 4px;
-    }
+    .footer-info strong { font-size: 13px; color: #263238; }
+    .footer-bottom { font-size: 11px; color: #78909c; text-align: center; margin-top: 4px; }
   </style>
 </head>
 <body>
 
-<!-- LOGO PET FUNNY NO TOPO -->
 <header class="top-brand">
   <img src="pet-funny-logo.svg" alt="Pet Funny" />
 </header>
 
-<!-- TELA DE LOGIN -->
 <section id="loginScreen">
   <div class="login-card">
     <div class="login-title">Área Administrativa – Pet Funny</div>
@@ -632,22 +388,12 @@
 
     <div class="login-field">
       <div class="login-label">Usuário</div>
-      <input
-        type="text"
-        id="loginUser"
-        class="login-input"
-        placeholder="adminpetfunny"
-      />
+      <input type="text" id="loginUser" class="login-input" placeholder="adminpetfunny" />
     </div>
 
     <div class="login-field">
       <div class="login-label">Senha</div>
-      <input
-        type="password"
-        id="loginPass"
-        class="login-input"
-        placeholder="••••••••"
-      />
+      <input type="password" id="loginPass" class="login-input" placeholder="••••••••" />
     </div>
 
     <button id="btnLogin" class="btn" style="margin-top: 8px;">
@@ -664,10 +410,8 @@
   </div>
 </section>
 
-<!-- ADMIN APP (SÓ APARECE APÓS LOGIN) -->
 <div id="adminApp">
   <div class="container">
-    <!-- TOPO DO PAINEL -->
     <div class="header">
       <div class="logo-block">
         <div class="logo-title">Pet Funny</div>
@@ -687,41 +431,25 @@
           <input type="text" id="filtroBusca" placeholder="Nome, pet ou telefone" />
         </div>
 
-        <button class="btn btn-light" id="btnExportarCSV">
-          Exportar CSV
-        </button>
+        <button class="btn btn-light" id="btnExportarCSV">Exportar CSV</button>
 
-        <!-- NOVO: BOTÃO SAIR -->
-        <button class="btn btn-danger btn-small" id="btnLogout">
-          Sair
-        </button>
+        <button class="btn btn-danger btn-small" id="btnLogout">Sair</button>
       </div>
     </div>
 
-    <!-- TABS -->
     <div class="tabs">
-      <button class="tab-btn active" data-tab="tab-agenda">
-        <span>📅</span> Agenda &amp; Mimos
-      </button>
-      <button class="tab-btn" data-tab="tab-clientes">
-        <span>👤</span> Clientes &amp; Pets
-      </button>
-      <button class="tab-btn" data-tab="tab-dashboard">
-        <span>📊</span> Dashboard
-      </button>
+      <button class="tab-btn active" data-tab="tab-agenda"><span>📅</span> Agenda &amp; Mimos</button>
+      <button class="tab-btn" data-tab="tab-clientes"><span>👤</span> Clientes &amp; Pets</button>
+      <button class="tab-btn" data-tab="tab-dashboard"><span>📊</span> Dashboard</button>
     </div>
 
     <!-- TAB: AGENDA -->
     <section id="tab-agenda" class="tab-view active">
-
       <div class="section-title-row">
         <div class="section-title">Agendamentos do dia</div>
-        <button class="btn btn-light" id="btnNovoAgendamento">
-          + Novo agendamento
-        </button>
+        <button class="btn btn-light" id="btnNovoAgendamento">+ Novo agendamento</button>
       </div>
 
-      <!-- formulário começa escondido -->
       <div class="form-panel hidden" id="formPanel">
         <input type="hidden" id="bookingId" />
         <input type="hidden" id="bookingOriginalStatus" />
@@ -802,31 +530,14 @@
         </div>
       </div>
 
-      <!-- ESTATÍSTICAS -->
       <div class="stats">
-        <div class="stats-item">
-          <span class="stats-label">Total de agendamentos:</span>
-          <span class="stats-value" id="statTotal">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Tosa Higiênica:</span>
-          <span class="stats-value" id="statTosa">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Hidratação:</span>
-          <span class="stats-value" id="statHidratacao">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Foto/Vídeo:</span>
-          <span class="stats-value" id="statFotoVideo">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Patinhas impecáveis:</span>
-          <span class="stats-value" id="statPatinhas">0</span>
-        </div>
+        <div class="stats-item"><span class="stats-label">Total de agendamentos:</span> <span class="stats-value" id="statTotal">0</span></div>
+        <div class="stats-item"><span class="stats-label">Tosa Higiênica:</span> <span class="stats-value" id="statTosa">0</span></div>
+        <div class="stats-item"><span class="stats-label">Hidratação:</span> <span class="stats-value" id="statHidratacao">0</span></div>
+        <div class="stats-item"><span class="stats-label">Foto/Vídeo:</span> <span class="stats-value" id="statFotoVideo">0</span></div>
+        <div class="stats-item"><span class="stats-label">Patinhas impecáveis:</span> <span class="stats-value" id="statPatinhas">0</span></div>
       </div>
 
-      <!-- TABELA AGENDA -->
       <div class="table-wrapper">
         <table>
           <thead>
@@ -846,9 +557,7 @@
           </thead>
           <tbody id="tbodyAgenda"></tbody>
         </table>
-        <div id="estadoVazio" class="empty" style="display:none;">
-          Nenhum agendamento encontrado para o filtro atual.
-        </div>
+        <div id="estadoVazio" class="empty" style="display:none;">Nenhum agendamento encontrado para o filtro atual.</div>
       </div>
     </section>
 
@@ -860,15 +569,10 @@
         <div class="subcard">
           <div class="subcard-title">
             <span>Clientes</span>
-            <span id="badgeClienteSelecionado" class="badge-mini badge-selected hidden">
-              Cliente selecionado
-            </span>
-            <button class="btn btn-secondary btn-small" id="btnNovoCliente">
-              + Novo cliente
-            </button>
+            <span id="badgeClienteSelecionado" class="badge-mini badge-selected hidden">Cliente selecionado</span>
+            <button class="btn btn-secondary btn-small" id="btnNovoCliente">+ Novo cliente</button>
           </div>
 
-          <!-- FORM DE CLIENTE OCULTO POR PADRÃO -->
           <div id="clienteFormBlock" class="hidden">
             <div class="form-group">
               <label for="cliPhone">Telefone (WhatsApp)</label>
@@ -901,7 +605,7 @@
           </div>
         </div>
 
-        <!-- PETS DO CLIENTE SELECIONADO (começa oculto) -->
+        <!-- PETS DO CLIENTE SELECIONADO -->
         <div class="subcard hidden" id="petsCard">
           <div class="subcard-title">
             <span>Pets do cliente selecionado</span>
@@ -942,14 +646,12 @@
         </div>
       </div>
     </section>
-
     <!-- TAB: DASHBOARD -->
     <section id="tab-dashboard" class="tab-view">
       <div class="section-title-row">
         <div class="section-title">Dashboard de Indicadores</div>
       </div>
 
-      <!-- FILTROS DO DASHBOARD -->
       <div class="form-panel" id="dashboardFilters">
         <div class="form-row-2">
           <div class="form-group">
@@ -973,84 +675,36 @@
         </div>
       </div>
 
-      <!-- KPIs PRINCIPAIS -->
       <div class="stats">
-        <div class="stats-item">
-          <span class="stats-label">Agendamentos no período:</span>
-          <span class="stats-value" id="dashTotalBookings">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Clientes únicos no período:</span>
-          <span class="stats-value" id="dashUniqueCustomers">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Total de clientes cadastrados:</span>
-          <span class="stats-value" id="dashTotalCustomers">0</span>
-        </div>
+        <div class="stats-item"><span class="stats-label">Agendamentos no período:</span> <span class="stats-value" id="dashTotalBookings">0</span></div>
+        <div class="stats-item"><span class="stats-label">Clientes únicos no período:</span> <span class="stats-value" id="dashUniqueCustomers">0</span></div>
+        <div class="stats-item"><span class="stats-label">Total de clientes cadastrados:</span> <span class="stats-value" id="dashTotalCustomers">0</span></div>
       </div>
 
-      <!-- STATUS DOS AGENDAMENTOS -->
       <div class="section-title" style="margin-top:12px;">Status dos agendamentos</div>
       <div class="stats">
-        <div class="stats-item">
-          <span class="stats-label">Agendado:</span>
-          <span class="stats-value" id="dashStatusAgendado">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Confirmado:</span>
-          <span class="stats-value" id="dashStatusConfirmado">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Recebido:</span>
-          <span class="stats-value" id="dashStatusRecebido">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Em serviço:</span>
-          <span class="stats-value" id="dashStatusEmServico">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Concluído:</span>
-          <span class="stats-value" id="dashStatusConcluido">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Entregue:</span>
-          <span class="stats-value" id="dashStatusEntregue">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Cancelado:</span>
-          <span class="stats-value" id="dashStatusCancelado">0</span>
-        </div>
+        <div class="stats-item"><span class="stats-label">Agendado:</span> <span class="stats-value" id="dashStatusAgendado">0</span></div>
+        <div class="stats-item"><span class="stats-label">Confirmado:</span> <span class="stats-value" id="dashStatusConfirmado">0</span></div>
+        <div class="stats-item"><span class="stats-label">Recebido:</span> <span class="stats-value" id="dashStatusRecebido">0</span></div>
+        <div class="stats-item"><span class="stats-label">Em serviço:</span> <span class="stats-value" id="dashStatusEmServico">0</span></div>
+        <div class="stats-item"><span class="stats-label">Concluído:</span> <span class="stats-value" id="dashStatusConcluido">0</span></div>
+        <div class="stats-item"><span class="stats-label">Entregue:</span> <span class="stats-value" id="dashStatusEntregue">0</span></div>
+        <div class="stats-item"><span class="stats-label">Cancelado:</span> <span class="stats-value" id="dashStatusCancelado">0</span></div>
       </div>
 
-      <!-- DISTRIBUIÇÃO DOS MIMOS -->
       <div class="section-title" style="margin-top:12px;">Mimos da Roleta no período</div>
       <div class="stats">
-        <div class="stats-item">
-          <span class="stats-label">Tosa Higiênica:</span>
-          <span class="stats-value" id="dashPrizeTosa">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Hidratação:</span>
-          <span class="stats-value" id="dashPrizeHidratacao">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Foto/Vídeo Profissional:</span>
-          <span class="stats-value" id="dashPrizeFotoVideo">0</span>
-        </div>
-        <div class="stats-item">
-          <span class="stats-label">Patinhas impecáveis:</span>
-          <span class="stats-value" id="dashPrizePatinhas">0</span>
-        </div>
+        <div class="stats-item"><span class="stats-label">Tosa Higiênica:</span> <span class="stats-value" id="dashPrizeTosa">0</span></div>
+        <div class="stats-item"><span class="stats-label">Hidratação:</span> <span class="stats-value" id="dashPrizeHidratacao">0</span></div>
+        <div class="stats-item"><span class="stats-label">Foto/Vídeo Profissional:</span> <span class="stats-value" id="dashPrizeFotoVideo">0</span></div>
+        <div class="stats-item"><span class="stats-label">Patinhas impecáveis:</span> <span class="stats-value" id="dashPrizePatinhas">0</span></div>
       </div>
 
-      <!-- GRÁFICOS -->
       <div class="section-title" style="margin-top:20px;">Visão Gráfica</div>
-
       <div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center;margin-top:10px;">
         <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
           <canvas id="chartStatus" style="max-width:460px;"></canvas>
         </div>
-
         <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
           <canvas id="chartPrizes" style="max-width:380px;"></canvas>
         </div>
@@ -1064,7 +718,6 @@
   </div>
 </div>
 
-<!-- RODAPÉ GLOBAL (MESMO DA ROLETA) -->
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-top">
@@ -1076,62 +729,48 @@
         <span>WhatsApp: (16) 98153-5338</span>
       </div>
     </div>
-    <div class="footer-bottom">
-      © 2024 Pet Funny • Roleta de Mimos. Todos os direitos reservados.
-    </div>
+    <div class="footer-bottom">© 2024 Pet Funny • Roleta de Mimos. Todos os direitos reservados.</div>
   </div>
 </footer>
 
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
   const API_BASE_URL = '';
 
+  /* ===== Helpers de normalização (corrige acentos/variações) ===== */
+  function normStr(s) {
+    return String(s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')   // remove acentos
+      .trim();
+  }
+
   /* ========= CONTROLE DE SESSÃO (30 MIN) ========= */
   const SESSION_KEY = 'pf_admin_session';
-  const SESSION_DURATION_MS = 30 * 60 * 1000; // 30 minutos
+  const SESSION_DURATION_MS = 30 * 60 * 1000;
   let sessionTimerId = null;
   let appInitialized = false;
 
   function setSession() {
     const expiresAt = Date.now() + SESSION_DURATION_MS;
-    const session = {
-      user: 'adminpetfunny',
-      expiresAt
-    };
-    try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    } catch (_) {}
+    const session = { user: 'adminpetfunny', expiresAt };
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (_) {}
   }
-
-  function clearSession() {
-    try {
-      localStorage.removeItem(SESSION_KEY);
-    } catch (_) {}
-  }
-
+  function clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch (_) {} }
   function getSession() {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
       if (!raw) return null;
       const data = JSON.parse(raw);
-      if (!data.expiresAt || Date.now() > data.expiresAt) {
-        clearSession();
-        return null;
-      }
+      if (!data.expiresAt || Date.now() > data.expiresAt) { clearSession(); return null; }
       return data;
-    } catch (_) {
-      clearSession();
-      return null;
-    }
+    } catch (_) { clearSession(); return null; }
   }
 
   function handleSessionExpired() {
-    if (sessionTimerId) {
-      clearInterval(sessionTimerId);
-      sessionTimerId = null;
-    }
+    if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
     clearSession();
     adminApp.style.display = 'none';
     loginScreen.classList.remove('hidden');
@@ -1139,23 +778,16 @@
   }
 
   function startSessionTimer() {
-    if (sessionTimerId) {
-      clearInterval(sessionTimerId);
-    }
+    if (sessionTimerId) clearInterval(sessionTimerId);
     sessionTimerId = setInterval(() => {
       const s = getSession();
-      if (!s) {
-        handleSessionExpired();
-      }
-    }, 30000); // verifica a cada 30s
+      if (!s) handleSessionExpired();
+    }, 30000);
   }
 
   async function initApp() {
     if (appInitialized) {
-      try {
-        await renderTabela();
-        await loadDashboard();
-      } catch (_) {}
+      try { await renderTabela(); await loadDashboard(); } catch (_) {}
       return;
     }
     appInitialized = true;
@@ -1163,9 +795,7 @@
       await renderTabela();
       await loadClientes();
       await loadDashboard();
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   }
 
   function enterAdminMode() {
@@ -1179,10 +809,7 @@
 
   function doLogout() {
     clearSession();
-    if (sessionTimerId) {
-      clearInterval(sessionTimerId);
-      sessionTimerId = null;
-    }
+    if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
     limparForm();
     limparClienteForm();
     adminApp.style.display = 'none';
@@ -1214,35 +841,25 @@
   btnLogin.addEventListener('click', () => {
     const u = loginUser.value.trim();
     const p = loginPass.value.trim();
-
-    if (u === 'adminpetfunny' && p === 'admin2605') {
-      enterAdminMode();
-    } else {
-      loginError.classList.remove('hidden');
-    }
+    if (u === 'adminpetfunny' && p === 'admin2605') enterAdminMode();
+    else loginError.classList.remove('hidden');
   });
 
   [loginUser, loginPass].forEach(el => {
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') btnLogin.click();
-    });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnLogin.click(); });
   });
 
   btnLogout.addEventListener('click', () => {
-    if (confirm('Deseja sair do painel?')) {
-      doLogout();
-    }
+    if (confirm('Deseja sair do painel?')) doLogout();
   });
 
   // ===== API HELPERS =====
   async function apiGet(path, params) {
-    const url = new URL(API_BASE_URL + path);
+    const url = new URL(API_BASE_URL + path, window.location.origin);
     if (params) {
       Object.keys(params).forEach(k => {
         const v = params[k];
-        if (v !== undefined && v !== null && v !== '') {
-          url.searchParams.append(k, v);
-        }
+        if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
       });
     }
     const resp = await fetch(url.toString());
@@ -1280,45 +897,24 @@
     return data;
   }
 
-  function sanitizePhone(phone) {
-    return (phone || '').replace(/\D/g, '');
-  }
+  function sanitizePhone(phone) { return (phone || '').replace(/\D/g, ''); }
 
   function formatTelefone(phone) {
     const digits = (phone || '').replace(/\D/g, '');
-    if (digits.length === 11) {
-      return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-    }
-    if (digits.length === 10) {
-      return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-    }
+    if (digits.length === 11) return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    if (digits.length === 10) return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
     return phone || '-';
   }
 
-  // ===== MÁSCARA TELEFONE (99) 9 9999-9999 =====
   function applyPhoneMask(input) {
     if (!input) return;
     let value = input.value.replace(/\D/g, '');
-
     if (value.length > 11) value = value.slice(0, 11);
-
     let formatted = value;
-
-    if (value.length > 0) {
-      formatted = `(${value.slice(0, 2)}`;
-    }
-    if (value.length >= 3) {
-      formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)}`;
-    }
-    if (value.length >= 4) {
-      formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)} ${value.slice(3, 7)}`;
-    }
-    if (value.length >= 8) {
-      formatted =
-        `(${value.slice(0, 2)}) ${value.slice(2, 3)} ` +
-        `${value.slice(3, 7)}-${value.slice(7, 11)}`;
-    }
-
+    if (value.length > 0) formatted = `(${value.slice(0, 2)}`;
+    if (value.length >= 3) formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)}`;
+    if (value.length >= 4) formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)} ${value.slice(3, 7)}`;
+    if (value.length >= 8) formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)} ${value.slice(3, 7)}-${value.slice(7, 11)}`;
     input.value = formatted;
   }
 
@@ -1349,104 +945,66 @@
 
   function getPeriodRange(periodValue) {
     const hoje = new Date();
-    let start = null;
-    let end = null;
+    let start = null, end = null;
 
     if (periodValue === 'today') {
       start = toISODateOnly(hoje);
       end = toISODateOnly(hoje);
     } else if (periodValue === '7') {
-      const d = new Date();
-      d.setDate(d.getDate() - 6);
-      start = toISODateOnly(d);
-      end = toISODateOnly(hoje);
+      const d = new Date(); d.setDate(d.getDate() - 6);
+      start = toISODateOnly(d); end = toISODateOnly(hoje);
     } else if (periodValue === '30') {
-      const d = new Date();
-      d.setDate(d.getDate() - 29);
-      start = toISODateOnly(d);
-      end = toISODateOnly(hoje);
+      const d = new Date(); d.setDate(d.getDate() - 29);
+      start = toISODateOnly(d); end = toISODateOnly(hoje);
     } else if (periodValue === 'month') {
       const dStart = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      start = toISODateOnly(dStart);
-      end = toISODateOnly(hoje);
+      start = toISODateOnly(dStart); end = toISODateOnly(hoje);
     }
-    // 'custom' é tratado na função loadDashboard
     return { start, end };
   }
 
   function classStatus(status) {
-    const s = (status || '').toLowerCase();
+    const s = normStr(status);
     if (s === 'agendado') return 'status-agendado';
     if (s === 'confirmado') return 'status-confirmado';
     if (s === 'recebido') return 'status-recebido';
-    if (s === 'em serviço') return 'status-em-servico';
-    if (s === 'concluído' || s === 'concluido') return 'status-concluido';
+    if (s === 'em servico' || s === 'em serviço') return 'status-em-servico';
+    if (s === 'concluido' || s === 'concluído') return 'status-concluido';
     if (s === 'entregue') return 'status-entregue';
     if (s === 'cancelado') return 'status-cancelado';
     return 'status-agendado';
   }
 
-  // Mensagem por status
   function buildStatusMessage(status, nome, petLabel, service, dataBR, time, prize) {
-    const s = (status || '').toLowerCase();
+    const s = normStr(status);
     const cabecalho = `Oi ${nome}! Aqui é do Pet Funny 🐾\n\n`;
     let corpo = '';
 
     switch (s) {
       case 'agendado':
-        corpo =
-          `Acabamos de registrar o agendamento do(a) *${petLabel}* ` +
-          `para *${service}* em *${dataBR} às ${time}*.\n\n` +
-          `Mimo da campanha Roleta de Mimos: *${prize}*.\n\n` +
-          `Quando estiver próximo do dia, te avisamos por aqui. 💚`;
+        corpo = `Acabamos de registrar o agendamento do(a) *${petLabel}* para *${service}* em *${dataBR} às ${time}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQuando estiver próximo do dia, te avisamos por aqui. 💚`;
         break;
       case 'confirmado':
-        corpo =
-          `Seu agendamento do(a) *${petLabel}* para *${service}* ` +
-          `em *${dataBR} às ${time}* foi *CONFIRMADO* ✅\n\n` +
-          `Mimo garantido: *${prize}*.\n\n` +
-          `Qualquer alteração é só avisar a gente aqui no WhatsApp.`;
+        corpo = `Seu agendamento do(a) *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CONFIRMADO* ✅\n\nMimo garantido: *${prize}*.\n\nQualquer alteração é só avisar a gente aqui no WhatsApp.`;
         break;
       case 'recebido':
-        corpo =
-          `O(a) *${petLabel}* já está aqui com a gente para *${service}* 🐶✨\n\n` +
-          `Estamos cuidando dele(a) com muito carinho.\n\n` +
-          `Mimo da vez: *${prize}*.\n\n` +
-          `Assim que estiver tudo pronto, te avisamos por aqui.`;
+        corpo = `O(a) *${petLabel}* já está aqui com a gente para *${service}* 🐶✨\n\nEstamos cuidando dele(a) com muito carinho.\n\nMimo da vez: *${prize}*.\n\nAssim que estiver tudo pronto, te avisamos por aqui.`;
         break;
-      case 'em serviço':
-        corpo =
-          `Estamos cuidando do(a) *${petLabel}* agora mesmo no *${service}* 🛁✂️\n\n` +
-          `Mimo aplicado: *${prize}*.\n\n` +
-          `Daqui a pouco ele(a) estará pronto(a) para ser buscado(a).`;
+      case 'em servico':
+        corpo = `Estamos cuidando do(a) *${petLabel}* agora mesmo no *${service}* 🛁✂️\n\nMimo aplicado: *${prize}*.\n\nDaqui a pouco ele(a) estará pronto(a) para ser buscado(a).`;
         break;
-      case 'concluído':
-        corpo =
-          `O serviço do(a) *${petLabel}* (*${service}*) foi *CONCLUÍDO* ✅\n\n` +
-          `Mimo aplicado: *${prize}*.\n\n` +
-          `Quando quiser, já pode vir buscar o(a) seu(sua) peludo(a).`;
+      case 'concluido':
+        corpo = `O serviço do(a) *${petLabel}* (*${service}*) foi *CONCLUÍDO* ✅\n\nMimo aplicado: *${prize}*.\n\nQuando quiser, já pode vir buscar o(a) seu(sua) peludo(a).`;
         break;
       case 'entregue':
-        corpo =
-          `O(a) *${petLabel}* já foi entregue e esperamos que você tenha gostado do resultado ✨\n\n` +
-          `Serviço: *${service}*\n` +
-          `Mimo da Roleta: *${prize}*.\n\n` +
-          `Obrigada por confiar no Pet Funny! 💚`;
+        corpo = `O(a) *${petLabel}* já foi entregue e esperamos que você tenha gostado do resultado ✨\n\nServiço: *${service}*\nMimo da Roleta: *${prize}*.\n\nObrigada por confiar no Pet Funny! 💚`;
         break;
       case 'cancelado':
-        corpo =
-          `Seu agendamento do(a) *${petLabel}* para *${service}* ` +
-          `em *${dataBR} às ${time}* foi *CANCELADO* ❌\n\n` +
-          `Se quiser remarcar, é só mandar uma mensagem por aqui que encontramos um novo horário pra vocês.`;
+        corpo = `Seu agendamento do(a) *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CANCELADO* ❌\n\nSe quiser remarcar, é só mandar uma mensagem por aqui que encontramos um novo horário pra vocês.`;
         break;
       default:
-        corpo =
-          `O status do agendamento do(a) *${petLabel}* para *${service}* ` +
-          `em *${dataBR} às ${time}* foi atualizado para: *${status.toUpperCase()}*.\n\n` +
-          `Mimo da campanha Roleta de Mimos: *${prize}*.\n\n` +
-          `Qualquer dúvida, é só chamar aqui no WhatsApp 💚`;
+        corpo = `O status do agendamento do(a) *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi atualizado para: *${String(status || '').toUpperCase()}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQualquer dúvida, é só chamar aqui no WhatsApp 💚`;
     }
-
     return cabecalho + corpo;
   }
 
@@ -1458,10 +1016,19 @@
     btn.addEventListener('click', () => {
       tabButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+
       const tabId = btn.getAttribute('data-tab');
-      tabViews.forEach(view => {
-        view.classList.toggle('active', view.id === tabId);
-      });
+      tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
+
+      // Quando abre o Dashboard, garante atualização + resize dos gráficos (canvas escondido)
+      if (tabId === 'tab-dashboard') {
+        loadDashboard().finally(() => {
+          setTimeout(() => {
+            try { if (statusChart) statusChart.resize(); } catch (_) {}
+            try { if (prizeChart) prizeChart.resize(); } catch (_) {}
+          }, 60);
+        });
+      }
     });
   });
 
@@ -1536,13 +1103,8 @@
     formPrize.disabled = isEdit;
   }
 
-  function mostrarFormAgenda() {
-    formPanel.classList.remove('hidden');
-  }
-
-  function esconderFormAgenda() {
-    formPanel.classList.add('hidden');
-  }
+  function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
+  function esconderFormAgenda() { formPanel.classList.add('hidden'); }
 
   async function fetchBookings() {
     const params = {};
@@ -1554,10 +1116,7 @@
 
   function atualizaEstatisticas(lista) {
     const total = lista.length;
-    let tosa = 0;
-    let hidratacao = 0;
-    let fotoVideo = 0;
-    let patinhas = 0;
+    let tosa = 0, hidratacao = 0, fotoVideo = 0, patinhas = 0;
 
     lista.forEach(a => {
       switch (a.prize) {
@@ -1575,112 +1134,7 @@
     statPatinhas.textContent = patinhas;
   }
 
-  async function loadDashboard() {
-    // 1) Descobre o período selecionado
-    let period = dashPeriod ? dashPeriod.value : 'today';
-    let { start, end } = getPeriodRange(period);
-
-    if (period === 'custom') {
-      start = dashStart.value || null;
-      end = dashEnd.value || null;
-      // se o usuário escolher custom e não preencher as datas, não faz nada
-      if (!start || !end) {
-        return;
-      }
-    }
-
-    let bookings = [];
-    let totalCustomers = 0;
-
-    // 2) Busca TODOS os agendamentos da API (sem filtro)
-    try {
-      const data = await apiGet('/api/bookings');
-      bookings = data.bookings || [];
-    } catch (e) {
-      console.error('Erro ao carregar bookings para dashboard:', e);
-      bookings = [];
-    }
-
-    // 3) Filtra por período no front usando o campo date (YYYY-MM-DD)
-    if (start || end) {
-      bookings = bookings.filter(b => {
-        const d = b.date;
-        if (!d) return false;
-        if (start && d < start) return false;
-        if (end && d > end) return false;
-        return true;
-      });
-    }
-
-    // 4) Busca total de clientes cadastrados
-    try {
-      const cData = await apiGet('/api/customers');
-      totalCustomers = (cData.customers || []).length;
-    } catch (e) {
-      console.error('Erro ao carregar customers para dashboard:', e);
-      totalCustomers = 0;
-    }
-
-    // 5) KPIs principais
-    const uniqueCustomersSet = new Set();
-    bookings.forEach(b => {
-      const cid = b.customer_id || b.customerId;
-      if (cid != null) uniqueCustomersSet.add(cid);
-    });
-
-    dashTotalBookings.textContent = bookings.length;
-    dashUniqueCustomers.textContent = uniqueCustomersSet.size;
-    dashTotalCustomers.textContent = totalCustomers;
-
-    // 6) Contagem de status
-    const statusCounts = {
-      agendado: 0,
-      confirmado: 0,
-      recebido: 0,
-      'em serviço': 0,
-      concluido: 0,
-      concluído: 0,
-      entregue: 0,
-      cancelado: 0
-    };
-
-    const prizeCounts = {
-      'Tosa Higiênica': 0,
-      'Hidratação': 0,
-      'Foto e Vídeo Profissional': 0,
-      'Patinhas impecáveis': 0
-    };
-
-    bookings.forEach(b => {
-      const s = (b.status || 'agendado').toLowerCase();
-      if (statusCounts.hasOwnProperty(s)) {
-        statusCounts[s]++;
-      }
-
-      const p = b.prize || '';
-      if (prizeCounts.hasOwnProperty(p)) {
-        prizeCounts[p]++;
-      }
-    });
-
-    dashStatusAgendado.textContent = statusCounts['agendado'] || 0;
-    dashStatusConfirmado.textContent = statusCounts['confirmado'] || 0;
-    dashStatusRecebido.textContent = statusCounts['recebido'] || 0;
-    dashStatusEmServico.textContent = statusCounts['em serviço'] || 0;
-    dashStatusConcluido.textContent =
-      (statusCounts['concluido'] || 0) + (statusCounts['concluído'] || 0);
-    dashStatusEntregue.textContent = statusCounts['entregue'] || 0;
-    dashStatusCancelado.textContent = statusCounts['cancelado'] || 0;
-
-    dashPrizeTosa.textContent = prizeCounts['Tosa Higiênica'] || 0;
-    dashPrizeHidratacao.textContent = prizeCounts['Hidratação'] || 0;
-    dashPrizeFotoVideo.textContent = prizeCounts['Foto e Vídeo Profissional'] || 0;
-    dashPrizePatinhas.textContent = prizeCounts['Patinhas impecáveis'] || 0;
-
-    // 7) Atualiza gráficos
-    renderCharts(bookings);
-  }
-
+  // ===== GRÁFICOS =====
   let statusChart = null;
   let prizeChart = null;
 
@@ -1689,9 +1143,8 @@
       agendado: 0,
       confirmado: 0,
       recebido: 0,
-      'em serviço': 0,
+      em_servico: 0,
       concluido: 0,
-      concluído: 0,
       entregue: 0,
       cancelado: 0
     };
@@ -1704,11 +1157,17 @@
     };
 
     bookings.forEach(b => {
-      const s = (b.status || '').toLowerCase();
-      if (statusCounts.hasOwnProperty(s)) statusCounts[s]++;
+      const s = normStr(b.status);
+      if (s === 'agendado') statusCounts.agendado++;
+      else if (s === 'confirmado') statusCounts.confirmado++;
+      else if (s === 'recebido') statusCounts.recebido++;
+      else if (s === 'em servico') statusCounts.em_servico++;
+      else if (s === 'concluido') statusCounts.concluido++;
+      else if (s === 'entregue') statusCounts.entregue++;
+      else if (s === 'cancelado') statusCounts.cancelado++;
 
-      const p = b.prize || null;
-      if (prizeCounts[p] != null) prizeCounts[p]++;
+      const p = b.prize || '';
+      if (prizeCounts.hasOwnProperty(p)) prizeCounts[p]++;
     });
 
     const ctxStatusEl = document.getElementById('chartStatus');
@@ -1728,13 +1187,13 @@
         datasets: [{
           label: 'Agendamentos',
           data: [
-            statusCounts['agendado'],
-            statusCounts['confirmado'],
-            statusCounts['recebido'],
-            statusCounts['em serviço'],
-            statusCounts['concluido'] + statusCounts['concluído'],
-            statusCounts['entregue'],
-            statusCounts['cancelado']
+            statusCounts.agendado,
+            statusCounts.confirmado,
+            statusCounts.recebido,
+            statusCounts.em_servico,
+            statusCounts.concluido,
+            statusCounts.entregue,
+            statusCounts.cancelado
           ]
         }]
       },
@@ -1752,15 +1211,103 @@
       type: 'doughnut',
       data: {
         labels: Object.keys(prizeCounts),
-        datasets: [{
-          data: Object.values(prizeCounts)
-        }]
+        datasets: [{ data: Object.values(prizeCounts) }]
       },
       options: {
         responsive: true,
         plugins: { legend: { position: 'bottom' } }
       }
     });
+  }
+
+  async function loadDashboard() {
+    let period = dashPeriod ? dashPeriod.value : 'today';
+    let { start, end } = getPeriodRange(period);
+
+    if (period === 'custom') {
+      start = dashStart.value || null;
+      end = dashEnd.value || null;
+      if (!start || !end) return;
+    }
+
+    let bookings = [];
+    let totalCustomers = 0;
+
+    try {
+      const data = await apiGet('/api/bookings');
+      bookings = data.bookings || [];
+    } catch (e) {
+      console.error('Erro ao carregar bookings para dashboard:', e);
+      bookings = [];
+    }
+
+    if (start || end) {
+      bookings = bookings.filter(b => {
+        const d = b.date;
+        if (!d) return false;
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        return true;
+      });
+    }
+
+    try {
+      const cData = await apiGet('/api/customers');
+      totalCustomers = (cData.customers || []).length;
+    } catch (e) {
+      console.error('Erro ao carregar customers para dashboard:', e);
+      totalCustomers = 0;
+    }
+
+    const uniqueCustomersSet = new Set();
+    bookings.forEach(b => {
+      const cid = b.customer_id || b.customerId;
+      if (cid != null) uniqueCustomersSet.add(cid);
+    });
+
+    dashTotalBookings.textContent = bookings.length;
+    dashUniqueCustomers.textContent = uniqueCustomersSet.size;
+    dashTotalCustomers.textContent = totalCustomers;
+
+    const statusCounts = {
+      agendado: 0, confirmado: 0, recebido: 0, em_servico: 0, concluido: 0, entregue: 0, cancelado: 0
+    };
+
+    const prizeCounts = {
+      'Tosa Higiênica': 0,
+      'Hidratação': 0,
+      'Foto e Vídeo Profissional': 0,
+      'Patinhas impecáveis': 0
+    };
+
+    bookings.forEach(b => {
+      const s = normStr(b.status);
+      if (s === 'agendado') statusCounts.agendado++;
+      else if (s === 'confirmado') statusCounts.confirmado++;
+      else if (s === 'recebido') statusCounts.recebido++;
+      else if (s === 'em servico') statusCounts.em_servico++;
+      else if (s === 'concluido') statusCounts.concluido++;
+      else if (s === 'entregue') statusCounts.entregue++;
+      else if (s === 'cancelado') statusCounts.cancelado++;
+
+      const p = b.prize || '';
+      if (prizeCounts.hasOwnProperty(p)) prizeCounts[p]++;
+    });
+
+    dashStatusAgendado.textContent = statusCounts.agendado;
+    dashStatusConfirmado.textContent = statusCounts.confirmado;
+    dashStatusRecebido.textContent = statusCounts.recebido;
+    dashStatusEmServico.textContent = statusCounts.em_servico;
+    dashStatusConcluido.textContent = statusCounts.concluido;
+    dashStatusEntregue.textContent = statusCounts.entregue;
+    dashStatusCancelado.textContent = statusCounts.cancelado;
+
+    dashPrizeTosa.textContent = prizeCounts['Tosa Higiênica'];
+    dashPrizeHidratacao.textContent = prizeCounts['Hidratação'];
+    dashPrizeFotoVideo.textContent = prizeCounts['Foto e Vídeo Profissional'];
+    dashPrizePatinhas.textContent = prizeCounts['Patinhas impecáveis'];
+
+    renderCharts(bookings);
   }
 
   async function loadPetsForCustomer(customerId) {
@@ -1805,9 +1352,7 @@
 
           if (bookingPetId != null) {
             formPetSelect.value = String(bookingPetId);
-            if (formPetSelect.value === String(bookingPetId)) {
-              selected = true;
-            }
+            if (formPetSelect.value === String(bookingPetId)) selected = true;
           }
 
           if (!selected && bookingPetName) {
@@ -1856,32 +1401,17 @@
       ultimaLista = lista;
 
       tbodyAgenda.innerHTML = '';
-      if (!lista.length) {
-        estadoVazio.style.display = 'block';
-      } else {
-        estadoVazio.style.display = 'none';
-      }
+      estadoVazio.style.display = lista.length ? 'none' : 'block';
 
       lista.forEach(a => {
         const tr = document.createElement('tr');
 
-        const tdData = document.createElement('td');
-        tdData.textContent = formatDataBr(a.date);
-
-        const tdHora = document.createElement('td');
-        tdHora.textContent = a.time || '-';
-
-        const tdTutor = document.createElement('td');
-        tdTutor.textContent = a.customer_name || '-';
-
-        const tdPet = document.createElement('td');
-        tdPet.textContent = a.pet_name || '-';
-
-        const tdTel = document.createElement('td');
-        tdTel.textContent = formatTelefone(a.phone);
-
-        const tdServ = document.createElement('td');
-        tdServ.textContent = a.service || '-';
+        const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
+        const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
+        const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
+        const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
+        const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
+        const tdServ = document.createElement('td'); tdServ.textContent = a.service || '-';
 
         const tdMimo = document.createElement('td');
         tdMimo.textContent = a.prize || '-';
@@ -1895,9 +1425,7 @@
         tdStatus.appendChild(spanStatus);
 
         const tdNotif = document.createElement('td');
-        tdNotif.textContent = a.last_notification_at
-          ? formatDateTimeBr(a.last_notification_at)
-          : '-';
+        tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
 
         const tdObs = document.createElement('td');
         tdObs.textContent = a.notes || '';
@@ -1921,9 +1449,7 @@
             await apiDelete('/api/bookings/' + a.id);
             await renderTabela();
             await loadDashboard();
-          } catch (e) {
-            alert(e.message);
-          }
+          } catch (e) { alert(e.message); }
         });
 
         divActions.appendChild(btnEditar);
@@ -1972,7 +1498,6 @@
     formNotes.value = '';
     formError.style.display = 'none';
     formError.textContent = '';
-
     setEditMode(false);
   }
 
@@ -2007,20 +1532,14 @@
     }
 
     try {
-      // garante cliente
       let customer;
       try {
         const lookup = await apiPost('/api/customers/lookup', { phone });
-        if (lookup.exists && lookup.customer) {
-          customer = lookup.customer;
-        }
+        if (lookup.exists && lookup.customer) customer = lookup.customer;
       } catch (_) {}
 
       if (!customer) {
-        const cRes = await apiPost('/api/customers', {
-          phone,
-          name: nome
-        });
+        const cRes = await apiPost('/api/customers', { phone, name: nome });
         customer = cRes.customer;
       }
 
@@ -2029,37 +1548,22 @@
       const body = {
         customer_id: customer.id,
         pet_id: petIdNum,
-        date,
-        time,
-        service,
-        prize,
-        notes,
-        status
+        date, time, service, prize, notes, status
       };
 
       let precisaWhats = false;
       let urlWhats = null;
 
-      if (id && status !== originalStatus) {
+      if (id && normStr(status) !== normStr(originalStatus)) {
         const dataBR = formatDataBr(date);
         const petLabel = formPetSelect.options[formPetSelect.selectedIndex]
           ? formPetSelect.options[formPetSelect.selectedIndex].textContent
           : 'seu pet';
 
-        const msg = buildStatusMessage(
-          status,
-          nome,
-          petLabel,
-          service,
-          dataBR,
-          time,
-          prize
-        );
+        const msg = buildStatusMessage(status, nome, petLabel, service, dataBR, time, prize);
 
         let fullPhone = phone;
-        if (!(fullPhone.startsWith('55') && fullPhone.length > 11)) {
-          fullPhone = '55' + fullPhone;
-        }
+        if (!(fullPhone.startsWith('55') && fullPhone.length > 11)) fullPhone = '55' + fullPhone;
 
         urlWhats = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
         precisaWhats = true;
@@ -2067,15 +1571,10 @@
         body.last_notification_at = new Date().toISOString();
       }
 
-      if (!id) {
-        await apiPost('/api/bookings', body);
-      } else {
-        await apiPut('/api/bookings/' + id, body);
-      }
+      if (!id) await apiPost('/api/bookings', body);
+      else await apiPut('/api/bookings/' + id, body);
 
-      if (precisaWhats && urlWhats) {
-        window.open(urlWhats, '_blank');
-      }
+      if (precisaWhats && urlWhats) window.open(urlWhats, '_blank');
 
       limparForm();
       esconderFormAgenda();
@@ -2094,19 +1593,7 @@
     }
 
     const linhas = [];
-    linhas.push([
-      'ID',
-      'Data',
-      'Hora',
-      'Tutor',
-      'Pet',
-      'Telefone',
-      'Serviço',
-      'Mimo',
-      'Status',
-      'Última Notificação',
-      'Observações'
-    ].join(';'));
+    linhas.push(['ID','Data','Hora','Tutor','Pet','Telefone','Serviço','Mimo','Status','Última Notificação','Observações'].join(';'));
 
     ultimaLista.forEach(a => {
       const cols = [
@@ -2135,18 +1622,15 @@
     const ano = hoje.getFullYear();
     const mes = String(hoje.getMonth() + 1).padStart(2, '0');
     const dia = String(hoje.getDate()).padStart(2, '0');
-
     a.download = `agenda_petfunny_${ano}-${mes}-${dia}.csv`;
+
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
-  filtroData.addEventListener('change', async () => {
-    await renderTabela();
-    await loadDashboard();
-  });
+  filtroData.addEventListener('change', async () => { await renderTabela(); await loadDashboard(); });
 
   filtroBusca.addEventListener('input', () => {
     clearTimeout(window.__filtroTimer);
@@ -2158,10 +1642,7 @@
 
   btnHoje.addEventListener('click', async () => {
     const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-    const dia = String(hoje.getDate()).padStart(2, '0');
-    filtroData.value = `${ano}-${mes}-${dia}`;
+    filtroData.value = toISODateOnly(hoje);
     await renderTabela();
     await loadDashboard();
   });
@@ -2175,44 +1656,25 @@
 
   btnExportarCSV.addEventListener('click', exportarCSV);
   btnSalvar.addEventListener('click', salvarAgendamento);
-  btnCancelarEdicao.addEventListener('click', () => {
-    limparForm();
-    esconderFormAgenda();
-  });
+  btnCancelarEdicao.addEventListener('click', () => { limparForm(); esconderFormAgenda(); });
 
   if (dashPeriod) {
     dashPeriod.addEventListener('change', () => {
       const val = dashPeriod.value;
-      if (val === 'custom') {
-        dashCustomRange.classList.remove('hidden');
-      } else {
-        dashCustomRange.classList.add('hidden');
-        loadDashboard();
-      }
+      if (val === 'custom') dashCustomRange.classList.remove('hidden');
+      else { dashCustomRange.classList.add('hidden'); loadDashboard(); }
     });
   }
-
-  if (dashApply) {
-    dashApply.addEventListener('click', (e) => {
-      e.preventDefault();
-      loadDashboard();
-    });
-  }
+  if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
   btnNovoAgendamento.addEventListener('click', () => {
     limparForm();
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
-    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-    const dia = String(hoje.getDate()).padStart(2, '0');
-    formDate.value = `${ano}-${mes}-${dia}`;
+    formDate.value = toISODateOnly(new Date());
     mostrarFormAgenda();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
-  formPhone.addEventListener('input', () => {
-    applyPhoneMask(formPhone);
-  });
+  formPhone.addEventListener('input', () => applyPhoneMask(formPhone));
 
   formPhone.addEventListener('blur', async () => {
     const phoneDigits = sanitizePhone(formPhone.value.trim());
@@ -2249,37 +1711,13 @@
   const petsCard = document.getElementById('petsCard');
 
   const racas = [
-    'SRD (Sem Raça Definida)',
-    'Poodle',
-    'Shih Tzu',
-    'Lhasa Apso',
-    'Labrador Retriever',
-    'Golden Retriever',
-    'Yorkshire Terrier',
-    'Bulldog Francês',
-    'Bulldog Inglês',
-    'Spitz Alemão (Lulu da Pomerânia)',
-    'Beagle',
-    'Border Collie',
-    'Boxer',
-    'Dachshund (Salsicha)',
-    'Maltês',
-    'Pinscher',
-    'Pastor Alemão',
-    'Rottweiler',
-    'Pitbull',
-    'Pug',
-    'Cocker Spaniel',
-    'Schnauzer',
-    'Husky Siberiano',
-    'Akita',
-    'Chihuahua',
-    'Outro (informar nas observações)'
+    'SRD (Sem Raça Definida)','Poodle','Shih Tzu','Lhasa Apso','Labrador Retriever','Golden Retriever',
+    'Yorkshire Terrier','Bulldog Francês','Bulldog Inglês','Spitz Alemão (Lulu da Pomerânia)','Beagle',
+    'Border Collie','Boxer','Dachshund (Salsicha)','Maltês','Pinscher','Pastor Alemão','Rottweiler',
+    'Pitbull','Pug','Cocker Spaniel','Schnauzer','Husky Siberiano','Akita','Chihuahua','Outro (informar nas observações)'
   ];
 
-  cliPhone.addEventListener('input', () => {
-    applyPhoneMask(cliPhone);
-  });
+  cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
 
   racas.forEach(r => {
     const opt = document.createElement('option');
@@ -2298,21 +1736,15 @@
     tbodyClientes.innerHTML = '';
     clientesCache.forEach(c => {
       const tr = document.createElement('tr');
-      const tdId = document.createElement('td');
-      const tdNome = document.createElement('td');
-      const tdTel = document.createElement('td');
+
+      const tdId = document.createElement('td'); tdId.textContent = c.id;
+      const tdNome = document.createElement('td'); tdNome.textContent = c.name || '-';
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(c.phone);
       const tdPetsCount = document.createElement('td');
+      tdPetsCount.innerHTML = c.pets_count ? `<span class="badge-mini">${c.pets_count} pet(s)</span>` : '-';
+
       const tdAcoes = document.createElement('td');
-
-      tdId.textContent = c.id;
-      tdNome.textContent = c.name || '-';
-      tdTel.textContent = formatTelefone(c.phone);
-      tdPetsCount.innerHTML = c.pets_count
-        ? `<span class="badge-mini">${c.pets_count} pet(s)</span>`
-        : '-';
-
-      const divActions = document.createElement('div');
-      divActions.className = 'actions';
+      const divActions = document.createElement('div'); divActions.className = 'actions';
 
       const btnSel = document.createElement('button');
       btnSel.textContent = 'Selecionar';
@@ -2322,7 +1754,6 @@
 
         badgeClienteSelecionado.classList.remove('hidden');
         clienteFormBlock.classList.remove('hidden');
-
         petsCard.classList.remove('hidden');
 
         cliPhone.value = formatTelefone(c.phone);
@@ -2349,9 +1780,7 @@
           }
           await loadClientes();
           await loadDashboard();
-        } catch (e) {
-          alert(e.message);
-        }
+        } catch (e) { alert(e.message); }
       });
 
       divActions.appendChild(btnSel);
@@ -2395,10 +1824,7 @@
     }
 
     try {
-      const data = await apiPost('/api/customers', {
-        phone: phoneDigits,
-        name
-      });
+      const data = await apiPost('/api/customers', { phone: phoneDigits, name });
       clienteSelecionadoId = data.customer.id;
       badgeClienteSelecionado.classList.remove('hidden');
       petsCard.classList.remove('hidden');
@@ -2421,19 +1847,14 @@
     tbodyPets.innerHTML = '';
     petsCache.forEach(p => {
       const tr = document.createElement('tr');
-      const tdId = document.createElement('td');
-      const tdNome = document.createElement('td');
-      const tdRaca = document.createElement('td');
-      const tdInfo = document.createElement('td');
+
+      const tdId = document.createElement('td'); tdId.textContent = p.id;
+      const tdNome = document.createElement('td'); tdNome.textContent = p.name;
+      const tdRaca = document.createElement('td'); tdRaca.textContent = p.breed || '-';
+      const tdInfo = document.createElement('td'); tdInfo.textContent = p.info || '-';
+
       const tdAcoes = document.createElement('td');
-
-      tdId.textContent = p.id;
-      tdNome.textContent = p.name;
-      tdRaca.textContent = p.breed || '-';
-      tdInfo.textContent = p.info || '-';
-
-      const divActions = document.createElement('div');
-      divActions.className = 'actions';
+      const divActions = document.createElement('div'); divActions.className = 'actions';
 
       const btnEdit = document.createElement('button');
       btnEdit.textContent = 'Editar';
@@ -2455,9 +1876,7 @@
           await loadPetsForClienteTab(clienteSelecionadoId);
           await loadClientes();
           await loadDashboard();
-        } catch (e) {
-          alert(e.message);
-        }
+        } catch (e) { alert(e.message); }
       });
 
       divActions.appendChild(btnEdit);
@@ -2502,18 +1921,9 @@
 
     try {
       if (!petEditIdLocal) {
-        await apiPost('/api/pets', {
-          customer_id: clienteSelecionadoId,
-          name,
-          breed,
-          info
-        });
+        await apiPost('/api/pets', { customer_id: clienteSelecionadoId, name, breed, info });
       } else {
-        await apiPut('/api/pets/' + petEditIdLocal, {
-          name,
-          breed,
-          info
-        });
+        await apiPut('/api/pets/' + petEditIdLocal, { name, breed, info });
       }
       limparPetsForm();
       await loadPetsForClienteTab(clienteSelecionadoId);
@@ -2531,9 +1941,7 @@
   btnPetLimpar.addEventListener('click', limparPetsForm);
   btnPetSalvar.addEventListener('click', salvarPet);
 
-  btnNovoPet.addEventListener('click', () => {
-    limparPetsForm();
-  });
+  btnNovoPet.addEventListener('click', () => limparPetsForm);
 
   btnNovoCliente.addEventListener('click', () => {
     clienteSelecionadoId = null;
@@ -2549,7 +1957,9 @@
     limparPetsForm();
   });
 
-  // Inicialização com tentativa de auto-login
+  // Inicialização
+  // garante estado correto do custom-range ao abrir
+  if (dashPeriod && dashPeriod.value === 'custom') dashCustomRange.classList.remove('hidden');
   tryAutoLogin();
 </script>
 </body>
