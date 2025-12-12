@@ -1,17 +1,18 @@
 {
   "name": "pet-funny-admin",
   "version": "1.0.0",
-  "description": "Painel Admin Pet Funny (banho e tosa, clientes, pets, roleta de mimos)",
+  "description": "Sistema Pet Funny - Roleta, Agenda, Clientes e Pets",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node server.js"
   },
-  "dependencies": {
-    "better-sqlite3": "^12.5.0",
-    "cors": "^2.8.5",
-    "express": "^4.19.0"
-  },
   "engines": {
-    "node": ">=18"
+    "node": "18.x"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "sqlite3": "^5.1.7"
   }
 }

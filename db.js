@@ -1,51 +1,61 @@
-// backend/db.js
-const Database = require('better-sqlite3');
-const db = new Database('petfunny.db');
-module.exports = db;
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
 
-// Criação das tabelas
+// caminho do banco
+const dbPath = path.join(__dirname, 'petfunny.db');
+
+// cria / abre o banco
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Erro ao abrir banco SQLite:', err.message);
+  } else {
+    console.log('Banco SQLite conectado:', dbPath);
+  }
+});
+
+// inicialização das tabelas
 db.serialize(() => {
-  // Clientes
+  // CLIENTES
   db.run(`
     CREATE TABLE IF NOT EXISTS customers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      phone TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
+      phone TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
     )
   `);
 
-  // Pets (IMPORTANTE para o erro que você está vendo)
-db.run(`
-  CREATE TABLE IF NOT EXISTS pets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    breed TEXT,
-    info TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (customer_id) REFERENCES customers(id)
-  )
-`);
+  // PETS
+  db.run(`
+    CREATE TABLE IF NOT EXISTS pets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      breed TEXT,
+      info TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+    )
+  `);
 
-  // Agendamentos
-db.run(`
-  CREATE TABLE IF NOT EXISTS bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_id INTEGER NOT NULL,
-    pet_id INTEGER NOT NULL,
-    date TEXT NOT NULL,
-    time TEXT NOT NULL,
-    service TEXT NOT NULL,
-    prize TEXT NOT NULL,
-    notes TEXT,
-    status TEXT NOT NULL DEFAULT 'agendado',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (customer_id) REFERENCES customers(id),
-    FOREIGN KEY (pet_id) REFERENCES pets(id)
-  )
-`);
-
+  // AGENDAMENTOS
+  db.run(`
+    CREATE TABLE IF NOT EXISTS bookings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL,
+      pet_id INTEGER,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      service TEXT NOT NULL,
+      prize TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'agendado',
+      notes TEXT,
+      last_notification_at TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (customer_id) REFERENCES customers(id),
+      FOREIGN KEY (pet_id) REFERENCES pets(id)
+    )
+  `);
 });
 
 module.exports = db;
