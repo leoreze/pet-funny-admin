@@ -440,6 +440,15 @@ app.delete('/api/bookings/:id', (req, res) => {
 
 // (rotas de bookings aqui embaixo…)
 
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "roleta.html"));
+});
+
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "admin.html"));
+});
+
+
 // START SERVER
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

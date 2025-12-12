@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Roleta de Mimos – Pet Funny</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    :root {
+      --turquesa: #01ADB7;
+      --coral: #F9A197;
+      --escuro: #222222;
+      --cinza-claro: #f4f4f4;
+      --branco: #ffffff;
+      --bg-grad: radial-gradient(circle at top, #ffffff 0, #f4f7f8 40%, #e9f5f6 100%);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, sans-serif;
+      background: var(--bg-grad);
+      color: var(--escuro);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    /* ========= HEADER GLOBAL ========= */
+
+    .top-brand {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      padding: 10px 16px 4px;
+    }
+
+    .top-brand img {
+      max-width: 260px;
+      height: auto;
+      display: block;
+    }
+
+    @media (max-width: 720px) {
+      .top-brand img {
+        max-width: 210px;
+      }
+    }
+
+    /* ========= ONBOARDING ========= */
+
+    .onboarding {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .onboarding-card {
+      max-width: 640px;
+      width: 100%;
+      background: var(--branco);
+      border-radius: 24px;
+      box-shadow: 0 22px 50px rgba(0, 0, 0, 0.10);
+      padding: 24px 20px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .onboarding-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(1, 173, 183, 0.08);
+      color: #0e5f64;
+      margin-bottom: 10px;
+    }
+
+    .onboarding-title {
+      font-size: 26px;
+      line-height: 1.2;
+      margin-bottom: 8px;
+      color: #133238;
+    }
+
+    .onboarding-title span {
+      color: var(--turquesa);
+    }
+
+    .onboarding-sub {
+      font-size: 14px;
+      color: #4b5b5f;
+      margin-bottom: 14px;
+    }
+
+    .onboarding-sub strong {
+      color: var(--turquesa);
+    }
+
+    .onboarding-list {
+      list-style: none;
+      margin-bottom: 18px;
+      font-size: 13px;
+      color: #455a64;
+    }
+
+    .onboarding-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .onboarding-list li span {
+      font-size: 16px;
+    }
+
+    .onboarding-cta {
+      display: flex;
+      justify-content: flex-start;
+      margin-top: 6px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, var(--turquesa), var(--coral));
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.16);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s;
+      text-decoration: none;
+    }
+
+    .btn:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+    }
+
+    .btn-secondary {
+      background: #eef3f4;
+      color: #37474f;
+      box-shadow: none;
+      text-transform: none;
+      letter-spacing: 0.04em;
+      font-weight: 500;
+    }
+
+    /* Box "como funciona" */
+    .how-it-works {
+      margin-top: 14px;
+      padding: 12px 12px 10px;
+      border-radius: 16px;
+      border: 1px dashed #cfdfe3;
+      background: #f7fbfc;
+      font-size: 13px;
+      color: #455a64;
+      animation: fadeIn 0.18s ease-out;
+    }
+
+    .how-it-works-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #16363c;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .how-it-works-steps {
+      list-style: none;
+      margin-top: 4px;
+    }
+
+    .how-it-works-steps li {
+      margin-bottom: 4px;
+    }
+
+    .how-it-works-steps strong {
+      color: var(--turquesa);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ========= APP PRINCIPAL ========= */
+
+    #app {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .page-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 16px 16px;
+    }
+
+    .card {
+      max-width: 960px;
+      width: 100%;
+      background: var(--branco);
+      border-radius: 24px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.10);
+      padding: 20px 18px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+
+    .card-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .card-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #16363c;
+    }
+
+    .card-subtitle {
+      font-size: 13px;
+      color: #607d8b;
+    }
+
+    .step-indicator {
+      display: flex;
+      gap: 4px;
+      font-size: 11px;
+      color: #607d8b;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .step-pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #d0dde0;
+      background: #f3f7f8;
+      font-weight: 500;
+    }
+
+    .step-pill strong {
+      color: var(--turquesa);
+    }
+
+    .steps-wrapper {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .left-panel {
+      flex: 1 1 280px;
+      min-width: 0;
+    }
+
+    .right-panel {
+      flex: 1 1 240px;
+      min-width: 0;
+      background: #f8fbfc;
+      border-radius: 18px;
+      padding: 12px 12px 14px;
+      border: 1px dashed #d1e4e7;
+    }
+
+    .side-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #37565c;
+      margin-bottom: 6px;
+    }
+
+    .side-list {
+      list-style: none;
+      font-size: 12px;
+      color: #455a64;
+    }
+
+    .side-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .side-bullet {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      background: linear-gradient(135deg, var(--turquesa), var(--coral));
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .side-caption {
+      font-size: 11px;
+      color: #78909c;
+      margin-top: 6px;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #455a64;
+    }
+
+    .field-help {
+      font-size: 11px;
+      color: #78909c;
+    }
+
+    input[type="text"],
+    input[type="tel"],
+    input[type="date"],
+    input[type="time"],
+    select,
+    textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid #d4dde0;
+      padding: 8px 10px;
+      font-size: 13px;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+      font-family: inherit;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--turquesa);
+      box-shadow: 0 0 0 2px rgba(1, 173, 183, 0.16);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 50px;
+    }
+
+    .btn-inline {
+      margin-top: 6px;
+    }
+
+    .error-msg {
+      font-size: 12px;
+      color: #c62828;
+      margin-top: 4px;
+    }
+
+    .success-msg {
+      font-size: 12px;
+      color: #2e7d32;
+      margin-top: 4px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ========= ROLETA ========= */
+
+    .wheel-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+    }
+
+    .wheel-container {
+      position: relative;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      margin: 0 auto;
+      background: conic-gradient(
+        var(--turquesa) 0deg 90deg,
+        var(--coral) 90deg 180deg,
+        #ffddc5 180deg 270deg,
+        #7fdde4 270deg 360deg
+      );
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+    }
+
+    .wheel-inner {
+      width: 68%;
+      height: 68%;
+      border-radius: 50%;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .wheel-center-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--turquesa), var(--coral));
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.9);
+    }
+
+    .wheel-pointer {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 14px solid transparent;
+      border-right: 14px solid transparent;
+      border-bottom: 18px solid #ff7043;
+      filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.2));
+    }
+
+    .wheel-shadow {
+      position: absolute;
+      bottom: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70%;
+      height: 20px;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.25), transparent 70%);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    .badge-prize {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--turquesa), var(--coral));
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .badge-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.16);
+      font-size: 16px;
+    }
+
+    .badge-label {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+    }
+
+    .badge-label span {
+      font-size: 11px;
+      font-weight: 400;
+      opacity: 0.9;
+    }
+
+    .pet-select-info {
+      font-size: 11px;
+      color: #78909c;
+      margin-top: 2px;
+    }
+
+    /* ========= OVERLAYS (SORTEANDO / SUCESSO) ========= */
+
+    .full-overlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top, #ffffff 0, #eaf7f8 40%, #d6eef0 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .overlay-card {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 24px 22px 20px;
+      max-width: 420px;
+      width: 90%;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.18);
+      text-align: center;
+    }
+
+    .overlay-icon-circle {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--turquesa), var(--coral));
+      color: #ffffff;
+      font-size: 30px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.16);
+    }
+
+    .overlay-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #16363c;
+      margin-bottom: 6px;
+    }
+
+    .overlay-subtitle {
+      font-size: 13px;
+      color: #546e7a;
+      margin-bottom: 14px;
+    }
+
+    .overlay-dots {
+      display: inline-flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .overlay-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--turquesa);
+      animation: dotPulse 0.9s infinite ease-in-out;
+    }
+
+    .overlay-dot:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+    .overlay-dot:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    @keyframes dotPulse {
+      0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Roletinha girando no overlay */
+    .overlay-wheel {
+      margin: 10px auto 6px;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: conic-gradient(
+        var(--turquesa) 0deg 90deg,
+        var(--coral) 90deg 180deg,
+        #ffddc5 180deg 270deg,
+        #7fdde4 270deg 360deg
+      );
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+      position: relative;
+      animation: overlaySpin 1.2s linear infinite;
+    }
+
+    .overlay-wheel::before {
+      content: "";
+      position: absolute;
+      inset: 24%;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.9);
+    }
+
+    .overlay-wheel::after {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--turquesa), var(--coral));
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.95);
+    }
+
+    .overlay-pointer {
+      position: absolute;
+      top: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 13px solid transparent;
+      border-right: 13px solid transparent;
+      border-bottom: 17px solid #ff7043;
+      filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.2));
+    }
+
+    @keyframes overlaySpin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    /* ========= RODAPÉ GLOBAL ========= */
+
+    .site-footer {
+      border-top: 1px solid #dde5e8;
+      padding: 12px 16px 16px;
+      background: transparent;
+    }
+
+    .footer-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .footer-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .footer-logo {
+      max-width: 140px;
+      height: auto;
+    }
+
+    .footer-info {
+      font-size: 12px;
+      color: #455a64;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .footer-info strong {
+      font-size: 13px;
+      color: #263238;
+    }
+
+    .footer-bottom {
+      font-size: 11px;
+      color: #78909c;
+      text-align: center;
+      margin-top: 4px;
+    }
+
+    @media (max-width: 720px) {
+      .card {
+        padding: 18px 14px 18px;
+      }
+      .steps-wrapper {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER GLOBAL: LOGO ROLETA (ONBOARDING + APP) -->
+<header class="top-brand">
+  <!-- ajuste o src para o arquivo real -->
+  <img src="roleta-de-mimos-logo.svg" alt="Roleta de Mimos – Pet Funny" />
+</header>
+
+<!-- ONBOARDING -->
+<section id="onboarding" class="onboarding">
+  <div class="onboarding-card">
+    <div class="onboarding-badge">
+      🎁 Roleta de Mimos • Pet Funny
+    </div>
+    <h1 class="onboarding-title">
+      Aqui o seu pet entra pra tomar banho e sai
+      <span>cheiroso, mimado e feliz</span> 💛
+    </h1>
+    <p class="onboarding-sub">
+      Na <strong>Roleta de Mimos da Pet Funny</strong>, cada agendamento pode ganhar um carinho extra:
+      tosa higiênica, hidratação, fotos lindas e muito mais. Você só precisa
+      se cadastrar, girar a roleta e escolher o melhor horário pro seu melhor amigo.
+    </p>
+
+    <ul class="onboarding-list">
+      <li><span>🐾</span> Mimos pensados pra deixar o banho &amp; tosa ainda mais especial.</li>
+      <li><span>🕒</span> Tudo organizadinho, com horário marcado e confirmação pelo WhatsApp.</li>
+      <li><span>🏡</span> Jeitinho de pet shop de bairro: a gente conhece cada pet pelo nome.</li>
+    </ul>
+
+    <div class="onboarding-cta">
+      <button id="btnIniciar" class="btn">
+        Quero participar da Roleta de Mimos
+      </button>
+      <button id="btnHowItWorks" class="btn btn-secondary" type="button">
+        Entender rapidinho como funciona
+      </button>
+    </div>
+
+    <!-- BOX "COMO FUNCIONA" (inicialmente escondido) -->
+    <div id="howItWorksBox" class="how-it-works hidden">
+      <div class="how-it-works-title">
+        <span>✨</span> <span>Em 4 passos, seu pet já vem se divertir na Pet Funny:</span>
+      </div>
+      <ul class="how-it-works-steps">
+        <li><strong>1. Você coloca seu WhatsApp</strong> pra gente reconhecer ou criar seu cadastro.</li>
+        <li><strong>2. Cadastra seus pets</strong> (ou confirma os que já existem no sistema).</li>
+        <li><strong>3. Gira a Roleta de Mimos</strong> e descobre qual presentinho o seu pet ganhou.</li>
+        <li><strong>4. Escolhe o dia e horário</strong> e já sai daqui com o agendamento enviado pro nosso WhatsApp.</li>
+      </ul>
+      <p style="font-size:12px; color:#607d8b; margin-top:6px;">
+        Tudo rápido, sem burocracia e com a mesma atenção que a gente dá no balcão. 💛
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- APP PRINCIPAL -->
+<div id="app">
+  <div class="page-content">
+    <main class="card">
+      <div class="card-header">
+        <div class="card-title-block">
+          <div class="card-title">Roleta de Mimos Pet Funny</div>
+          <div class="card-subtitle">
+            Cadastre-se, gire a roleta e agende o banho do seu pet com um mimo especial 🐶✨
+          </div>
+        </div>
+        <div class="step-indicator">
+          <div class="step-pill" id="stepPillText">
+            <strong>Passo 1</strong> • Identificação
+          </div>
+        </div>
+      </div>
+
+      <div class="steps-wrapper">
+        <!-- LADO ESQUERDO: ETAPAS -->
+        <div class="left-panel">
+
+          <!-- PASSO 1: TELEFONE -->
+          <section id="step1" class="step">
+            <div class="field-group">
+              <div class="field-label">Qual é o seu WhatsApp?</div>
+              <div class="field-help">
+                Vamos usar apenas para confirmar o agendamento e mandar as informações do seu mimo.
+              </div>
+              <input type="tel" id="phoneInput" placeholder="(16) 98153-5338" />
+            </div>
+            <div id="step1Error" class="error-msg hidden"></div>
+            <button id="btnStep1Next" class="btn btn-inline">Continuar</button>
+          </section>
+
+          <!-- PASSO 2: CADASTRO TUTOR + PETS -->
+          <section id="step2" class="step hidden">
+            <div class="field-group">
+              <div class="field-label">Seu nome completo</div>
+              <input type="text" id="ownerName" placeholder="Como você gostaria de ser chamado(a)?" />
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">Pets</div>
+              <div class="field-help">
+                Cadastre um ou mais pets. Depois você escolhe qual deles vai usar o mimo na hora de agendar.
+              </div>
+            </div>
+
+            <div id="petsContainer"></div>
+
+            <button type="button" id="btnAddPet" class="btn btn-secondary btn-inline">
+              + Adicionar outro pet
+            </button>
+
+            <div id="step2Error" class="error-msg hidden"></div>
+
+            <button id="btnStep2Next" class="btn btn-inline" style="margin-top:10px;">
+              Continuar para a Roleta
+            </button>
+          </section>
+
+          <!-- PASSO 3: ROLETA -->
+          <section id="step3" class="step hidden">
+            <div class="wheel-wrapper">
+              <div class="wheel-container" id="wheel">
+                <div class="wheel-pointer"></div>
+                <div class="wheel-inner">
+                  <div class="wheel-center-dot"></div>
+                </div>
+                <div class="wheel-shadow"></div>
+              </div>
+              <div class="field-help">
+                Clique em <strong>“Girar roleta”</strong> e descubra qual mimo o seu pet vai ganhar.
+              </div>
+              <button id="btnSpin" class="btn">Girar roleta</button>
+              <div id="step3Error" class="error-msg hidden"></div>
+            </div>
+          </section>
+
+          <!-- PASSO 4: MIMO + AGENDAMENTO -->
+          <section id="step4" class="step hidden">
+            <div id="prizeBadgeWrapper" class="badge-prize hidden">
+              <div class="badge-icon" id="prizeIcon">🎁</div>
+              <div class="badge-label">
+                <strong id="prizeTitle">Mimo sorteado</strong>
+                <span id="prizeSubtitle">Já está garantido no próximo agendamento.</span>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">Para qual pet será esse mimo?</div>
+              <select id="petSelect"></select>
+              <div class="pet-select-info">
+                Os pets cadastrados no seu WhatsApp aparecem aqui. Se quiser cadastrar outro, é só falar com a gente pelo WhatsApp. 💬
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">Qual serviço você deseja agendar?</div>
+              <select id="serviceSelect">
+                <option value="">Selecione o serviço...</option>
+                <option value="Banho">Banho</option>
+                <option value="Banho com Hidratação">Banho com Hidratação</option>
+                <option value="Banho + Tosa">Banho + Tosa</option>
+                <option value="Banho + Tosa Higiênica">Banho + Tosa Higiênica</option>
+                <option value="Banho + Tosa Específica da Raça">Banho + Tosa Específica da Raça</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">Escolha o dia</div>
+              <div class="field-help">
+                Atendemos de <strong>segunda a sexta, das 07:30 às 17:30</strong>, e
+                <strong>aos sábados, das 07:30 às 13:00</strong>.
+              </div>
+              <input type="date" id="dateInput" />
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">Escolha o horário</div>
+              <input type="time" id="timeInput" />
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">Observações (opcional)</div>
+              <textarea id="notesInput" placeholder="Ex: busca em casa, pet idoso, medicação, etc."></textarea>
+            </div>
+
+            <div id="step4Error" class="error-msg hidden"></div>
+            <div id="step4Success" class="success-msg hidden"></div>
+
+            <button id="btnConfirmBooking" class="btn btn-inline">
+              Confirmar agendamento e falar no WhatsApp
+            </button>
+          </section>
+
+        </div>
+
+        <!-- LADO DIREITO: LISTA DE MIMOS -->
+        <aside class="right-panel">
+          <div class="side-title">O que o seu pet pode ganhar na Roleta de Mimos?</div>
+          <ul class="side-list">
+            <li>
+              <div class="side-bullet">✂️</div>
+              <div>
+                <strong>Tosa Higiênica</strong><br />
+                Limpeza das áreas íntimas, patinhas e orelhas para mais conforto e higiene.
+              </div>
+            </li>
+            <li>
+              <div class="side-bullet">💧</div>
+              <div>
+                <strong>Hidratação</strong><br />
+                Tratamento especial para deixar os pelos mais macios, cheirosos e saudáveis.
+              </div>
+            </li>
+            <li>
+              <div class="side-bullet">📸</div>
+              <div>
+                <strong>Foto e Vídeo Profissional</strong><br />
+                Registro fofo e profissional do banho do seu pet para você guardar e postar.
+              </div>
+            </li>
+            <li>
+              <div class="side-bullet">🐾</div>
+              <div>
+                <strong>Patinhas impecáveis</strong><br />
+                Acabamento caprichado nas patinhas para aquele passeio cheio de estilo.
+              </div>
+            </li>
+          </ul>
+          <div class="side-caption">
+            *Um mimo por agendamento. Válido apenas nos horários disponíveis da agenda Pet Funny. 💛
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- OVERLAY: SORTEANDO O MIMO -->
+<section id="sortingScreen" class="full-overlay hidden">
+  <div class="overlay-card">
+    <div class="overlay-icon-circle">🎁</div>
+    <div class="overlay-title">Sorteando o mimo do seu pet...</div>
+    <div class="overlay-subtitle">
+      Segura a ansiedade! Estamos girando a Roleta de Mimos pra ver qual carinho extra ele vai ganhar hoje. 🐶✨
+    </div>
+    <div style="position: relative; display:inline-block;">
+      <div class="overlay-wheel"></div>
+      <div class="overlay-pointer"></div>
+    </div>
+    <div class="overlay-dots">
+      <div class="overlay-dot"></div>
+      <div class="overlay-dot"></div>
+      <div class="overlay-dot"></div>
+    </div>
+  </div>
+</section>
+
+<!-- OVERLAY: AGENDAMENTO CONFIRMADO -->
+<section id="successScreen" class="full-overlay hidden">
+  <div class="overlay-card">
+    <div class="overlay-icon-circle">✅</div>
+    <div class="overlay-title">Agendamento enviado com sucesso!</div>
+    <div class="overlay-subtitle">
+      Em instantes vamos abrir o WhatsApp da Pet Funny com todos os detalhes do banho
+      e do mimo sorteado. É só confirmar por lá. 💚
+    </div>
+    <div class="overlay-dots">
+      <div class="overlay-dot"></div>
+      <div class="overlay-dot"></div>
+      <div class="overlay-dot"></div>
+    </div>
+  </div>
+</section>
+
+<!-- RODAPÉ GLOBAL (SEM FUNDO BRANCO) -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-top">
+      <!-- Logo Pet Funny no rodapé -->
+      <img src="pet-funny-logo.svg" alt="Pet Funny" class="footer-logo" />
+
+      <div class="footer-info">
+        <strong>Pet Funny • Banho &amp; Tosa</strong>
+        <span>Rua Virgílio de Carvalho Neves Neto, 794 – Ribeirão Preto / SP</span>
+        <span>Horário: Seg–Sex: 07:30 às 17:30 • Sábado: 07:30 às 13:00</span>
+        <span>WhatsApp: (16) 98153-5338</span>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      © 2024 Pet Funny • Roleta de Mimos. Todos os direitos reservados.
+    </div>
+  </div>
+</footer>
+
+<script>
+  const API_BASE_URL = ''; // se estiver servindo pelo mesmo host/porta do backend, pode manter vazio
+
+  // ======= ESTADO =========
+  let currentPhoneDigits = null;
+  let currentCustomer = null;
+  let currentPets = [];
+  let selectedPrize = null;
+  let spinning = false;
+
+  const prizes = [
+    { key: 'Tosa Higiênica', icon: '✂️', subtitle: 'Seu pet vai sair ainda mais confortável e limpinho.' },
+    { key: 'Hidratação', icon: '💧', subtitle: 'Pelos mais macios, cheirosos e saudáveis.' },
+    { key: 'Foto e Vídeo Profissional', icon: '📸', subtitle: 'Um registro lindo pra você guardar e postar.' },
+    { key: 'Patinhas impecáveis', icon: '🐾', subtitle: 'Acabamento perfeito para o próximo passeio.' }
+  ];
+
+  // ======= ELEMENTOS =========
+  const onboardingSection = document.getElementById('onboarding');
+  const app = document.getElementById('app');
+  const btnIniciar = document.getElementById('btnIniciar');
+  const btnHowItWorks = document.getElementById('btnHowItWorks');
+  const howItWorksBox = document.getElementById('howItWorksBox');
+
+  const stepPillText = document.getElementById('stepPillText');
+
+  const step1 = document.getElementById('step1');
+  const step2 = document.getElementById('step2');
+  const step3 = document.getElementById('step3');
+  const step4 = document.getElementById('step4');
+
+  const phoneInput = document.getElementById('phoneInput');
+  const step1Error = document.getElementById('step1Error');
+  const btnStep1Next = document.getElementById('btnStep1Next');
+
+  const ownerName = document.getElementById('ownerName');
+  const petsContainer = document.getElementById('petsContainer');
+  const btnAddPet = document.getElementById('btnAddPet');
+  const step2Error = document.getElementById('step2Error');
+  const btnStep2Next = document.getElementById('btnStep2Next');
+
+  const wheel = document.getElementById('wheel');
+  const btnSpin = document.getElementById('btnSpin');
+  const step3Error = document.getElementById('step3Error');
+
+  const prizeBadgeWrapper = document.getElementById('prizeBadgeWrapper');
+  const prizeIcon = document.getElementById('prizeIcon');
+  const prizeTitle = document.getElementById('prizeTitle');
+  const prizeSubtitle = document.getElementById('prizeSubtitle');
+
+  const petSelect = document.getElementById('petSelect');
+  const serviceSelect = document.getElementById('serviceSelect');
+  const dateInput = document.getElementById('dateInput');
+  const timeInput = document.getElementById('timeInput');
+  const notesInput = document.getElementById('notesInput');
+
+  const step4Error = document.getElementById('step4Error');
+  const step4Success = document.getElementById('step4Success');
+  const btnConfirmBooking = document.getElementById('btnConfirmBooking');
+
+  const sortingScreen = document.getElementById('sortingScreen');
+  const successScreen = document.getElementById('successScreen');
+
+  // ======= MÁSCARA TELEFONE - FORMATO (99) 9 9999-9999 =========
+  function formatPhone(input) {
+    let value = input.value.replace(/\D/g, ""); // Remove tudo que não é número
+
+    if (value.length > 11) value = value.slice(0, 11); // limita a 11 dígitos
+
+    let formatted = value;
+
+    if (value.length > 0) {
+      formatted = `(${value.slice(0, 2)}`;
+    }
+    if (value.length >= 3) {
+      formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)}`;
+    }
+    if (value.length >= 4) {
+      formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)} ${value.slice(3, 7)}`;
+    }
+    if (value.length >= 8) {
+      formatted =
+        `(${value.slice(0, 2)}) ${value.slice(2, 3)} ` +
+        `${value.slice(3, 7)}-${value.slice(7, 11)}`;
+    }
+
+    input.value = formatted;
+  }
+
+  // Aplica máscara ao digitar
+  phoneInput.addEventListener("input", () => {
+    formatPhone(phoneInput);
+  });
+
+  // Raças (mesma lista do admin/backend)
+  const racas = [
+    'SRD (Sem Raça Definida)',
+    'Poodle',
+    'Shih Tzu',
+    'Lhasa Apso',
+    'Labrador Retriever',
+    'Golden Retriever',
+    'Yorkshire Terrier',
+    'Bulldog Francês',
+    'Bulldog Inglês',
+    'Spitz Alemão (Lulu da Pomerânia)',
+    'Beagle',
+    'Border Collie',
+    'Boxer',
+    'Dachshund (Salsicha)',
+    'Maltês',
+    'Pinscher',
+    'Pastor Alemão',
+    'Rottweiler',
+    'Pitbull',
+    'Pug',
+    'Cocker Spaniel',
+    'Schnauzer',
+    'Husky Siberiano',
+    'Akita',
+    'Chihuahua',
+    'Outro (informar nas observações)'
+  ];
+
+  // ======= UTIL API =========
+  async function apiPost(path, body) {
+    const resp = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    return data;
+  }
+
+  async function apiGet(path, params = {}) {
+    const url = new URL((API_BASE_URL || '') + path, window.location.origin);
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        url.searchParams.append(k, v);
+      }
+    });
+    const resp = await fetch(url.toString());
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
+    return data;
+  }
+
+  // ======= FLUXO TELAS =========
+  function showStep(stepNumber) {
+    [step1, step2, step3, step4].forEach(s => s.classList.add('hidden'));
+    if (stepNumber === 1) {
+      step1.classList.remove('hidden');
+      stepPillText.innerHTML = '<strong>Passo 1</strong> • Identificação';
+    } else if (stepNumber === 2) {
+      step2.classList.remove('hidden');
+      stepPillText.innerHTML = '<strong>Passo 2</strong> • Cadastro rápido';
+    } else if (stepNumber === 3) {
+      step3.classList.remove('hidden');
+      stepPillText.innerHTML = '<strong>Passo 3</strong> • Girar roleta';
+    } else if (stepNumber === 4) {
+      step4.classList.remove('hidden');
+      stepPillText.innerHTML = '<strong>Passo 4</strong> • Escolher dia &amp; horário';
+    }
+  }
+
+  function sanitizePhone(phone) {
+    return (phone || '').replace(/\D/g, '');
+  }
+
+  function createPetFields() {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field-group';
+    wrapper.style.border = '1px solid #e0e7ea';
+    wrapper.style.borderRadius = '14px';
+    wrapper.style.padding = '10px 10px 8px';
+    wrapper.style.marginBottom = '8px';
+    wrapper.style.background = '#f8fbfc';
+
+    const nameId = 'petName_' + Math.random().toString(36).slice(2);
+    const breedId = 'petBreed_' + Math.random().toString(36).slice(2);
+    const infoId = 'petInfo_' + Math.random().toString(36).slice(2);
+
+    wrapper.innerHTML = `
+      <div class="field-group">
+        <div class="field-label">Nome do pet</div>
+        <input type="text" id="${nameId}" placeholder="Nome do pet" />
+      </div>
+      <div class="field-group">
+        <div class="field-label">Raça</div>
+        <select id="${breedId}"></select>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Mais informações sobre o pet (opcional)</div>
+        <textarea id="${infoId}" placeholder="Porte, comportamento, medicação, etc."></textarea>
+      </div>
+      <button type="button" class="btn btn-secondary btn-inline btn-remove-pet">Remover pet</button>
+    `;
+
+    const breedSelect = wrapper.querySelector('select');
+    racas.forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r;
+      opt.textContent = r;
+      breedSelect.appendChild(opt);
+    });
+
+    const removeBtn = wrapper.querySelector('.btn-remove-pet');
+    removeBtn.addEventListener('click', () => {
+      petsContainer.removeChild(wrapper);
+    });
+
+    petsContainer.appendChild(wrapper);
+  }
+
+  function getPetsFromForm() {
+    const groups = Array.from(petsContainer.querySelectorAll('.field-group')).filter(
+      g => g.querySelector('input[type="text"]')
+    );
+
+    const pets = [];
+
+    groups.forEach(group => {
+      const nameInput = group.querySelector('input[type="text"]');
+      const breedSelect = group.querySelector('select');
+      const infoTextarea = group.querySelector('textarea');
+
+      const name = (nameInput?.value || '').trim();
+      const breed = breedSelect?.value || '';
+      const info = (infoTextarea?.value || '').trim();
+
+      if (name && breed) {
+        pets.push({ name, breed, info });
+      }
+    });
+
+    return pets;
+  }
+
+  function fillPetSelect() {
+    petSelect.innerHTML = '';
+    if (!currentPets || !currentPets.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Nenhum pet encontrado. Fale com a gente no WhatsApp.';
+      petSelect.appendChild(opt);
+      petSelect.disabled = true;
+    } else {
+      petSelect.disabled = false;
+      const opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = 'Selecione o pet...';
+      petSelect.appendChild(opt0);
+
+      currentPets.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.breed
+          ? `${p.name} (${p.breed})`
+          : p.name;
+        petSelect.appendChild(opt);
+      });
+    }
+  }
+
+  function setPrize(prize) {
+    selectedPrize = prize;
+    prizeBadgeWrapper.classList.remove('hidden');
+    prizeIcon.textContent = prize.icon;
+    prizeTitle.textContent = prize.key;
+    prizeSubtitle.textContent = prize.subtitle;
+  }
+
+  function validarDiaHora(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+
+    const date = new Date(dateStr + 'T' + timeStr + ':00');
+    if (Number.isNaN(date.getTime())) {
+      return 'Data ou horário inválidos.';
+    }
+
+    const diaSemana = date.getDay(); // 0=Domingo, 6=Sáb
+    const [hh, mm] = timeStr.split(':').map(n => parseInt(n, 10));
+    const minutos = hh * 60 + mm;
+
+    const inicio = 7 * 60 + 30; // 07:30
+
+    if (diaSemana === 0) {
+      return 'Atendemos apenas de segunda a sábado.';
+    } else if (diaSemana >= 1 && diaSemana <= 5) {
+      const fim = 17 * 60 + 30; // 17:30
+      if (minutos < inicio || minutos > fim) {
+        return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+      }
+    } else if (diaSemana === 6) {
+      const fim = 13 * 60; // 13:00
+      if (minutos < inicio || minutos > fim) {
+        return 'Sábado: horários entre 07:30 e 13:00.';
+      }
+    }
+
+    return null;
+  }
+
+  // ======= EVENTOS =========
+
+  // Onboarding → mostra app
+  btnIniciar.addEventListener('click', () => {
+    onboardingSection.style.display = 'none';
+    app.style.display = 'flex';
+    showStep(1);
+    setTimeout(() => {
+      phoneInput.focus();
+    }, 200);
+  });
+
+  // Botão "Entender rapidinho como funciona"
+  btnHowItWorks.addEventListener('click', () => {
+    const isHidden = howItWorksBox.classList.contains('hidden');
+    if (isHidden) {
+      howItWorksBox.classList.remove('hidden');
+      btnHowItWorks.textContent = 'Fechar explicação';
+    } else {
+      howItWorksBox.classList.add('hidden');
+      btnHowItWorks.textContent = 'Entender rapidinho como funciona';
+    }
+  });
+
+  // Passo 1: telefone
+  btnStep1Next.addEventListener('click', async () => {
+    step1Error.classList.add('hidden');
+    const raw = phoneInput.value.trim();
+    const digits = sanitizePhone(raw);
+
+    if (!digits || digits.length < 10) {
+      step1Error.textContent = 'Por favor, informe um WhatsApp válido (com DDD).';
+      step1Error.classList.remove('hidden');
+      return;
+    }
+
+    currentPhoneDigits = digits;
+
+    try {
+      const lookup = await apiPost('/api/customers/lookup', { phone: digits });
+
+      if (lookup.exists && lookup.customer) {
+        // CLIENTE JÁ CADASTRADO
+        currentCustomer = lookup.customer;
+
+        // buscar pets desse cliente
+        try {
+          const petsResp = await apiGet('/api/pets', { customer_id: currentCustomer.id });
+          currentPets = petsResp.pets || [];
+        } catch (e) {
+          console.error('Erro ao buscar pets do cliente:', e);
+          currentPets = [];
+        }
+
+        fillPetSelect();
+        showStep(3); // vai direto para a roleta
+      } else {
+        // CLIENTE NOVO → preencher dados e PETS
+        currentCustomer = null;
+        currentPets = [];
+        ownerName.value = '';
+        petsContainer.innerHTML = '';
+        createPetFields();
+        showStep(2);
+      }
+    } catch (e) {
+      step1Error.textContent = e.message;
+      step1Error.classList.remove('hidden');
+    }
+  });
+
+  // adicionar pet (no cadastro)
+  btnAddPet.addEventListener('click', () => {
+    createPetFields();
+  });
+
+  // Passo 2: cadastro
+  btnStep2Next.addEventListener('click', async () => {
+    step2Error.classList.add('hidden');
+    const name = ownerName.value.trim();
+    const pets = getPetsFromForm();
+
+    if (!name) {
+      step2Error.textContent = 'Informe seu nome.';
+      step2Error.classList.remove('hidden');
+      return;
+    }
+    if (!pets.length) {
+      step2Error.textContent = 'Cadastre pelo menos um pet para continuar.';
+      step2Error.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const cRes = await apiPost('/api/customers', {
+        name,
+        phone: currentPhoneDigits
+      });
+      currentCustomer = cRes.customer;
+
+      currentPets = [];
+      for (const p of pets) {
+        const respPet = await apiPost('/api/pets', {
+          customer_id: currentCustomer.id,
+          name: p.name,
+          breed: p.breed,
+          info: p.info || null
+        });
+        currentPets.push(respPet.pet);
+      }
+
+      fillPetSelect();
+      showStep(3);
+    } catch (e) {
+      step2Error.textContent = e.message;
+      step2Error.classList.remove('hidden');
+    }
+  });
+
+  // Passo 3: girar roleta + overlay de 5s
+  btnSpin.addEventListener('click', () => {
+    step3Error.classList.add('hidden');
+    if (spinning) return;
+    spinning = true;
+
+    // mostra overlay de "sorteando"
+    sortingScreen.classList.remove('hidden');
+
+    const randomIndex = Math.floor(Math.random() * prizes.length);
+    const prize = prizes[randomIndex];
+
+    const baseRotation = 360 * 4;
+    const segmentAngle = 360 / prizes.length;
+    const extraRotation = segmentAngle * randomIndex + segmentAngle / 2;
+
+    const finalRotation = baseRotation + extraRotation;
+
+    wheel.style.transition = 'transform 2.5s ease-out';
+    wheel.style.transform = `rotate(${finalRotation}deg)`;
+
+    // termina a rotação real da roleta
+    setTimeout(() => {
+      wheel.style.transition = 'none';
+      const normalized = finalRotation % 360;
+      wheel.style.transform = `rotate(${normalized}deg)`;
+      setPrize(prize);
+      spinning = false;
+    }, 2600);
+
+    // mantém a tela de "sorteando" por 5s e depois vai para o agendamento
+    setTimeout(() => {
+      sortingScreen.classList.add('hidden');
+      showStep(4);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 5000);
+  });
+
+  // Passo 4: confirmar agendamento + overlay de sucesso
+  btnConfirmBooking.addEventListener('click', async () => {
+    step4Error.classList.add('hidden');
+    step4Success.classList.add('hidden');
+
+    if (!currentCustomer) {
+      step4Error.textContent = 'Ocorreu um problema com o cadastro. Volte e tente novamente.';
+      step4Error.classList.remove('hidden');
+      return;
+    }
+
+    if (!selectedPrize) {
+      step4Error.textContent = 'Gire a roleta antes de confirmar o agendamento.';
+      step4Error.classList.remove('hidden');
+      return;
+    }
+
+    const petId = petSelect.value;
+    const service = serviceSelect.value;
+    const date = dateInput.value;
+    const time = timeInput.value;
+    const notes = notesInput.value.trim();
+
+    if (!petId) {
+      step4Error.textContent = 'Selecione o pet que vai usar o mimo.';
+      step4Error.classList.remove('hidden');
+      return;
+    }
+    if (!service) {
+      step4Error.textContent = 'Selecione o serviço do agendamento.';
+      step4Error.classList.remove('hidden');
+      return;
+    }
+
+    const erroHorario = validarDiaHora(date, time);
+    if (erroHorario) {
+      step4Error.textContent = erroHorario;
+      step4Error.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      const body = {
+        customer_id: currentCustomer.id,
+        pet_id: parseInt(petId, 10),
+        date,
+        time,
+        service,
+        prize: selectedPrize.key,
+        notes,
+        status: 'agendado'
+      };
+
+      await apiPost('/api/bookings', body);
+
+      const pet = currentPets.find(p => String(p.id) === String(petId));
+      const petName = pet ? pet.name : 'seu pet';
+
+      const dataBr = (() => {
+        const parts = (date || '').split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        return date;
+      })();
+
+      const texto = `
+Oi, aqui é da Pet Funny 🐾
+
+Novo agendamento vindo da Roleta de Mimos:
+
+• Tutor(a): ${currentCustomer.name || ''}
+• WhatsApp do tutor: ${phoneInput.value.trim() || ''}
+• Pet: ${petName}
+• Serviço: ${service}
+• Mimo da Roleta: ${selectedPrize.key}
+• Data: ${dataBr}
+• Horário: ${time}
+• Observações: ${notes || '—'}
+
+Vamos confirmar esse horário por aqui. 💛
+      `.trim();
+
+      const encoded = encodeURIComponent(texto);
+      const url = `https://wa.me/5516981535338?text=${encoded}`;
+
+      // mostra overlay de sucesso por 5s e depois abre o WhatsApp
+      successScreen.classList.remove('hidden');
+
+      setTimeout(() => {
+        window.open(url, '_blank');
+        successScreen.classList.add('hidden');
+      }, 5000);
+
+    } catch (e) {
+      step4Error.textContent = e.message;
+      step4Error.classList.remove('hidden');
+    }
+  });
+
+  // INIT – deixa pelo menos um pet no formulário
+  createPetFields();
+</script>
+
+</body>
+</html>
