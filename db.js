@@ -1,149 +1,113 @@
-// db.js — Turso (libSQL) + fallback local (opcional)
-// Requer: npm i @libsql/client
+// backend/db.js — PostgreSQL (pg)
+// Requer: npm i pg
 
-const fs = require("fs");
-const path = require("path");
-const { createClient } = require("@libsql/client");
+const { Pool } = require('pg');
 
-// Variáveis padrão (Render)
-const TURSO_DATABASE_URL = process.env.TURSO_DATABASE_URL || process.env.TURSO_URL || "";
-const TURSO_AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN || "";
+// Render geralmente injeta DATABASE_URL
+const DATABASE_URL = process.env.DATABASE_URL;
 
-// Opcional: fallback local (para dev). Se não quiser, pode remover.
-const USE_LOCAL_SQLITE =
-  !TURSO_DATABASE_URL ||
-  TURSO_DATABASE_URL.trim() === "";
+// SSL: no Render normalmente precisa em produção.
+// Se você estiver rodando local, pode deixar PGSSLMODE=disable ou NODE_ENV=development.
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Fallback local via arquivo SQLite usando libsql local (file:...)
-const LOCAL_DB_FILE = process.env.LOCAL_DB_FILE || "pet-funny.sqlite";
-const LOCAL_DB_URL = `file:${path.join(__dirname, LOCAL_DB_FILE)}`;
-
-const client = createClient({
-  url: USE_LOCAL_SQLITE ? LOCAL_DB_URL : TURSO_DATABASE_URL,
-  authToken: USE_LOCAL_SQLITE ? undefined : TURSO_AUTH_TOKEN,
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 });
 
-async function exec(sql, args = []) {
-  return client.execute({ sql, args });
+/**
+ * Helper para queries:
+ * - all: retorna array
+ * - get: retorna 1 linha ou null
+ * - run: retorna { lastID, changes }
+ */
+async function query(sql, params = []) {
+  return pool.query(sql, params);
 }
 
-async function execMany(sql) {
-  // executeMultiple aceita várias instruções separadas por ;
-  return client.executeMultiple(sql);
+async function all(sql, params = []) {
+  const res = await query(sql, params);
+  return res.rows || [];
+}
+
+async function get(sql, params = []) {
+  const res = await query(sql, params);
+  return res.rows?.[0] || null;
 }
 
 /**
- * Migração/Inicialização:
- * - Cria tabelas se não existirem
- * - Garante defaults para created_at
- * - Se a tabela customers já existir COM created_at NOT NULL sem default, recria corretamente.
+ * run:
+ * - Para INSERT com RETURNING id, lastID vem.
+ * - Para UPDATE/DELETE, changes vem de rowCount.
+ */
+async function run(sql, params = []) {
+  const res = await query(sql, params);
+
+  let lastID;
+  // Se tiver RETURNING id, pega o primeiro
+  if (res.rows && res.rows[0]) {
+    if (res.rows[0].id !== undefined && res.rows[0].id !== null) {
+      lastID = Number(res.rows[0].id);
+    }
+  }
+
+  return {
+    lastID,
+    changes: typeof res.rowCount === 'number' ? res.rowCount : undefined,
+  };
+}
+
+/**
+ * initDb:
+ * - Cria tabelas/índices se não existirem (idempotente)
+ * - Mantém pet_id NULL em bookings
  */
 async function initDb() {
-  // 1) Cria schema base (idempotente)
-  await execMany(`
-    PRAGMA foreign_keys = ON;
-
+  // Observação: Postgres não suporta "CREATE TABLE IF NOT EXISTS" com FK inline? Suporta sim.
+  // E índices com IF NOT EXISTS também.
+  const sql = `
     CREATE TABLE IF NOT EXISTS customers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       phone TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS pets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      customer_id INTEGER NOT NULL,
+      id SERIAL PRIMARY KEY,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       breed TEXT,
       info TEXT,
-      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
-      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS bookings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      customer_id INTEGER NOT NULL,
-      pet_id INTEGER,
-      date TEXT NOT NULL,         -- YYYY-MM-DD
-      time TEXT NOT NULL,         -- HH:MM
+      id SERIAL PRIMARY KEY,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      pet_id INTEGER REFERENCES pets(id) ON DELETE SET NULL, -- ✅ pode ser NULL
+      date TEXT NOT NULL,   -- YYYY-MM-DD
+      time TEXT NOT NULL,   -- HH:MM
       service TEXT NOT NULL,
       prize TEXT NOT NULL,
       notes TEXT,
       status TEXT NOT NULL DEFAULT 'agendado',
-      last_notification_at TEXT,
-      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
-      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
-      FOREIGN KEY (pet_id) REFERENCES pets(id) ON DELETE SET NULL
+      last_notification_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
     CREATE INDEX IF NOT EXISTS idx_pets_customer_id ON pets(customer_id);
     CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(date);
     CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);
-  `);
+    CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);
+  `;
 
-  // 2) Correção do seu cenário específico:
-  // Se customers.created_at está NOT NULL mas SEM DEFAULT, inserts falham.
-  // A forma mais segura é recriar a tabela.
-  // Vamos detectar se existe DEFAULT no schema do customers.created_at.
-  const info = await exec(`PRAGMA table_info(customers);`);
-  const cols = info.rows || [];
-
-  const createdAtCol = cols.find((c) => c.name === "created_at");
-  const hasDefault = createdAtCol && createdAtCol.dflt_value;
-
-  if (createdAtCol && !hasDefault) {
-    // recria tabela customers com default correto
-    await execMany(`
-      PRAGMA foreign_keys = OFF;
-
-      CREATE TABLE IF NOT EXISTS customers_new (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        phone TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
-      );
-
-      INSERT INTO customers_new (id, phone, name, created_at)
-      SELECT id, phone, name,
-             COALESCE(created_at, CURRENT_TIMESTAMP)
-      FROM customers;
-
-      DROP TABLE customers;
-      ALTER TABLE customers_new RENAME TO customers;
-
-      CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
-
-      PRAGMA foreign_keys = ON;
-    `);
-  }
-}
-
-/**
- * Helpers com padrão parecido com sqlite:
- * - all/get/run para facilitar no server.js
- */
-async function all(sql, args = []) {
-  const res = await exec(sql, args);
-  return res.rows || [];
-}
-
-async function get(sql, args = []) {
-  const rows = await all(sql, args);
-  return rows[0] || null;
-}
-
-async function run(sql, args = []) {
-  const res = await exec(sql, args);
-  // libsql retorna lastInsertRowid / rowsAffected
-  return {
-    lastID: res.lastInsertRowid ? Number(res.lastInsertRowid) : undefined,
-    changes: typeof res.rowsAffected === "number" ? res.rowsAffected : undefined,
-  };
+  await query(sql);
 }
 
 module.exports = {
-  client,
+  pool,
   initDb,
   all,
   get,

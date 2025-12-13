@@ -301,6 +301,7 @@
       justify-content: space-between;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .subtable-wrapper {
@@ -464,9 +465,9 @@
             <input type="text" id="formNome" placeholder="Nome do tutor" />
           </div>
           <div class="form-group">
-            <label for="formPetSelect">Pet</label>
+            <label for="formPetSelect">Pet (opcional)</label>
             <select id="formPetSelect">
-              <option value="">Selecione o pet...</option>
+              <option value="">(Sem pet informado)</option>
             </select>
           </div>
           <div class="form-group">
@@ -646,6 +647,7 @@
         </div>
       </div>
     </section>
+
     <!-- TAB: DASHBOARD -->
     <section id="tab-dashboard" class="tab-view">
       <div class="section-title-row">
@@ -982,28 +984,28 @@
 
     switch (s) {
       case 'agendado':
-        corpo = `Acabamos de registrar o agendamento do(a) *${petLabel}* para *${service}* em *${dataBR} às ${time}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQuando estiver próximo do dia, te avisamos por aqui. 💚`;
+        corpo = `Acabamos de registrar o agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQuando estiver próximo do dia, te avisamos por aqui. 💚`;
         break;
       case 'confirmado':
-        corpo = `Seu agendamento do(a) *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CONFIRMADO* ✅\n\nMimo garantido: *${prize}*.\n\nQualquer alteração é só avisar a gente aqui no WhatsApp.`;
+        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CONFIRMADO* ✅\n\nMimo garantido: *${prize}*.\n\nQualquer alteração é só avisar a gente aqui no WhatsApp.`;
         break;
       case 'recebido':
-        corpo = `O(a) *${petLabel}* já está aqui com a gente para *${service}* 🐶✨\n\nEstamos cuidando dele(a) com muito carinho.\n\nMimo da vez: *${prize}*.\n\nAssim que estiver tudo pronto, te avisamos por aqui.`;
+        corpo = `*${petLabel}* já está aqui com a gente para *${service}* 🐶✨\n\nEstamos cuidando com muito carinho.\n\nMimo da vez: *${prize}*.\n\nAssim que estiver tudo pronto, te avisamos por aqui.`;
         break;
       case 'em servico':
-        corpo = `Estamos cuidando do(a) *${petLabel}* agora mesmo no *${service}* 🛁✂️\n\nMimo aplicado: *${prize}*.\n\nDaqui a pouco ele(a) estará pronto(a) para ser buscado(a).`;
+        corpo = `Estamos cuidando de *${petLabel}* agora mesmo no *${service}* 🛁✂️\n\nMimo aplicado: *${prize}*.\n\nDaqui a pouco estará pronto(a) para ser buscado(a).`;
         break;
       case 'concluido':
-        corpo = `O serviço do(a) *${petLabel}* (*${service}*) foi *CONCLUÍDO* ✅\n\nMimo aplicado: *${prize}*.\n\nQuando quiser, já pode vir buscar o(a) seu(sua) peludo(a).`;
+        corpo = `O serviço de *${petLabel}* (*${service}*) foi *CONCLUÍDO* ✅\n\nMimo aplicado: *${prize}*.\n\nQuando quiser, já pode vir buscar.`;
         break;
       case 'entregue':
-        corpo = `O(a) *${petLabel}* já foi entregue e esperamos que você tenha gostado do resultado ✨\n\nServiço: *${service}*\nMimo da Roleta: *${prize}*.\n\nObrigada por confiar no Pet Funny! 💚`;
+        corpo = `Tudo entregue, e esperamos que você tenha gostado do resultado ✨\n\nReferência: *${petLabel}*\nServiço: *${service}*\nMimo da Roleta: *${prize}*.\n\nObrigada por confiar no Pet Funny! 💚`;
         break;
       case 'cancelado':
-        corpo = `Seu agendamento do(a) *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CANCELADO* ❌\n\nSe quiser remarcar, é só mandar uma mensagem por aqui que encontramos um novo horário pra vocês.`;
+        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CANCELADO* ❌\n\nSe quiser remarcar, é só mandar mensagem por aqui que encontramos um novo horário.`;
         break;
       default:
-        corpo = `O status do agendamento do(a) *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi atualizado para: *${String(status || '').toUpperCase()}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQualquer dúvida, é só chamar aqui no WhatsApp 💚`;
+        corpo = `O status do agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi atualizado para: *${String(status || '').toUpperCase()}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQualquer dúvida, é só chamar aqui no WhatsApp 💚`;
     }
     return cabecalho + corpo;
   }
@@ -1020,7 +1022,6 @@
       const tabId = btn.getAttribute('data-tab');
       tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
 
-      // Quando abre o Dashboard, garante atualização + resize dos gráficos (canvas escondido)
       if (tabId === 'tab-dashboard') {
         loadDashboard().finally(() => {
           setTimeout(() => {
@@ -1099,7 +1100,7 @@
   function setEditMode(isEdit) {
     formPhone.disabled = isEdit;
     formNome.disabled = isEdit;
-    formPetSelect.disabled = isEdit;
+    formPetSelect.disabled = isEdit; // em edição, trava para não desalinhar o booking
     formPrize.disabled = isEdit;
   }
 
@@ -1313,13 +1314,17 @@
   async function loadPetsForCustomer(customerId) {
     const data = await apiGet('/api/pets', { customer_id: customerId });
     const pets = (data.pets || []);
-    formPetSelect.innerHTML = '<option value="">Selecione o pet...</option>';
+
+    // ✅ sempre garante a opção "sem pet"
+    formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
+
     pets.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.id;
       opt.textContent = p.breed ? `${p.name} (${p.breed})` : p.name;
       formPetSelect.appendChild(opt);
     });
+
     return pets;
   }
 
@@ -1337,58 +1342,29 @@
     formNotes.value = booking.notes || '';
     formError.style.display = 'none';
 
-    formPetSelect.innerHTML = '<option value="">Selecione o pet...</option>';
+    formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
 
     setEditMode(true);
 
     const customerId = booking.customer_id || booking.customerId;
-    const bookingPetId = booking.pet_id || booking.petId;
+    const bookingPetId = booking.pet_id ?? booking.petId; // pode ser null
     const bookingPetName = booking.pet_name || booking.petName;
 
     if (customerId) {
       loadPetsForCustomer(customerId)
         .then(() => {
-          let selected = false;
-
           if (bookingPetId != null) {
             formPetSelect.value = String(bookingPetId);
-            if (formPetSelect.value === String(bookingPetId)) selected = true;
+          } else {
+            formPetSelect.value = ''; // sem pet
           }
 
-          if (!selected && bookingPetName) {
-            const nomeLower = bookingPetName.toLowerCase();
-            for (const opt of formPetSelect.options) {
-              if (opt.textContent.toLowerCase().startsWith(nomeLower)) {
-                formPetSelect.value = opt.value;
-                selected = true;
-                break;
-              }
-            }
-          }
-
-          if (!selected && bookingPetName) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = bookingPetName;
-            formPetSelect.appendChild(opt);
-            formPetSelect.value = '';
+          // fallback: se não achou pet_id mas tem nome
+          if (bookingPetId == null && bookingPetName) {
+            // mantém "sem pet informado", mas não perde o nome no WhatsApp (fallback)
           }
         })
-        .catch(() => {
-          if (bookingPetName) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = bookingPetName;
-            formPetSelect.appendChild(opt);
-            formPetSelect.value = '';
-          }
-        });
-    } else if (bookingPetName) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = bookingPetName;
-      formPetSelect.appendChild(opt);
-      formPetSelect.value = '';
+        .catch(() => {});
     }
 
     mostrarFormAgenda();
@@ -1489,7 +1465,7 @@
     bookingOriginalStatus.value = 'agendado';
     formPhone.value = '';
     formNome.value = '';
-    formPetSelect.innerHTML = '<option value="">Selecione o pet...</option>';
+    formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
     formPrize.value = 'Tosa Higiênica';
     formService.value = '';
     formDate.value = '';
@@ -1511,7 +1487,10 @@
     const rawPhone = formPhone.value.trim();
     const phone = sanitizePhone(rawPhone);
     const nome = formNome.value.trim();
-    const petId = formPetSelect.value;
+
+    const petIdRaw = formPetSelect.value; // pode ser ''
+    const petIdNum = petIdRaw ? parseInt(petIdRaw, 10) : null;
+
     const prize = formPrize.value;
     const service = formService.value;
     const date = formDate.value;
@@ -1519,6 +1498,7 @@
     const status = formStatus.value;
     const notes = formNotes.value.trim();
 
+    // ✅ obrigatórios: customer_id (via lookup/create), date, time, service, prize
     if (!date || !time || !prize || !service) {
       formError.textContent = 'Data, horário, serviço e mimo são obrigatórios.';
       formError.style.display = 'block';
@@ -1543,21 +1523,22 @@
         customer = cRes.customer;
       }
 
-      let petIdNum = petId ? parseInt(petId, 10) : null;
-
       const body = {
         customer_id: customer.id,
-        pet_id: petIdNum,
+        pet_id: petIdNum, // ✅ pode ser null
         date, time, service, prize, notes, status
       };
 
       let precisaWhats = false;
       let urlWhats = null;
 
+      // WhatsApp somente se status mudou
       if (id && normStr(status) !== normStr(originalStatus)) {
         const dataBR = formatDataBr(date);
-        const petLabel = formPetSelect.options[formPetSelect.selectedIndex]
-          ? formPetSelect.options[formPetSelect.selectedIndex].textContent
+
+        // ✅ fallback quando não tem pet selecionado
+        const petLabel = petIdNum
+          ? (formPetSelect.options[formPetSelect.selectedIndex]?.textContent || 'seu pet')
           : 'seu pet';
 
         const msg = buildStatusMessage(status, nome, petLabel, service, dataBR, time, prize);
@@ -1957,8 +1938,6 @@
     limparPetsForm();
   });
 
-  // Inicialização
-  // garante estado correto do custom-range ao abrir
   if (dashPeriod && dashPeriod.value === 'custom') dashCustomRange.classList.remove('hidden');
   tryAutoLogin();
 </script>
