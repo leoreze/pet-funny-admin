@@ -57,7 +57,7 @@ app.post('/api/customers/lookup', async (req, res) => {
 
   try {
     const row = await db.get(
-      'SELECT * FROM customers WHERE phone = ?',
+      'SELECT * FROM customers WHERE phone = $1',
       [phone]
     );
     if (!row) return res.json({ exists: false });
@@ -77,25 +77,25 @@ app.post('/api/customers', async (req, res) => {
 
   try {
     const row = await db.get(
-      'SELECT * FROM customers WHERE phone = ?',
+      'SELECT * FROM customers WHERE phone = $1',
       [phone]
     );
 
     if (row) {
       await db.run(
-        'UPDATE customers SET name = ? WHERE id = ?',
+        'UPDATE customers SET name = $1 WHERE id = $2',
         [name, row.id]
       );
       return res.json({ customer: { ...row, name }, existed: true });
     }
 
     const result = await db.run(
-      'INSERT INTO customers (phone, name) VALUES (?, ?)',
+      'INSERT INTO customers (phone, name) VALUES ($1, $2)',
       [phone, name]
     );
 
     const novo = await db.get(
-      'SELECT * FROM customers WHERE id = ?',
+      'SELECT * FROM customers WHERE id = $1',
       [result.lastID]
     );
 
@@ -110,7 +110,7 @@ app.post('/api/customers', async (req, res) => {
 app.delete('/api/customers/:id', async (req, res) => {
   try {
     const result = await db.run(
-      'DELETE FROM customers WHERE id = ?',
+      'DELETE FROM customers WHERE id = $1',
       [req.params.id]
     );
     res.json({ deleted: result.changes > 0 });
@@ -130,7 +130,7 @@ app.get('/api/pets', async (req, res) => {
 
   try {
     const rows = await db.all(
-      'SELECT * FROM pets WHERE customer_id = ? ORDER BY name',
+      'SELECT * FROM pets WHERE customer_id = $1 ORDER BY name',
       [customer_id]
     );
     res.json({ pets: rows });
@@ -149,12 +149,12 @@ app.post('/api/pets', async (req, res) => {
 
   try {
     const result = await db.run(
-      'INSERT INTO pets (customer_id, name, breed, info) VALUES (?, ?, ?, ?)',
+      'INSERT INTO pets (customer_id, name, breed, info) VALUES ($1, $2,$3, $4)',
       [customer_id, name, breed || null, info || null]
     );
 
     const pet = await db.get(
-      'SELECT * FROM pets WHERE id = ?',
+      'SELECT * FROM pets WHERE id = $1',
       [result.lastID]
     );
 
@@ -171,12 +171,12 @@ app.put('/api/pets/:id', async (req, res) => {
 
   try {
     await db.run(
-      'UPDATE pets SET name = ?, breed = ?, info = ? WHERE id = ?',
+      'UPDATE pets SET name = $1, breed = $2, info = $3 WHERE id = $4',
       [name, breed || null, info || null, req.params.id]
     );
 
     const pet = await db.get(
-      'SELECT * FROM pets WHERE id = ?',
+      'SELECT * FROM pets WHERE id = $1',
       [req.params.id]
     );
 
@@ -190,7 +190,7 @@ app.put('/api/pets/:id', async (req, res) => {
 app.delete('/api/pets/:id', async (req, res) => {
   try {
     const result = await db.run(
-      'DELETE FROM pets WHERE id = ?',
+      'DELETE FROM pets WHERE id = $1',
       [req.params.id]
     );
     res.json({ deleted: result.changes > 0 });
@@ -235,7 +235,7 @@ app.post('/api/bookings', async (req, res) => {
       `
       INSERT INTO bookings
         (customer_id, pet_id, date, time, service, prize, notes, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `,
       [
         customer_id,
@@ -274,16 +274,16 @@ app.get('/api/bookings', async (req, res) => {
   const params = [];
 
   if (date) {
-    sql += ' AND b.date = ?';
+    sql += ' AND b.date = $1';
     params.push(date);
   }
 
   if (search) {
     sql += `
       AND (
-        c.name LIKE ?
-        OR p.name LIKE ?
-        OR c.phone LIKE ?
+        c.name LIKE $1
+        OR p.name LIKE $2
+        OR c.phone LIKE $3
       )
     `;
     params.push(`%${search}%`, `%${search}%`, `%${search.replace(/\D/g, '')}%`);
@@ -323,17 +323,17 @@ app.put('/api/bookings/:id', async (req, res) => {
     await db.run(
       `
       UPDATE bookings SET
-        customer_id = ?,
-        pet_id = ?,
-        date = ?,
-        time = ?,
-        service = ?,
-        prize = ?,
-        notes = ?,
-        status = ?,
-        last_notification_at = ?
-      WHERE id = ?
-      `,
+        customer_id = $1,
+        pet_id = $2,
+        date = $3,
+        time = $4,
+        service = $5,
+        prize = $6,
+        notes = $7,
+        status = $8,
+        last_notification_at = $1
+      WHERE id = $10
+      `,9
       [
         customer_id,
         safePetId,
@@ -358,7 +358,7 @@ app.put('/api/bookings/:id', async (req, res) => {
 app.delete('/api/bookings/:id', async (req, res) => {
   try {
     await db.run(
-      'DELETE FROM bookings WHERE id = ?',
+      'DELETE FROM bookings WHERE id = $1',
       [req.params.id]
     );
     res.json({ success: true });
