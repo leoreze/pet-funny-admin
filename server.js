@@ -14,10 +14,9 @@ app.use(express.static(__dirname));
 // Servir a pasta frontend na rota /app (por exemplo)
 app.use('/app', express.static(path.join(__dirname, '..', 'frontend')));
 
-// Rota raiz -> admin
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'admin.html'));
-});
+(async () => {
+  await db.initDb();
+})();
 
 // ===== CLIENTES BÁSICO (exemplo) =====
 
