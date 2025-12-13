@@ -15,8 +15,7 @@ app.use(express.json());
 // Admin (admin.html, logo, etc)
 app.use(express.static(__dirname));
 
-// Frontend público (roleta.html, css, js)
-app.use('/public', express.static(path.join(__dirname, '..', 'public')));
+
 
 /* =========================
    INIT DATABASE
