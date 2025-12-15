@@ -611,8 +611,7 @@
               <select id="serviceSelect" disabled>
                 <option value="">Carregando serviços...</option>
               </select>
-
-              <div class="field-help" id="serviceHelp">Escolha o serviço para calcular o valor real do agendamento.</div>
+              <div class="field-help" id="serviceHelp">O valor será preenchido automaticamente no WhatsApp.</div>
             </div>
 
             <div class="field-group">
@@ -738,7 +737,7 @@
 </footer>
 
 <script>
-  const API_BASE_URL = '';
+  const API_BASE_URL = ''; // mesmo host/porta do backend
 
   let currentPhoneDigits = null;
   let currentCustomer = null;
@@ -746,9 +745,7 @@
   let selectedPrize = null;
   let spinning = false;
 
-  let occupiedTimes = new Set();
-
-  // ✅ serviços (cache)
+  let occupiedTimes = new Set(); // "HH:MM"
   let servicesCache = [];
 
   const prizes = [
@@ -857,32 +854,11 @@
     return data;
   }
 
-  // =========================
-  // SERVICES (dinâmico)
-  // =========================
-
-  function centsToBRL(cents) {
+  // ======= SERVICES (dinâmico) =======
+  function formatCentsBRL(cents) {
     const n = Number(cents);
-    if (!Number.isFinite(n)) return null;
-    return n / 100;
-  }
-
-  function formatBRL(value) {
-    const num = Number(value);
-    if (!Number.isFinite(num)) return '';
-    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  }
-
-  function getServicePriceReais(service) {
-    // suporta: price (reais) OU value_cents (centavos)
-    if (service && service.price !== undefined && service.price !== null && service.price !== '') {
-      const p = Number(service.price);
-      return Number.isFinite(p) ? p : null;
-    }
-    if (service && service.value_cents !== undefined && service.value_cents !== null && service.value_cents !== '') {
-      return centsToBRL(service.value_cents);
-    }
-    return null;
+    if (!Number.isFinite(n)) return '';
+    return (n / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
   function renderServiceSelect(services) {
@@ -896,14 +872,15 @@
     (services || []).forEach(s => {
       const opt = document.createElement('option');
       opt.value = String(s.id);
+
       opt.dataset.title = String(s.title || '');
+      opt.dataset.valueCents = String(s.value_cents ?? '');
 
-      const priceReais = getServicePriceReais(s);
-      opt.dataset.price_reais = (priceReais === null ? '' : String(priceReais));
+      const priceLabel = (s.value_cents !== undefined && s.value_cents !== null && s.value_cents !== '')
+        ? ` • ${formatCentsBRL(s.value_cents)}`
+        : '';
 
-      const priceLabel = (priceReais === null) ? '' : ` • ${formatBRL(priceReais)}`;
       opt.textContent = `${s.title}${priceLabel}`;
-
       serviceSelect.appendChild(opt);
     });
 
@@ -923,24 +900,6 @@
     servicesCache = resp.services || [];
     renderServiceSelect(servicesCache);
   }
-
-  // Atualiza helper quando seleciona serviço (mostra preço se existir)
-  serviceSelect.addEventListener('change', () => {
-    const opt = serviceSelect.options[serviceSelect.selectedIndex];
-    const title = opt?.dataset?.title || '';
-    const priceReais = opt?.dataset?.price_reais ? Number(opt.dataset.price_reais) : null;
-
-    if (!opt || !opt.value) {
-      serviceHelp.textContent = 'Escolha o serviço para calcular o valor real do agendamento.';
-      return;
-    }
-
-    if (Number.isFinite(priceReais)) {
-      serviceHelp.textContent = `Serviço selecionado: ${title} (${formatBRL(priceReais)}).`;
-    } else {
-      serviceHelp.textContent = `Serviço selecionado: ${title}.`;
-    }
-  });
 
   function showStep(stepNumber) {
     [step1, step2, step3, step4].forEach(s => s.classList.add('hidden'));
@@ -1255,6 +1214,7 @@
     return `${hh}:${mm}`;
   }
 
+  // ======= EVENTOS =======
   btnIniciar.addEventListener('click', async () => {
     onboardingSection.style.display = 'none';
     app.style.display = 'flex';
@@ -1439,10 +1399,13 @@
     }
 
     const petId = petSelect.value;
-    const serviceId = serviceSelect.value;
 
+    const serviceId = serviceSelect.value;
     const selectedOpt = serviceSelect.options[serviceSelect.selectedIndex];
     const serviceTitle = selectedOpt?.dataset?.title || selectedOpt?.textContent || '';
+
+    const serviceValueCents = Number(selectedOpt?.dataset?.valueCents);
+    const serviceValueBRL = Number.isFinite(serviceValueCents) ? formatCentsBRL(serviceValueCents) : '—';
 
     const date = dateInput.value;
     const time = getSelectedTimeHHMM();
@@ -1488,13 +1451,7 @@
         pet_id: parseInt(petId, 10),
         date,
         time,
-
-        // ✅ FK (principal)
-        service_id: parseInt(serviceId, 10),
-
-        // ✅ compatibilidade (se você ainda salva texto no banco)
-        service: serviceTitle,
-
+        service: serviceTitle, // mantém compatível com seu backend atual
         prize: selectedPrize.key,
         notes,
         status: 'agendado'
@@ -1513,14 +1470,6 @@
         return str.normalize('NFC');
       }
 
-     // --- pega valor do serviço selecionado (em reais) ---
-      const opt = serviceSelect.options[serviceSelect.selectedIndex];
-      const priceReais = opt?.dataset?.price_reais ? Number(opt.dataset.price_reais) : null;
-      const serviceValueLine = Number.isFinite(priceReais)
-        ? `• Valor do serviço: ${formatBRL(priceReais)}`
-        : `• Valor do serviço: (não informado)`;
-
-      // --- mensagem WhatsApp (com valor) ---
       const texto = normalizeText(`
 Oi, Pet Funny, meu nome é ${currentCustomer.name || ''}, realizei um novo agendamento vindo da Roleta de Mimos:
 
@@ -1528,7 +1477,7 @@ Oi, Pet Funny, meu nome é ${currentCustomer.name || ''}, realizei um novo agend
 • WhatsApp do tutor: ${phoneInput.value.trim() || ''}
 • Pet: ${petName}
 • Serviço: ${serviceTitle}
-${serviceValueLine}
+• Valor do serviço: ${serviceValueBRL}
 • Mimo da Roleta: ${selectedPrize.key}
 • Data: ${dataBr}
 • Horário: ${time}
@@ -1553,7 +1502,6 @@ Aguardo o retorno de confirmação do agendamento.`).trim();
   });
 
   createPetFields();
-
   resetTimeSelects();
   setAvailabilityMessage('');
 </script>
