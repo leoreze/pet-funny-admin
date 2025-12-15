@@ -406,7 +406,7 @@
     </div>
 
     <div class="login-footer-hint">
-      Usuário: <strong>adminpetfunny</strong> • Senha: <strong>admin2605</strong>
+      Área exclusiva para a equipe Pet Funny.
     </div>
   </div>
 </section>
@@ -1051,33 +1051,33 @@
 
   function buildStatusMessage(status, nome, petLabel, service, dataBR, time, prize) {
     const s = normStr(status);
-    const cabecalho = `Oi ${nome}! Aqui é do Pet Funny 🐾\n\n`;
+    const cabecalho = `Oi ${nome}! Aqui é do Pet Funny!\n\n`;
     let corpo = '';
 
     switch (s) {
       case 'agendado':
-        corpo = `Acabamos de registrar o agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQuando estiver próximo do dia, te avisamos por aqui. 💚`;
+        corpo = `Acabamos de registrar o agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQuando estiver próximo do dia, te avisamos por aqui.`;
         break;
       case 'confirmado':
-        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CONFIRMADO* ✅\n\nMimo garantido: *${prize}*.\n\nQualquer alteração é só avisar a gente aqui no WhatsApp.`;
+        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CONFIRMADO* \n\nMimo garantido: *${prize}*.\n\nQualquer alteração é só avisar a gente aqui no WhatsApp.`;
         break;
       case 'recebido':
-        corpo = `*${petLabel}* já está aqui com a gente para *${service}* 🐶✨\n\nEstamos cuidando com muito carinho.\n\nMimo da vez: *${prize}*.\n\nAssim que estiver tudo pronto, te avisamos por aqui.`;
+        corpo = `*${petLabel}* já está aqui com a gente para *${service}* \n\nEstamos cuidando com muito carinho.\n\nMimo da vez: *${prize}*.\n\nAssim que estiver tudo pronto, te avisamos por aqui.`;
         break;
       case 'em servico':
-        corpo = `Estamos cuidando de *${petLabel}* agora mesmo no *${service}* 🛁✂️\n\nMimo aplicado: *${prize}*.\n\nDaqui a pouco estará pronto(a) para ser buscado(a).`;
+        corpo = `Estamos cuidando de *${petLabel}* agora mesmo no *${service}* \n\nMimo aplicado: *${prize}*.\n\nDaqui a pouco estará pronto(a) para ser buscado(a).`;
         break;
       case 'concluido':
-        corpo = `O serviço de *${petLabel}* (*${service}*) foi *CONCLUÍDO* ✅\n\nMimo aplicado: *${prize}*.\n\nQuando quiser, já pode vir buscar.`;
+        corpo = `O serviço de *${petLabel}* (*${service}*) foi *CONCLUÍDO* \n\nMimo aplicado: *${prize}*.\n\nQuando quiser, já pode vir buscar.`;
         break;
       case 'entregue':
-        corpo = `Tudo entregue, e esperamos que você tenha gostado do resultado ✨\n\nReferência: *${petLabel}*\nServiço: *${service}*\nMimo da Roleta: *${prize}*.\n\nObrigada por confiar no Pet Funny! 💚`;
+        corpo = `Tudo entregue, e esperamos que você tenha gostado do resultado! \n\nReferência: *${petLabel}*\nServiço: *${service}*\nMimo da Roleta: *${prize}*.\n\nObrigada por confiar no Pet Funny!`;
         break;
       case 'cancelado':
-        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CANCELADO* ❌\n\nSe quiser remarcar, é só mandar mensagem por aqui que encontramos um novo horário.`;
+        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CANCELADO* \n\nSe quiser remarcar, é só mandar mensagem por aqui que encontramos um novo horário.`;
         break;
       default:
-        corpo = `O status do agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi atualizado para: *${String(status || '').toUpperCase()}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQualquer dúvida, é só chamar aqui no WhatsApp 💚`;
+        corpo = `O status do agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi atualizado para: *${String(status || '').toUpperCase()}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQualquer dúvida, é só chamar aqui no WhatsApp!`;
     }
     return cabecalho + corpo;
   }
