@@ -741,9 +741,14 @@
 <script>
 const API_BASE_URL = '';
 
-function buildApiUrl(path) {
-  return (API_BASE_URL || '') + path;
+function buildUrl(path, params = {}) {
+  const url = new URL((API_BASE_URL || '') + path, window.location.origin);
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
+  });
+  return url.toString();
 }
+
 
 
   /* ===== Helpers de normalização (corrige acentos/variações) ===== */
@@ -883,19 +888,13 @@ btnLogin.addEventListener('click', () => {
   });
 
   // ===== API HELPERS =====
- async function apiGet(path, params) {
-  const url = new URL(buildUrl(path));
-  if (params) {
-    Object.keys(params).forEach(k => {
-      const v = params[k];
-      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
-    });
-  }
-  const resp = await fetch(url.toString());
+async function apiGet(path, params) {
+  const resp = await fetch(buildUrl(path, params));
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
   return data;
 }
+
 
 async function apiPost(path, body) {
   const resp = await fetch(buildUrl(path), {
