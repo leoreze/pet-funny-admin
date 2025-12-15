@@ -52,6 +52,9 @@ async function ensureServicesTable() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    ALTER TABLE services
+    ADD COLUMN IF NOT EXISTS price NUMERIC(10,2) NOT NULL DEFAULT 0;
+
     CREATE INDEX IF NOT EXISTS idx_services_date
       ON services(date);
   `;
