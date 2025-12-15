@@ -258,10 +258,11 @@ app.post('/api/bookings', async (req, res) => {
 
 
 // ================== SERVICES ==================
+// ================== SERVICES ==================
+
 app.get('/api/services', async (req, res) => {
   try {
     const { date, search } = req.query;
-
     const where = [];
     const params = [];
 
@@ -271,12 +272,18 @@ app.get('/api/services', async (req, res) => {
     }
 
     if (search) {
-      params.push(`%${search}%`);
-      where.push(`LOWER(title) LIKE LOWER($${params.length})`);
+      params.push(`%${search.toLowerCase()}%`);
+      where.push(`LOWER(title) LIKE $${params.length}`);
     }
 
     const sql = `
-      SELECT id, date, title, price, created_at, updated_at
+      SELECT
+        id,
+        date,
+        title,
+        value_cents,
+        created_at,
+        updated_at
       FROM services
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY date DESC, id DESC
@@ -286,88 +293,105 @@ app.get('/api/services', async (req, res) => {
     res.json({ services });
   } catch (e) {
     console.error('Erro em GET /api/services:', e);
-    res.status(500).json({ error: e.message || 'Erro ao buscar serviços.' });
+    res.status(500).json({ error: 'Erro ao buscar serviços.' });
   }
 });
 
 app.post('/api/services', async (req, res) => {
   try {
-    const { date, title, price } = req.body || {};
+    const { date, title, value_cents } = req.body || {};
 
     if (!date || !String(title || '').trim()) {
       return res.status(400).json({ error: 'Campos obrigatórios: date, title.' });
     }
 
-    const priceNum = Number(price);
-    if (Number.isNaN(priceNum) || priceNum < 0) {
-      return res.status(400).json({ error: 'Preço inválido.' });
+    const cents = Number(value_cents);
+    if (!Number.isInteger(cents) || cents < 0) {
+      return res.status(400).json({ error: 'Valor inválido.' });
     }
 
     const row = await db.get(
-      `INSERT INTO services (date, title, price)
-       VALUES ($1, $2, $3)
-       RETURNING id, date, title, price, created_at, updated_at`,
-      [date, String(title).trim(), priceNum]
+      `
+      INSERT INTO services (date, title, value_cents)
+      VALUES ($1, $2, $3)
+      RETURNING id, date, title, value_cents, created_at, updated_at
+      `,
+      [date, String(title).trim(), cents]
     );
 
     res.json({ service: row });
   } catch (e) {
     console.error('Erro em POST /api/services:', e);
-    res.status(500).json({ error: e.message || 'Erro ao salvar serviço.' });
+    res.status(500).json({ error: 'Erro ao salvar serviço.' });
   }
 });
 
 app.put('/api/services/:id', async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'ID inválido.' });
+    }
 
-    const { date, title, price } = req.body || {};
+    const { date, title, value_cents } = req.body || {};
+
     if (!date || !String(title || '').trim()) {
       return res.status(400).json({ error: 'Campos obrigatórios: date, title.' });
     }
 
-    const priceNum = Number(price);
-    if (Number.isNaN(priceNum) || priceNum < 0) {
-      return res.status(400).json({ error: 'Preço inválido.' });
+    const cents = Number(value_cents);
+    if (!Number.isInteger(cents) || cents < 0) {
+      return res.status(400).json({ error: 'Valor inválido.' });
     }
 
     const row = await db.get(
-      `UPDATE services
-         SET date = $1,
-             title = $2,
-             price = $3,
-             updated_at = NOW()
-       WHERE id = $4
-       RETURNING id, date, title, price, created_at, updated_at`,
-      [date, String(title).trim(), priceNum, id]
+      `
+      UPDATE services
+      SET
+        date = $1,
+        title = $2,
+        value_cents = $3,
+        updated_at = NOW()
+      WHERE id = $4
+      RETURNING id, date, title, value_cents, created_at, updated_at
+      `,
+      [date, String(title).trim(), cents, id]
     );
 
-    if (!row) return res.status(404).json({ error: 'Serviço não encontrado.' });
+    if (!row) {
+      return res.status(404).json({ error: 'Serviço não encontrado.' });
+    }
+
     res.json({ service: row });
   } catch (e) {
-    console.error('Erro em PUT /api/services/:id:', e);
-    res.status(500).json({ error: e.message || 'Erro ao atualizar serviço.' });
+    console.error('Erro em PUT /api/services:', e);
+    res.status(500).json({ error: 'Erro ao atualizar serviço.' });
   }
 });
 
 app.delete('/api/services/:id', async (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'ID inválido.' });
+    }
 
     const row = await db.get(
-      `DELETE FROM services WHERE id = $1 RETURNING id`,
+      'DELETE FROM services WHERE id = $1 RETURNING id',
       [id]
     );
 
-    if (!row) return res.status(404).json({ error: 'Serviço não encontrado.' });
+    if (!row) {
+      return res.status(404).json({ error: 'Serviço não encontrado.' });
+    }
+
     res.json({ ok: true });
   } catch (e) {
-    console.error('Erro em DELETE /api/services/:id:', e);
-    res.status(500).json({ error: e.message || 'Erro ao excluir serviço.' });
+    console.error('Erro em DELETE /api/services:', e);
+    res.status(500).json({ error: 'Erro ao excluir serviço.' });
   }
 });
+
 
 app.get('/api/bookings', async (req, res) => {
   const { date, search } = req.query;
@@ -429,7 +453,7 @@ app.put('/api/bookings/:id', async (req, res) => {
   let safePetId = null;
   if (pet_id !== undefined && pet_id !== null && pet_id !== '') {
     const parsed = Number(pet_id);
-    safePetId = Number.isFinite(parsed) ? parsed : null;
+    safePetId = Number.isInteger(parsed) ? parsed : null;
   }
 
   try {
@@ -444,9 +468,9 @@ app.put('/api/bookings/:id', async (req, res) => {
         prize = $6,
         notes = $7,
         status = $8,
-        last_notification_at = $1
+        last_notification_at = $9
       WHERE id = $10
-      `,9
+      `,
       [
         customer_id,
         safePetId,
@@ -467,6 +491,7 @@ app.put('/api/bookings/:id', async (req, res) => {
     res.status(500).json({ error: 'Erro ao atualizar agendamento.' });
   }
 });
+
 
 app.delete('/api/bookings/:id', async (req, res) => {
   try {
