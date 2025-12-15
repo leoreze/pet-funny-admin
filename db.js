@@ -47,7 +47,7 @@ async function ensureServicesTable() {
       id SERIAL PRIMARY KEY,
       date DATE NOT NULL,
       title TEXT NOT NULL,
-      value_cents INTEGER NOT NULL,
+      price INTEGER NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
