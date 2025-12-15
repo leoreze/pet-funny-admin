@@ -216,7 +216,7 @@
 
     .field-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
     .field-label { font-size: 12px; font-weight: 500; color: #455a64; }
-    .field-help { font-size: 11px; color: #78909c; }
+    .field-help { font-size: 11px; color: #78909c; margin-top: 2px; }
 
     input[type="text"], input[type="tel"], input[type="date"], input[type="time"], select, textarea {
       width: 100%;
@@ -239,7 +239,6 @@
     .success-msg { font-size: 12px; color: #2e7d32; margin-top: 4px; }
     .hidden { display: none !important; }
 
-    /* ====== PET WRAPPER (correção do bug de coleta de pets) ====== */
     .pet-wrapper {
       border: 1px solid #e0e7ea;
       border-radius: 14px;
@@ -337,8 +336,6 @@
     }
     .badge-label { display: flex; flex-direction: column; line-height: 1.2; }
     .badge-label span { font-size: 11px; font-weight: 400; opacity: 0.9; }
-
-    .pet-select-info { font-size: 11px; color: #78909c; margin-top: 2px; }
 
     .full-overlay {
       position: fixed;
@@ -487,9 +484,8 @@
       <span>cheiroso, mimado e feliz</span> 💛
     </h1>
     <p class="onboarding-sub">
-      Na <strong>Roleta de Mimos da Pet Funny</strong>, cada agendamento pode ganhar um carinho extra:
-      tosa higiênica, hidratação, fotos lindas e muito mais. Você só precisa
-      se cadastrar, girar a roleta e escolher o melhor horário pro seu melhor amigo.
+      Na <strong>Roleta de Mimos da Pet Funny</strong>, cada agendamento pode ganhar um carinho extra.
+      Você só precisa se cadastrar, girar a roleta e escolher o melhor horário.
     </p>
 
     <ul class="onboarding-list">
@@ -511,11 +507,8 @@
         <li><strong>1. Você coloca seu WhatsApp</strong> pra gente reconhecer ou criar seu cadastro.</li>
         <li><strong>2. Cadastra seus pets</strong> (ou confirma os que já existem no sistema).</li>
         <li><strong>3. Gira a Roleta de Mimos</strong> e descobre qual presentinho o seu pet ganhou.</li>
-        <li><strong>4. Escolhe o dia e horário</strong> e já sai daqui com o agendamento enviado pro nosso WhatsApp.</li>
+        <li><strong>4. Escolhe o dia e horário</strong> e confirma no WhatsApp.</li>
       </ul>
-      <p style="font-size:12px; color:#607d8b; margin-top:6px;">
-        Tudo rápido, sem burocracia e com a mesma atenção que a gente dá no balcão. 💛
-      </p>
     </div>
   </div>
 </section>
@@ -539,7 +532,7 @@
           <section id="step1" class="step">
             <div class="field-group">
               <div class="field-label">Qual é o seu WhatsApp?</div>
-              <div class="field-help">Vamos usar apenas para confirmar o agendamento e mandar as informações do seu mimo.</div>
+              <div class="field-help">Vamos usar apenas para confirmar o agendamento.</div>
               <input type="tel" id="phoneInput" placeholder="(16) 98153-5338" />
             </div>
             <div id="step1Error" class="error-msg hidden"></div>
@@ -601,9 +594,7 @@
             <div class="field-group">
               <div class="field-label">Para qual pet será esse mimo?</div>
               <select id="petSelect"></select>
-              <div class="pet-select-info">
-                Os pets cadastrados no seu WhatsApp aparecem aqui. Se quiser cadastrar outro, é só falar com a gente pelo WhatsApp. 💬
-              </div>
+              <div class="field-help">Os pets cadastrados no seu WhatsApp aparecem aqui.</div>
             </div>
 
             <div class="field-group">
@@ -621,15 +612,18 @@
             <div class="field-group">
               <div class="field-label">Escolha o dia</div>
               <div class="field-help">
-                Atendemos de <strong>segunda a sexta, das 07:30 às 17:30</strong>, e
-                <strong>aos sábados, das 07:30 às 13:00</strong>.
+                Seg–Sex: <strong>07:30–17:30</strong> • Sáb: <strong>07:30–13:00</strong> • Dom: <strong>fechado</strong>
               </div>
               <input type="date" id="dateInput" />
             </div>
 
             <div class="field-group">
               <div class="field-label">Escolha o horário</div>
-              <input type="time" id="timeInput" />
+              <div style="display:flex; gap:10px;">
+                <select id="hourSelect" style="flex:1;"></select>
+                <select id="minuteSelect" style="flex:1;"></select>
+              </div>
+              <div id="availabilityMsg" class="field-help"></div>
             </div>
 
             <div class="field-group">
@@ -652,35 +646,23 @@
           <ul class="side-list">
             <li>
               <div class="side-bullet">✂️</div>
-              <div>
-                <strong>Tosa Higiênica</strong><br />
-                Limpeza das áreas íntimas, patinhas e orelhas para mais conforto e higiene.
-              </div>
+              <div><strong>Tosa Higiênica</strong><br />Mais conforto e higiene.</div>
             </li>
             <li>
               <div class="side-bullet">💧</div>
-              <div>
-                <strong>Hidratação</strong><br />
-                Tratamento especial para deixar os pelos mais macios, cheirosos e saudáveis.
-              </div>
+              <div><strong>Hidratação</strong><br />Pelos mais macios e saudáveis.</div>
             </li>
             <li>
               <div class="side-bullet">📸</div>
-              <div>
-                <strong>Foto e Vídeo Profissional</strong><br />
-                Registro fofo e profissional do banho do seu pet para você guardar e postar.
-              </div>
+              <div><strong>Foto e Vídeo</strong><br />Registro fofo do banho.</div>
             </li>
             <li>
               <div class="side-bullet">🐾</div>
-              <div>
-                <strong>Patinhas impecáveis</strong><br />
-                Acabamento caprichado nas patinhas para aquele passeio cheio de estilo.
-              </div>
+              <div><strong>Patinhas impecáveis</strong><br />Acabamento caprichado.</div>
             </li>
           </ul>
           <div class="side-caption">
-            *Um mimo por agendamento. Válido apenas nos horários disponíveis da agenda Pet Funny. 💛
+            *Um mimo por agendamento. Válido apenas nos horários disponíveis. 💛
           </div>
         </aside>
       </div>
@@ -692,9 +674,7 @@
   <div class="overlay-card">
     <div class="overlay-icon-circle">🎁</div>
     <div class="overlay-title">Sorteando o mimo do seu pet...</div>
-    <div class="overlay-subtitle">
-      Segura a ansiedade! Estamos girando a Roleta de Mimos pra ver qual carinho extra ele vai ganhar hoje. 🐶✨
-    </div>
+    <div class="overlay-subtitle">Segura a ansiedade! 🐶✨</div>
     <div style="position: relative; display:inline-block;">
       <div class="overlay-wheel"></div>
       <div class="overlay-pointer"></div>
@@ -709,10 +689,7 @@
   <div class="overlay-card">
     <div class="overlay-icon-circle">✅</div>
     <div class="overlay-title">Agendamento enviado com sucesso!</div>
-    <div class="overlay-subtitle">
-      Em instantes vamos abrir o WhatsApp da Pet Funny com todos os detalhes do banho
-      e do mimo sorteado. É só confirmar por lá. 💚
-    </div>
+    <div class="overlay-subtitle">Vamos abrir o WhatsApp da Pet Funny com todos os detalhes. 💚</div>
     <div class="overlay-dots">
       <div class="overlay-dot"></div><div class="overlay-dot"></div><div class="overlay-dot"></div>
     </div>
@@ -737,7 +714,7 @@
 </footer>
 
 <script>
-  const API_BASE_URL = ''; // mesmo host/porta do backend (Render). Se separar domínios, preencher aqui.
+  const API_BASE_URL = '';
 
   // ======= ESTADO =========
   let currentPhoneDigits = null;
@@ -745,6 +722,9 @@
   let currentPets = [];
   let selectedPrize = null;
   let spinning = false;
+
+  // Estado: horários ocupados do dia selecionado
+  let occupiedTimes = new Set(); // ex: "09:00", "09:30"
 
   const prizes = [
     { key: 'Tosa Higiênica', icon: '✂️', subtitle: 'Seu pet vai sair ainda mais confortável e limpinho.' },
@@ -789,7 +769,9 @@
   const petSelect = document.getElementById('petSelect');
   const serviceSelect = document.getElementById('serviceSelect');
   const dateInput = document.getElementById('dateInput');
-  const timeInput = document.getElementById('timeInput');
+  const hourSelect = document.getElementById('hourSelect');
+  const minuteSelect = document.getElementById('minuteSelect');
+  const availabilityMsg = document.getElementById('availabilityMsg');
   const notesInput = document.getElementById('notesInput');
 
   const step4Error = document.getElementById('step4Error');
@@ -799,12 +781,43 @@
   const sortingScreen = document.getElementById('sortingScreen');
   const successScreen = document.getElementById('successScreen');
 
-  // ======= REGRAS (min date) =========
-  // Evita agendamento no passado
+  // ======= MIN DATE =========
   const today = new Date().toISOString().split('T')[0];
   dateInput.min = today;
 
-  // ======= MÁSCARA TELEFONE =========
+  // ======= API =========
+  const API_BASE = (API_BASE_URL || '').replace(/\/+$/, '');
+  function buildUrl(path) {
+    return new URL(API_BASE + path, window.location.origin).toString();
+  }
+
+  async function apiGet(path, params = {}) {
+    const url = new URL(buildUrl(path));
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
+    });
+    const resp = await fetch(url.toString());
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
+    return data;
+  }
+
+  async function apiPost(path, body) {
+    const resp = await fetch(buildUrl(path), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    return data;
+  }
+
+  // ======= UTIL =========
+  function sanitizePhone(phone) {
+    return (phone || '').replace(/\D/g, '');
+  }
+
   function formatPhone(input) {
     let value = input.value.replace(/\D/g, "");
     if (value.length > 11) value = value.slice(0, 11);
@@ -820,7 +833,7 @@
   }
   phoneInput.addEventListener("input", () => formatPhone(phoneInput));
 
-  // Raças
+  // ======= RACAS =========
   const racas = [
     'SRD (Sem Raça Definida)','Poodle','Shih Tzu','Lhasa Apso','Labrador Retriever','Golden Retriever',
     'Yorkshire Terrier','Bulldog Francês','Bulldog Inglês','Spitz Alemão (Lulu da Pomerânia)','Beagle',
@@ -828,29 +841,6 @@
     'Pitbull','Pug','Cocker Spaniel','Schnauzer','Husky Siberiano','Akita','Chihuahua',
     'Outro (informar nas observações)'
   ];
-
-  // ======= UTIL API =========
-  async function apiPost(path, body) {
-    const resp = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
-    return data;
-  }
-
-  async function apiGet(path, params = {}) {
-    const url = new URL((API_BASE_URL || '') + path, window.location.origin);
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
-    });
-    const resp = await fetch(url.toString());
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
-    return data;
-  }
 
   // ======= FLUXO TELAS =========
   function showStep(stepNumber) {
@@ -870,11 +860,7 @@
     }
   }
 
-  function sanitizePhone(phone) {
-    return (phone || '').replace(/\D/g, '');
-  }
-
-  // ======= PETS (corrigido: wrapper com classe própria) =========
+  // ======= PETS =========
   function createPetFields() {
     const wrapper = document.createElement('div');
     wrapper.className = 'pet-wrapper';
@@ -893,7 +879,7 @@
         <select id="${breedId}"></select>
       </div>
       <div class="field-group">
-        <div class="field-label">Mais informações sobre o pet (opcional)</div>
+        <div class="field-label">Mais informações (opcional)</div>
         <textarea id="${infoId}" placeholder="Porte, comportamento, medicação, etc."></textarea>
       </div>
       <button type="button" class="btn btn-secondary btn-inline btn-remove-pet">Remover pet</button>
@@ -957,19 +943,16 @@
     }
   }
 
-  // ======= PRÊMIO (persistência) =========
+  // ======= PRÊMIO =========
   function setPrize(prize) {
     selectedPrize = prize;
     prizeBadgeWrapper.classList.remove('hidden');
     prizeIcon.textContent = prize.icon;
     prizeTitle.textContent = prize.key;
     prizeSubtitle.textContent = prize.subtitle;
-
-    // persiste para evitar perda em reload
     try { localStorage.setItem('petfunny_prize', JSON.stringify(prize)); } catch {}
   }
 
-  // Carrega prêmio salvo (se existir)
   (function loadSavedPrize() {
     try {
       const saved = localStorage.getItem('petfunny_prize');
@@ -977,6 +960,7 @@
     } catch {}
   })();
 
+  // ======= REGRAS AGENDA =========
   function validarDiaHora(dateStr, timeStr) {
     if (!dateStr || !timeStr) return 'Informe a data e o horário.';
 
@@ -988,8 +972,8 @@
     const minutos = hh * 60 + mm;
 
     const inicio = 7 * 60 + 30; // 07:30
-
     if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+
     if (diaSemana >= 1 && diaSemana <= 5) {
       const fim = 17 * 60 + 30; // 17:30
       if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
@@ -1001,8 +985,167 @@
     return null;
   }
 
-  // ======= EVENTOS =========
+  // ======= HORÁRIOS: OCCUPIED + UI =========
+  function pad2(n) { return String(n).padStart(2, '0'); }
 
+  function normalizeHHMM(t) {
+    const s = String(t || '').trim();
+    const m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const hh = String(parseInt(m[1], 10)).padStart(2, '0');
+    const mm = m[2];
+    return `${hh}:${mm}`;
+  }
+
+  function isActiveBookingStatus(status) {
+    const s = String(status || '').toLowerCase();
+    return s !== 'cancelado' && s !== 'cancelada' && s !== 'canceled' && s !== 'cancelled';
+  }
+
+  function buildHoursRange(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    const day = d.getDay(); // 0=Dom
+    if (day === 0) return { closed: true };
+
+    const startMin = 7 * 60 + 30;
+    const endMin = (day === 6) ? (13 * 60) : (17 * 60 + 30);
+    return { startMin, endMin, closed: false, day };
+  }
+
+  function countAvailableSlots(dateStr) {
+    const range = buildHoursRange(dateStr);
+    if (!range || range.closed) return 0;
+
+    let count = 0;
+    for (let m = range.startMin; m <= range.endMin; m += 30) {
+      const hh = Math.floor(m / 60);
+      const mm = m % 60;
+      const t = `${pad2(hh)}:${pad2(mm)}`;
+      if (!occupiedTimes.has(t)) count++;
+    }
+    return count;
+  }
+
+  async function loadOccupiedTimesForDate(dateStr) {
+    occupiedTimes = new Set();
+    if (!dateStr) return;
+
+    const resp = await apiGet('/api/bookings', { date: dateStr });
+    const bookings = resp.bookings || [];
+
+    bookings.forEach(b => {
+      if (!isActiveBookingStatus(b.status)) return;
+      const hhmm = normalizeHHMM(b.time);
+      if (hhmm) occupiedTimes.add(hhmm);
+    });
+  }
+
+  function setAvailabilityMessage(dateStr) {
+    availabilityMsg.textContent = '';
+    const range = buildHoursRange(dateStr);
+
+    if (!dateStr) {
+      availabilityMsg.textContent = 'Selecione uma data para ver os horários disponíveis.';
+      return;
+    }
+    if (!range || range.closed) {
+      availabilityMsg.textContent = 'Fechado aos domingos.';
+      return;
+    }
+
+    const available = countAvailableSlots(dateStr);
+    if (available <= 0) {
+      availabilityMsg.textContent = 'Dia lotado. Escolha outra data.';
+    } else if (available === 1) {
+      availabilityMsg.textContent = '1 horário disponível.';
+    } else {
+      availabilityMsg.textContent = `${available} horários disponíveis.`;
+    }
+  }
+
+  function populateHourSelect(dateStr) {
+    hourSelect.innerHTML = '';
+    minuteSelect.innerHTML = '';
+    hourSelect.appendChild(new Option('Hora...', ''));
+    minuteSelect.appendChild(new Option('Min...', ''));
+
+    const range = buildHoursRange(dateStr);
+    if (!dateStr) {
+      hourSelect.disabled = true;
+      minuteSelect.disabled = true;
+      return;
+    }
+    if (!range || range.closed) {
+      hourSelect.disabled = true;
+      minuteSelect.disabled = true;
+      hourSelect.appendChild(new Option('Fechado', ''));
+      return;
+    }
+
+    hourSelect.disabled = false;
+    minuteSelect.disabled = false;
+
+    const startHour = Math.floor(range.startMin / 60);
+    const endHour = Math.floor(range.endMin / 60);
+
+    for (let h = startHour; h <= endHour; h++) {
+      const hh = pad2(h);
+      const candidates = [`${hh}:00`, `${hh}:30`];
+
+      const hasAnyFree = candidates.some(t => {
+        const [H, M] = t.split(':').map(Number);
+        const total = H * 60 + M;
+        if (total < range.startMin || total > range.endMin) return false;
+        if (occupiedTimes.has(t)) return false;
+        return true;
+      });
+
+      if (hasAnyFree) hourSelect.appendChild(new Option(hh, hh));
+    }
+
+    // Dia lotado: se só tiver placeholder
+    if (hourSelect.options.length === 1) {
+      hourSelect.disabled = true;
+      minuteSelect.disabled = true;
+      hourSelect.appendChild(new Option('Sem horários', ''));
+    }
+  }
+
+  function populateMinuteSelect(dateStr, hh) {
+    minuteSelect.innerHTML = '';
+    minuteSelect.appendChild(new Option('Min...', ''));
+
+    const range = buildHoursRange(dateStr);
+    if (!range || range.closed || !hh) return;
+
+    const h = parseInt(hh, 10);
+    [0, 30].forEach(mm => {
+      const total = h * 60 + mm;
+      if (total < range.startMin || total > range.endMin) return;
+
+      const t = `${pad2(h)}:${pad2(mm)}`;
+      if (occupiedTimes.has(t)) return;
+
+      minuteSelect.appendChild(new Option(pad2(mm), pad2(mm)));
+    });
+
+    if (minuteSelect.options.length === 1) {
+      minuteSelect.disabled = true;
+      minuteSelect.appendChild(new Option('Sem horários', ''));
+    } else {
+      minuteSelect.disabled = false;
+    }
+  }
+
+  function getSelectedTimeHHMM() {
+    const hh = hourSelect.value;
+    const mm = minuteSelect.value;
+    if (!hh || !mm) return '';
+    return `${hh}:${mm}`;
+  }
+
+  // ======= EVENTOS =========
   btnIniciar.addEventListener('click', () => {
     onboardingSection.style.display = 'none';
     app.style.display = 'flex';
@@ -1021,7 +1164,6 @@
     }
   });
 
-  // Passo 1: telefone
   btnStep1Next.addEventListener('click', async () => {
     step1Error.classList.add('hidden');
     const digits = sanitizePhone(phoneInput.value.trim());
@@ -1066,7 +1208,6 @@
 
   btnAddPet.addEventListener('click', () => createPetFields());
 
-  // Passo 2: cadastro
   btnStep2Next.addEventListener('click', async () => {
     step2Error.classList.add('hidden');
     const name = ownerName.value.trim();
@@ -1106,7 +1247,6 @@
     }
   });
 
-  // Passo 3: girar roleta
   btnSpin.addEventListener('click', () => {
     step3Error.classList.add('hidden');
     if (spinning) return;
@@ -1143,7 +1283,36 @@
     }, 5000);
   });
 
-  // Passo 4: confirmar agendamento
+  // DATA -> busca horários ocupados + mostra disponibilidade + repopula combos
+  dateInput.addEventListener('change', async () => {
+    hourSelect.value = '';
+    minuteSelect.value = '';
+    minuteSelect.disabled = false;
+
+    try {
+      await loadOccupiedTimesForDate(dateInput.value);
+    } catch (e) {
+      console.error('Falha ao carregar horários ocupados:', e);
+      occupiedTimes = new Set(); // fallback: não bloqueia
+    }
+
+    setAvailabilityMessage(dateInput.value);
+    populateHourSelect(dateInput.value);
+
+    // reseta minutos
+    minuteSelect.innerHTML = '';
+    minuteSelect.appendChild(new Option('Min...', ''));
+    minuteSelect.disabled = true;
+  });
+
+  hourSelect.addEventListener('change', () => {
+    populateMinuteSelect(dateInput.value, hourSelect.value);
+    minuteSelect.value = '';
+  });
+
+  // Mensagem inicial
+  setAvailabilityMessage('');
+
   btnConfirmBooking.addEventListener('click', async () => {
     step4Error.classList.add('hidden');
     step4Success.classList.add('hidden');
@@ -1153,7 +1322,6 @@
       step4Error.classList.remove('hidden');
       return;
     }
-
     if (!selectedPrize) {
       step4Error.textContent = 'Gire a roleta antes de confirmar o agendamento.';
       step4Error.classList.remove('hidden');
@@ -1163,7 +1331,7 @@
     const petId = petSelect.value;
     const service = serviceSelect.value;
     const date = dateInput.value;
-    const time = timeInput.value;
+    const time = getSelectedTimeHHMM();
     const notes = notesInput.value.trim();
 
     if (!petId) {
@@ -1173,6 +1341,18 @@
     }
     if (!service) {
       step4Error.textContent = 'Selecione o serviço do agendamento.';
+      step4Error.classList.remove('hidden');
+      return;
+    }
+    if (!time) {
+      step4Error.textContent = 'Selecione hora e minuto.';
+      step4Error.classList.remove('hidden');
+      return;
+    }
+
+    // proteção extra (caso alguém force o horário)
+    if (occupiedTimes.has(time)) {
+      step4Error.textContent = 'Esse horário acabou de ser preenchido. Escolha outro horário.';
       step4Error.classList.remove('hidden');
       return;
     }
@@ -1205,12 +1385,10 @@
         return date;
       })();
 
-      function normalizeText(str) {
-  return str.normalize('NFC');
-}
+      const texto = `
+Oi, aqui é da Pet Funny 🐾
 
-      const texto = normalizeText(`
-Oi, Pet Funny, aqui é  ${currentCustomer.name || ''}, Realizei um novo agendamento vindo da Roleta de Mimos:
+Novo agendamento vindo da Roleta de Mimos:
 
 • Tutor(a): ${currentCustomer.name || ''}
 • WhatsApp do tutor: ${phoneInput.value.trim() || ''}
@@ -1221,8 +1399,8 @@ Oi, Pet Funny, aqui é  ${currentCustomer.name || ''}, Realizei um novo agendame
 • Horário: ${time}
 • Observações: ${notes || '—'}
 
-Aguardo o retorno de confirmação do agendamento.`).trim();   
-
+Vamos confirmar esse horário por aqui. 💛
+      `.trim();
 
       const url = `https://wa.me/5516981535338?text=${encodeURIComponent(texto)}`;
 
@@ -1231,10 +1409,8 @@ Aguardo o retorno de confirmação do agendamento.`).trim();
       setTimeout(() => {
         window.open(url, '_blank');
         successScreen.classList.add('hidden');
-
-        // limpa prêmio após sucesso (evita reaproveitar prêmio indevidamente)
         try { localStorage.removeItem('petfunny_prize'); } catch {}
-      }, 5000);
+      }, 3000);
 
     } catch (e) {
       step4Error.textContent = e.message;
@@ -1242,8 +1418,10 @@ Aguardo o retorno de confirmação do agendamento.`).trim();
     }
   });
 
-  // INIT – deixa pelo menos um pet no formulário
+  // INIT
   createPetFields();
+  populateHourSelect('');
+  minuteSelect.disabled = true;
 </script>
 
 </body>
