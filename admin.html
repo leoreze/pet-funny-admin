@@ -405,9 +405,10 @@
       Usuário ou senha incorretos. Tente novamente.
     </div>
 
-    <div class="login-footer-hint">
-      Usuário: <strong>adminpetfunny</strong> • Senha: <strong>admin2605</strong>
-    </div>
+   <div class="login-footer-hint">
+  Acesso restrito à equipe.
+</div>
+
   </div>
 </section>
 
@@ -738,7 +739,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-  const API_BASE_URL = '';
+  const API_BASE = (API_BASE_URL || '').replace(/\/+$/, '');
+function buildUrl(path) {
+  return new URL(API_BASE + path, window.location.origin).toString();
+}
+
 
   /* ===== Helpers de normalização (corrige acentos/variações) ===== */
   function normStr(s) {
@@ -840,12 +845,33 @@
   const loginError = document.getElementById('loginError');
   const btnLogout = document.getElementById('btnLogout');
 
-  btnLogin.addEventListener('click', () => {
-    const u = loginUser.value.trim();
-    const p = loginPass.value.trim();
-    if (u === 'adminpetfunny' && p === 'admin2605') enterAdminMode();
-    else loginError.classList.remove('hidden');
-  });
+// ===== LOGIN (credenciais) =====
+// Opção A (rápida): defina aqui (não recomendado em produção)
+const DEFAULT_ADMIN_USER = 'adminpetfunny';
+const DEFAULT_ADMIN_PASS = 'admin2605';
+
+// Opção B (recomendado p/ não commitar senha):
+// No console do navegador, rode 1x:
+// localStorage.setItem('PF_ADMIN_USER','SEUUSUARIO')
+// localStorage.setItem('PF_ADMIN_PASS','SUASENHA')
+function getAdminCreds() {
+  const u = (localStorage.getItem('PF_ADMIN_USER') || '').trim();
+  const p = (localStorage.getItem('PF_ADMIN_PASS') || '').trim();
+  return {
+    user: u || DEFAULT_ADMIN_USER,
+    pass: p || DEFAULT_ADMIN_PASS
+  };
+}
+
+btnLogin.addEventListener('click', () => {
+  const u = loginUser.value.trim();
+  const p = loginPass.value.trim();
+
+  const creds = getAdminCreds();
+  if (u === creds.user && p === creds.pass) enterAdminMode();
+  else loginError.classList.remove('hidden');
+});
+
 
   [loginUser, loginPass].forEach(el => {
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnLogin.click(); });
@@ -856,48 +882,49 @@
   });
 
   // ===== API HELPERS =====
-  async function apiGet(path, params) {
-    const url = new URL(API_BASE_URL + path, window.location.origin);
-    if (params) {
-      Object.keys(params).forEach(k => {
-        const v = params[k];
-        if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
-      });
-    }
-    const resp = await fetch(url.toString());
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
-    return data;
-  }
-
-  async function apiPost(path, body) {
-    const resp = await fetch(API_BASE_URL + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+ async function apiGet(path, params) {
+  const url = new URL(buildUrl(path));
+  if (params) {
+    Object.keys(params).forEach(k => {
+      const v = params[k];
+      if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
     });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
-    return data;
   }
+  const resp = await fetch(url.toString());
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
+  return data;
+}
 
-  async function apiPut(path, body) {
-    const resp = await fetch(API_BASE_URL + path, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao atualizar.');
-    return data;
-  }
+async function apiPost(path, body) {
+  const resp = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+  return data;
+}
 
-  async function apiDelete(path) {
-    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao apagar.');
-    return data;
-  }
+async function apiPut(path, body) {
+  const resp = await fetch(buildUrl(path), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || 'Erro ao atualizar.');
+  return data;
+}
+
+async function apiDelete(path) {
+  const resp = await fetch(buildUrl(path), { method: 'DELETE' });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || 'Erro ao excluir.');
+  return data;
+}
+
 
   function sanitizePhone(phone) { return (phone || '').replace(/\D/g, ''); }
 

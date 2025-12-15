@@ -378,6 +378,7 @@ app.put('/api/bookings/:id', async (req, res) => {
   }
 });
 
+
 app.delete('/api/bookings/:id', async (req, res) => {
   try {
     await db.run(
