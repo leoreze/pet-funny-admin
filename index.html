@@ -1210,7 +1210,7 @@
 }
 
       const texto = normalizeText(`
-Oi, Pet Funny, aqui é  ${currentCustomer.name || ''} 🐕, Realizei um novo agendamento vindo da Roleta de Mimos:
+Oi, Pet Funny, aqui é  ${currentCustomer.name || ''}, Realizei um novo agendamento vindo da Roleta de Mimos:
 
 • Tutor(a): ${currentCustomer.name || ''}
 • WhatsApp do tutor: ${phoneInput.value.trim() || ''}
@@ -1221,7 +1221,7 @@ Oi, Pet Funny, aqui é  ${currentCustomer.name || ''} 🐕, Realizei um novo age
 • Horário: ${time}
 • Observações: ${notes || '—'}
 
-Aguardo o retorno de confirmação do agendamento. 💛`).trim();   
+Aguardo o retorno de confirmação do agendamento.`).trim();   
 
 
       const url = `https://wa.me/5516981535338?text=${encodeURIComponent(texto)}`;
