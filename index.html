@@ -1287,43 +1287,56 @@
   btnAddPet.addEventListener('click', () => createPetFields());
 
   btnStep2Next.addEventListener('click', async () => {
-    step2Error.classList.add('hidden');
-    const name = ownerName.value.trim();
-    const pets = getPetsFromForm();
+  step2Error.classList.add('hidden');
+  const name = ownerName.value.trim();
+  const pets = getPetsFromForm();
 
-    if (!name) {
-      step2Error.textContent = 'Informe seu nome.';
-      step2Error.classList.remove('hidden');
-      return;
+  if (!name) {
+    step2Error.textContent = 'Informe seu nome.';
+    step2Error.classList.remove('hidden');
+    return;
+  }
+  if (!pets.length) {
+    step2Error.textContent = 'Cadastre pelo menos um pet para continuar.';
+    step2Error.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const cRes = await apiPost('/api/customers', { name, phone: currentPhoneDigits });
+
+    if (!cRes || !cRes.customer || !cRes.customer.id) {
+      console.error('Resposta inesperada de /api/customers:', cRes);
+      throw new Error('Cadastro do cliente não retornou ID. Verifique a API /api/customers.');
     }
-    if (!pets.length) {
-      step2Error.textContent = 'Cadastre pelo menos um pet para continuar.';
-      step2Error.classList.remove('hidden');
-      return;
-    }
 
-    try {
-      const cRes = await apiPost('/api/customers', { name, phone: currentPhoneDigits });
-      currentCustomer = cRes.customer;
+    currentCustomer = cRes.customer;
 
-      currentPets = [];
-      for (const p of pets) {
-        const respPet = await apiPost('/api/pets', {
-          customer_id: currentCustomer.id,
-          name: p.name,
-          breed: p.breed,
-          info: p.info || null
-        });
-        currentPets.push(respPet.pet);
+    currentPets = [];
+    for (const p of pets) {
+      const respPet = await apiPost('/api/pets', {
+        customer_id: currentCustomer.id,
+        name: p.name,
+        breed: p.breed,
+        info: p.info || null
+      });
+
+      if (!respPet || !respPet.pet || !respPet.pet.id) {
+        console.error('Resposta inesperada de /api/pets:', respPet);
+        throw new Error('Cadastro do pet não retornou ID. Verifique a API /api/pets.');
       }
 
-      fillPetSelect();
-      showStep(3);
-    } catch (e) {
-      step2Error.textContent = e.message;
-      step2Error.classList.remove('hidden');
+      currentPets.push(respPet.pet);
     }
-  });
+
+    fillPetSelect();
+    showStep(3);
+  } catch (e) {
+    step2Error.textContent = e.message;
+    step2Error.classList.remove('hidden');
+  }
+});
+
 
   btnSpin.addEventListener('click', () => {
     step3Error.classList.add('hidden');
