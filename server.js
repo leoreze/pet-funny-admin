@@ -2,7 +2,7 @@
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const db = require('./db'); // db.js (SQLite agora / PostgreSQL depois)
+const db = require('./db'); // PostgreSQL
 
 const app = express();
 app.use(cors());
@@ -11,21 +11,18 @@ app.use(express.json());
 /* =========================
    STATIC FILES
 ========================= */
-
-// Admin (admin.html, logo, etc)
-app.use(express.static(__dirname));
-
-
+app.use(express.static(path.join(__dirname)));
 
 /* =========================
-   INIT DATABASE
+   INIT DATABASE (bloqueante)
 ========================= */
 (async () => {
   try {
     await db.initDb();
-    console.log('Banco inicializado com sucesso');
+    console.log('✅ Banco inicializado com sucesso');
   } catch (err) {
-    console.error('Erro ao inicializar banco:', err);
+    console.error('❌ Erro fatal ao inicializar banco:', err);
+    process.exit(1);
   }
 })();
 
@@ -53,14 +50,20 @@ app.get('/api/customers', async (req, res) => {
 // Lookup por telefone
 app.post('/api/customers/lookup', async (req, res) => {
   const { phone } = req.body;
-  if (!phone) return res.status(400).json({ error: 'Telefone é obrigatório.' });
+  if (!phone) {
+    return res.status(400).json({ error: 'Telefone é obrigatório.' });
+  }
 
   try {
     const row = await db.get(
       'SELECT * FROM customers WHERE phone = $1',
       [phone]
     );
-    if (!row) return res.json({ exists: false });
+
+    if (!row) {
+      return res.json({ exists: false });
+    }
+
     res.json({ exists: true, customer: row });
   } catch (err) {
     console.error('Erro em lookup customers:', err);
@@ -71,26 +74,31 @@ app.post('/api/customers/lookup', async (req, res) => {
 // Criar / atualizar cliente
 app.post('/api/customers', async (req, res) => {
   const { phone, name } = req.body;
+
   if (!phone || !name) {
     return res.status(400).json({ error: 'Telefone e nome são obrigatórios.' });
   }
 
   try {
-    const row = await db.get(
+    const existing = await db.get(
       'SELECT * FROM customers WHERE phone = $1',
       [phone]
     );
 
-    if (row) {
+    if (existing) {
       await db.run(
         'UPDATE customers SET name = $1 WHERE id = $2',
-        [name, row.id]
+        [name, existing.id]
       );
-      return res.json({ customer: { ...row, name }, existed: true });
+
+      return res.json({
+        customer: { ...existing, name },
+        existed: true
+      });
     }
 
     const result = await db.run(
-      'INSERT INTO customers (phone, name) VALUES ($1, $2)',
+      'INSERT INTO customers (phone, name) VALUES ($1, $2) RETURNING id',
       [phone, name]
     );
 
@@ -144,12 +152,18 @@ app.post('/api/pets', async (req, res) => {
   const { customer_id, name, breed, info } = req.body;
 
   if (!customer_id || !name) {
-    return res.status(400).json({ error: 'Cliente e nome do pet são obrigatórios.' });
+    return res.status(400).json({
+      error: 'Cliente e nome do pet são obrigatórios.'
+    });
   }
 
   try {
     const result = await db.run(
-      'INSERT INTO pets (customer_id, name, breed, info) VALUES ($1, $2,$3, $4)',
+      `
+      INSERT INTO pets (customer_id, name, breed, info)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id
+      `,
       [customer_id, name, breed || null, info || null]
     );
 
@@ -167,7 +181,9 @@ app.post('/api/pets', async (req, res) => {
 
 app.put('/api/pets/:id', async (req, res) => {
   const { name, breed, info } = req.body;
-  if (!name) return res.status(400).json({ error: 'Nome do pet é obrigatório.' });
+  if (!name) {
+    return res.status(400).json({ error: 'Nome do pet é obrigatório.' });
+  }
 
   try {
     await db.run(
@@ -216,14 +232,12 @@ app.post('/api/bookings', async (req, res) => {
     status
   } = req.body;
 
-  // ✅ validação correta
   if (!customer_id || !date || !time || !service || !prize) {
     return res.status(400).json({
       error: 'Cliente, data, horário, serviço e mimo são obrigatórios.'
     });
   }
 
-  // ✅ pet_id pode ser NULL
   let safePetId = null;
   if (pet_id !== undefined && pet_id !== null && pet_id !== '') {
     const parsed = Number(pet_id);
@@ -236,6 +250,7 @@ app.post('/api/bookings', async (req, res) => {
       INSERT INTO bookings
         (customer_id, pet_id, date, time, service, prize, notes, status)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id
       `,
       [
         customer_id,
@@ -271,22 +286,30 @@ app.get('/api/bookings', async (req, res) => {
     LEFT JOIN pets p ON p.id = b.pet_id
     WHERE 1=1
   `;
+
   const params = [];
+  let idx = 1;
 
   if (date) {
-    sql += ' AND b.date = $1';
+    sql += ` AND b.date = $${idx}`;
     params.push(date);
+    idx++;
   }
 
   if (search) {
     sql += `
       AND (
-        c.name LIKE $1
-        OR p.name LIKE $2
-        OR c.phone LIKE $3
+        c.name ILIKE $${idx}
+        OR p.name ILIKE $${idx + 1}
+        OR c.phone LIKE $${idx + 2}
       )
     `;
-    params.push(`%${search}%`, `%${search}%`, `%${search.replace(/\D/g, '')}%`);
+    params.push(
+      `%${search}%`,
+      `%${search}%`,
+      `%${search.replace(/\D/g, '')}%`
+    );
+    idx += 3;
   }
 
   sql += ' ORDER BY b.date ASC, b.time ASC';
@@ -331,9 +354,9 @@ app.put('/api/bookings/:id', async (req, res) => {
         prize = $6,
         notes = $7,
         status = $8,
-        last_notification_at = $1
+        last_notification_at = $9
       WHERE id = $10
-      `,9
+      `,
       [
         customer_id,
         safePetId,
@@ -385,5 +408,5 @@ app.get('/admin', (req, res) => {
 ========================= */
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log('🚀 Pet Funny API rodando na porta', PORT);
+  console.log(`🚀 Pet Funny API rodando na porta ${PORT}`);
 });
