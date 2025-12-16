@@ -1,123 +1,116 @@
-// backend/db.js
+// db.js
 const { Pool } = require('pg');
-
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL não definida nas variáveis de ambiente');
-}
-
-const isProduction = process.env.NODE_ENV === 'production';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Helpers
-async function query(sql, params = []) {
-  return pool.query(sql, params);
-}
-
-async function all(sql, params = []) {
-  const res = await query(sql, params);
-  return res.rows || [];
-}
-
-async function get(sql, params = []) {
-  const res = await query(sql, params);
-  return res.rows?.[0] || null;
-}
-
-async function run(sql, params = []) {
-  const res = await query(sql, params);
-
-  return {
-    lastID: res.rows?.[0]?.id ? Number(res.rows[0].id) : undefined,
-    changes: res.rowCount,
-  };
-}
-
-
-
-/* ============================
-   MIGRATION: SERVICES TABLE
-   ============================ */
-async function ensureServicesTable() {
-  const sql = `
-    CREATE TABLE IF NOT EXISTS services (
-      id SERIAL PRIMARY KEY,
-      date DATE NOT NULL,
-      title TEXT NOT NULL,
-      price INTEGER NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    ALTER TABLE services
-    ADD COLUMN IF NOT EXISTS price NUMERIC(10,2) NOT NULL DEFAULT 0;
-
-    CREATE INDEX IF NOT EXISTS idx_services_date
-      ON services(date);
-  `;
+async function initDb() {
+  const client = await pool.connect();
   try {
-    await pool.query(sql);
-    console.log('✔ services table ready');
+    await client.query('BEGIN');
+
+    /* =======================
+       CUSTOMERS
+    ======================= */
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    /* =======================
+       PETS
+    ======================= */
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pets (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        breed TEXT,
+        info TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    /* =======================
+       SERVICES (PADRÃO CORRETO)
+    ======================= */
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS services (
+        id SERIAL PRIMARY KEY,
+        date DATE,
+        title TEXT NOT NULL,
+        value_cents INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    /* =======================
+       BOOKINGS (COM service_id)
+    ======================= */
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER REFERENCES customers(id),
+        pet_id INTEGER REFERENCES pets(id),
+        service_id INTEGER REFERENCES services(id),
+        service TEXT, -- compatibilidade / snapshot
+        prize TEXT,
+        date DATE NOT NULL,
+        time TIME NOT NULL,
+        notes TEXT,
+        status TEXT DEFAULT 'agendado',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    /* =======================
+       MIGRATIONS DEFENSIVAS
+    ======================= */
+    await client.query(`
+      ALTER TABLE services
+      ADD COLUMN IF NOT EXISTS value_cents INTEGER DEFAULT 0;
+    `);
+
+    await client.query(`
+      ALTER TABLE bookings
+      ADD COLUMN IF NOT EXISTS service_id INTEGER;
+    `);
+
+    await client.query('COMMIT');
+    console.log('DB pronto');
   } catch (err) {
-    console.error('✖ error creating services table:', err);
+    await client.query('ROLLBACK');
+    console.error('Erro ao inicializar DB:', err);
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
-// roda automaticamente ao subir o servidor
-ensureServicesTable();
+async function all(sql, params = []) {
+  const { rows } = await pool.query(sql, params);
+  return rows;
+}
 
-// Init DB (idempotente e seguro)
-async function initDb() {
-  await query(`
-    CREATE TABLE IF NOT EXISTS customers (
-      id SERIAL PRIMARY KEY,
-      phone TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
+async function get(sql, params = []) {
+  const { rows } = await pool.query(sql, params);
+  return rows[0];
+}
 
-  await query(`
-    CREATE TABLE IF NOT EXISTS pets (
-      id SERIAL PRIMARY KEY,
-      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      breed TEXT,
-      info TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  await query(`
-    CREATE TABLE IF NOT EXISTS bookings (
-      id SERIAL PRIMARY KEY,
-      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-      pet_id INTEGER REFERENCES pets(id) ON DELETE SET NULL,
-      date TEXT NOT NULL,
-      time TEXT NOT NULL,
-      service TEXT NOT NULL,
-      prize TEXT NOT NULL,
-      notes TEXT,
-      status TEXT NOT NULL DEFAULT 'agendado',
-      last_notification_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  await query(`CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_pets_customer_id ON pets(customer_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(date);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);`);
+async function run(sql, params = []) {
+  return pool.query(sql, params);
 }
 
 module.exports = {
-  pool,
   initDb,
   all,
   get,
-  run,
+  run
 };
