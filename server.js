@@ -192,131 +192,130 @@ app.post('/api/bookings', async (req, res) => {
   }
 });
 
-// ================== SERVICES ==================
+/* =========================
+   SERVICES
+========================= */
 
+// Listar serviços
 app.get('/api/services', async (req, res) => {
   try {
-    const { date, search } = req.query;
-    const where = [];
-    const params = [];
-
-    if (date) {
-      params.push(date);
-      where.push(`date = $${params.length}`);
-    }
-
-    if (search) {
-      params.push(`%${String(search).toLowerCase()}%`);
-      where.push(`LOWER(title) LIKE $${params.length}`);
-    }
-
-    const sql = `
+    const services = await db.all(
+      `
       SELECT
         id,
-        date,
-        title,
+        name,
+        duration_min,
         value_cents,
-        created_at,
-        updated_at
+        is_active,
+        created_at
       FROM services
-      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-      ORDER BY date DESC, id DESC
-    `;
+      WHERE is_active = true
+      ORDER BY name
+      `
+    );
 
-    const services = await db.all(sql, params);
     res.json({ services });
-  } catch (e) {
-    console.error('Erro em GET /api/services:', e);
+  } catch (err) {
+    console.error('Erro ao listar services:', err);
     res.status(500).json({ error: 'Erro ao buscar serviços.' });
   }
 });
 
+// Criar serviço
 app.post('/api/services', async (req, res) => {
+  const { name, duration_min, value_cents } = req.body;
+
+  if (!String(name || '').trim()) {
+    return res.status(400).json({ error: 'Nome do serviço é obrigatório.' });
+  }
+
+  const duration = Number(duration_min) || 60;
+  const cents = Number(value_cents);
+
+  if (!Number.isInteger(cents) || cents < 0) {
+    return res.status(400).json({ error: 'value_cents inválido.' });
+  }
+
   try {
-    const { date, title, value_cents } = req.body || {};
-
-    if (!date || !String(title || '').trim()) {
-      return res.status(400).json({ error: 'Campos obrigatórios: date, title.' });
-    }
-
-    const cents = Number(value_cents);
-    if (!Number.isInteger(cents) || cents < 0) {
-      return res.status(400).json({ error: 'Valor inválido.' });
-    }
-
-    const row = await db.get(
+    const service = await db.get(
       `
-      INSERT INTO services (date, title, value_cents)
+      INSERT INTO services (name, duration_min, value_cents)
       VALUES ($1, $2, $3)
-      RETURNING id, date, title, value_cents, created_at, updated_at
+      RETURNING *
       `,
-      [date, String(title).trim(), cents]
+      [name.trim(), duration, cents]
     );
 
-    res.json({ service: row });
-  } catch (e) {
-    console.error('Erro em POST /api/services:', e);
+    res.json({ service });
+  } catch (err) {
+    console.error('Erro ao criar service:', err);
     res.status(500).json({ error: 'Erro ao salvar serviço.' });
   }
 });
 
+// Atualizar serviço
 app.put('/api/services/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  const { name, duration_min, value_cents, is_active } = req.body;
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: 'ID inválido.' });
+  }
+
+  const duration = Number(duration_min) || 60;
+  const cents = Number(value_cents);
+
+  if (!String(name || '').trim() || !Number.isInteger(cents) || cents < 0) {
+    return res.status(400).json({ error: 'Dados inválidos.' });
+  }
+
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: 'ID inválido.' });
-    }
-
-    const { date, title, value_cents } = req.body || {};
-
-    if (!date || !String(title || '').trim()) {
-      return res.status(400).json({ error: 'Campos obrigatórios: date, title.' });
-    }
-
-    const cents = Number(value_cents);
-    if (!Number.isInteger(cents) || cents < 0) {
-      return res.status(400).json({ error: 'Valor inválido.' });
-    }
-
-    const row = await db.get(
+    const service = await db.get(
       `
       UPDATE services
       SET
-        date = $1,
-        title = $2,
+        name = $1,
+        duration_min = $2,
         value_cents = $3,
-        updated_at = NOW()
-      WHERE id = $4
-      RETURNING id, date, title, value_cents, created_at, updated_at
+        is_active = $4
+      WHERE id = $5
+      RETURNING *
       `,
-      [date, String(title).trim(), cents, id]
+      [name.trim(), duration, cents, is_active !== false, id]
     );
 
-    if (!row) return res.status(404).json({ error: 'Serviço não encontrado.' });
+    if (!service) {
+      return res.status(404).json({ error: 'Serviço não encontrado.' });
+    }
 
-    res.json({ service: row });
-  } catch (e) {
-    console.error('Erro em PUT /api/services:', e);
+    res.json({ service });
+  } catch (err) {
+    console.error('Erro ao atualizar service:', err);
     res.status(500).json({ error: 'Erro ao atualizar serviço.' });
   }
 });
 
+// Soft delete
 app.delete('/api/services/:id', async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ error: 'ID inválido.' });
+  }
+
   try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: 'ID inválido.' });
-    }
+    await db.run(
+      `UPDATE services SET is_active = false WHERE id = $1`,
+      [id]
+    );
 
-    const row = await db.get('DELETE FROM services WHERE id = $1 RETURNING id', [id]);
-    if (!row) return res.status(404).json({ error: 'Serviço não encontrado.' });
-
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('Erro em DELETE /api/services:', e);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Erro ao desativar service:', err);
     res.status(500).json({ error: 'Erro ao excluir serviço.' });
   }
 });
+
 
 /* =========================
    BOOKINGS (GET/PUT/DELETE)
