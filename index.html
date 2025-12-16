@@ -477,6 +477,41 @@
       gap: 2px;
     }
     .footer-info strong { font-size: 13px; color: #263238; }
+
+    /* ======= SOCIAL LINKS (NOVO) ======= */
+    .footer-social {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+    .footer-social-label {
+      font-size: 12px;
+      color: #455a64;
+      font-weight: 600;
+      margin-right: 4px;
+    }
+    .social-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #d0dde0;
+      background: #f3f7f8;
+      color: #37474f;
+      text-decoration: none;
+      font-size: 12px;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+      white-space: nowrap;
+    }
+    .social-link:hover {
+      border-color: rgba(1, 173, 183, 0.6);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
+      transform: translateY(-1px);
+    }
+
     .footer-bottom { font-size: 11px; color: #78909c; text-align: center; margin-top: 4px; }
 
     @media (max-width: 720px) {
@@ -760,6 +795,22 @@
         <span>Rua Virgílio de Carvalho Neves Neto, 794 – Ribeirão Preto / SP</span>
         <span>Horário: Seg–Sex: 07:30 às 17:30 • Sábado: 07:30 às 13:00</span>
         <span>WhatsApp: (16) 98153-5338</span>
+
+        <!-- REDES SOCIAIS (NOVO) -->
+        <div class="footer-social" aria-label="Redes sociais Pet Funny">
+          <span class="footer-social-label">Redes:</span>
+          <a class="social-link" href="https://www.youtube.com/@petfunnyrp" target="_blank" rel="noopener noreferrer" aria-label="YouTube Pet Funny">
+            ▶️ YouTube
+          </a>
+          <a class="social-link" href="https://web.facebook.com/petfunnyrp/" target="_blank" rel="noopener noreferrer" aria-label="Facebook Pet Funny">
+            👍 Facebook
+          </a>
+          <a class="social-link" href="https://www.instagram.com/petfunnybanhoetosa/" target="_blank" rel="noopener noreferrer" aria-label="Instagram Pet Funny">
+            📸 Instagram
+          </a>
+        </div>
+        <!-- /REDES SOCIAIS (NOVO) -->
+
       </div>
     </div>
     <div class="footer-bottom">
@@ -774,7 +825,6 @@
   <meta itemprop="telephone" content="+5516981535338">
   <meta itemprop="url" content="https://www.agendapetfunny.com.br">
 </div>
-
 
 <script>
   const API_BASE_URL = ''; // mesmo host/porta do backend
@@ -1327,56 +1377,55 @@
   btnAddPet.addEventListener('click', () => createPetFields());
 
   btnStep2Next.addEventListener('click', async () => {
-  step2Error.classList.add('hidden');
-  const name = ownerName.value.trim();
-  const pets = getPetsFromForm();
+    step2Error.classList.add('hidden');
+    const name = ownerName.value.trim();
+    const pets = getPetsFromForm();
 
-  if (!name) {
-    step2Error.textContent = 'Informe seu nome.';
-    step2Error.classList.remove('hidden');
-    return;
-  }
-  if (!pets.length) {
-    step2Error.textContent = 'Cadastre pelo menos um pet para continuar.';
-    step2Error.classList.remove('hidden');
-    return;
-  }
-
-  try {
-    const cRes = await apiPost('/api/customers', { name, phone: currentPhoneDigits });
-
-    if (!cRes || !cRes.customer || !cRes.customer.id) {
-      console.error('Resposta inesperada de /api/customers:', cRes);
-      throw new Error('Cadastro do cliente não retornou ID. Verifique a API /api/customers.');
+    if (!name) {
+      step2Error.textContent = 'Informe seu nome.';
+      step2Error.classList.remove('hidden');
+      return;
+    }
+    if (!pets.length) {
+      step2Error.textContent = 'Cadastre pelo menos um pet para continuar.';
+      step2Error.classList.remove('hidden');
+      return;
     }
 
-    currentCustomer = cRes.customer;
+    try {
+      const cRes = await apiPost('/api/customers', { name, phone: currentPhoneDigits });
 
-    currentPets = [];
-    for (const p of pets) {
-      const respPet = await apiPost('/api/pets', {
-        customer_id: currentCustomer.id,
-        name: p.name,
-        breed: p.breed,
-        info: p.info || null
-      });
-
-      if (!respPet || !respPet.pet || !respPet.pet.id) {
-        console.error('Resposta inesperada de /api/pets:', respPet);
-        throw new Error('Cadastro do pet não retornou ID. Verifique a API /api/pets.');
+      if (!cRes || !cRes.customer || !cRes.customer.id) {
+        console.error('Resposta inesperada de /api/customers:', cRes);
+        throw new Error('Cadastro do cliente não retornou ID. Verifique a API /api/customers.');
       }
 
-      currentPets.push(respPet.pet);
+      currentCustomer = cRes.customer;
+
+      currentPets = [];
+      for (const p of pets) {
+        const respPet = await apiPost('/api/pets', {
+          customer_id: currentCustomer.id,
+          name: p.name,
+          breed: p.breed,
+          info: p.info || null
+        });
+
+        if (!respPet || !respPet.pet || !respPet.pet.id) {
+          console.error('Resposta inesperada de /api/pets:', respPet);
+          throw new Error('Cadastro do pet não retornou ID. Verifique a API /api/pets.');
+        }
+
+        currentPets.push(respPet.pet);
+      }
+
+      fillPetSelect();
+      showStep(3);
+    } catch (e) {
+      step2Error.textContent = e.message;
+      step2Error.classList.remove('hidden');
     }
-
-    fillPetSelect();
-    showStep(3);
-  } catch (e) {
-    step2Error.textContent = e.message;
-    step2Error.classList.remove('hidden');
-  }
-});
-
+  });
 
   btnSpin.addEventListener('click', () => {
     step3Error.classList.add('hidden');
@@ -1580,7 +1629,6 @@ Aguardo o retorno de confirmação do agendamento.`).trim();
   ]
 }
 </script>
-
 
 </body>
 </html>
