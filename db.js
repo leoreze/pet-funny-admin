@@ -1,116 +1,123 @@
-// db.js
+// backend/db.js
 const { Pool } = require('pg');
+
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL não definida nas variáveis de ambiente');
+}
+
+const isProduction = process.env.NODE_ENV === 'production';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 });
 
-/* =========================
-   HELPERS
-========================= */
-
-async function columnExists(table, column) {
-  const q = `
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_name = $1 AND column_name = $2
-  `;
-  const r = await pool.query(q, [table, column]);
-  return r.rowCount > 0;
+// Helpers
+async function query(sql, params = []) {
+  return pool.query(sql, params);
 }
 
-/* =========================
-   MIGRATIONS
-========================= */
-
-async function ensureCustomersTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS customers (
-      id SERIAL PRIMARY KEY,
-      phone TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `);
+async function all(sql, params = []) {
+  const res = await query(sql, params);
+  return res.rows || [];
 }
 
-async function ensurePetsTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS pets (
-      id SERIAL PRIMARY KEY,
-      customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
-      name TEXT NOT NULL,
-      breed TEXT,
-      info TEXT,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `);
+async function get(sql, params = []) {
+  const res = await query(sql, params);
+  return res.rows?.[0] || null;
 }
 
+async function run(sql, params = []) {
+  const res = await query(sql, params);
+
+  return {
+    lastID: res.rows?.[0]?.id ? Number(res.rows[0].id) : undefined,
+    changes: res.rowCount,
+  };
+}
+
+
+
+/* ============================
+   MIGRATION: SERVICES TABLE
+   ============================ */
 async function ensureServicesTable() {
-  await pool.query(`
+  const sql = `
     CREATE TABLE IF NOT EXISTS services (
       id SERIAL PRIMARY KEY,
       date DATE NOT NULL,
       title TEXT NOT NULL,
-      value_cents INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW()
-    )
-  `);
+      value_cents INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
 
-  // remove coluna antiga "price" se existir
-  if (await columnExists('services', 'price')) {
-    await pool.query(`ALTER TABLE services DROP COLUMN price`);
+    ALTER TABLE services
+  ADD COLUMN IF NOT EXISTS price NUMERIC(10,2) NOT NULL DEFAULT 0;
+
+    CREATE INDEX IF NOT EXISTS idx_services_date
+      ON services(date);
+  `;
+  try {
+    await pool.query(sql);
+    console.log('✔ services table ready');
+  } catch (err) {
+    console.error('✖ error creating services table:', err);
   }
 }
 
-async function ensureBookingsTable() {
-  await pool.query(`
+// roda automaticamente ao subir o servidor
+ensureServicesTable();
+
+// Init DB (idempotente e seguro)
+async function initDb() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id SERIAL PRIMARY KEY,
+      phone TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS pets (
+      id SERIAL PRIMARY KEY,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      breed TEXT,
+      info TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS bookings (
       id SERIAL PRIMARY KEY,
-      customer_id INTEGER REFERENCES customers(id),
-      pet_id INTEGER REFERENCES pets(id),
-      service TEXT, -- compatibilidade
-      service_id INTEGER REFERENCES services(id),
-      prize TEXT,
-      date DATE NOT NULL,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      pet_id INTEGER REFERENCES pets(id) ON DELETE SET NULL,
+      date TEXT NOT NULL,
       time TEXT NOT NULL,
-      status TEXT DEFAULT 'agendado',
+      service TEXT NOT NULL,
+      prize TEXT NOT NULL,
       notes TEXT,
-      phone TEXT NOT NULL,
-      last_notification_at TIMESTAMP,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
+      status TEXT NOT NULL DEFAULT 'agendado',
+      last_notification_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
-  if (!(await columnExists('bookings', 'service_id'))) {
-    await pool.query(`ALTER TABLE bookings ADD COLUMN service_id INTEGER REFERENCES services(id)`);
-  }
+  await query(`CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_pets_customer_id ON pets(customer_id);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(date);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);`);
 }
-
-/* =========================
-   INIT
-========================= */
-
-async function init() {
-  await ensureCustomersTable();
-  await ensurePetsTable();
-  await ensureServicesTable();
-  await ensureBookingsTable();
-}
-
-init().catch(err => {
-  console.error('Erro ao inicializar banco:', err);
-  process.exit(1);
-});
-
-/* =========================
-   EXPORTS
-========================= */
 
 module.exports = {
-  query: (text, params) => pool.query(text, params),
-  pool
+  pool,
+  initDb,
+  all,
+  get,
+  run,
 };

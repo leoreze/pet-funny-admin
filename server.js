@@ -54,31 +54,30 @@ app.post('/api/customers/lookup', async (req, res) => {
 // Criar / atualizar cliente
 app.post('/api/customers', async (req, res) => {
   const { phone, name } = req.body;
-  if (!phone || !name) return res.status(400).json({ error: 'Telefone e nome são obrigatórios.' });
+  if (!phone || !name) {
+    return res.status(400).json({ error: 'Telefone e nome são obrigatórios.' });
+  }
 
   try {
-    const existing = await db.get('SELECT * FROM customers WHERE phone = $1', [phone]);
+    const row = await db.get('SELECT * FROM customers WHERE phone = $1', [phone]);
 
-    if (existing) {
-      const updated = await db.get(
-        'UPDATE customers SET name = $1 WHERE id = $2 RETURNING *',
-        [name, existing.id]
-      );
-      return res.json({ customer: updated, existed: true });
+    if (row) {
+      await db.run('UPDATE customers SET name = $1 WHERE id = $2', [name, row.id]);
+      return res.json({ customer: { ...row, name }, existed: true });
     }
 
-    const created = await db.get(
-      'INSERT INTO customers (phone, name) VALUES ($1, $2) RETURNING *',
+    const result = await db.run(
+      'INSERT INTO customers (phone, name) VALUES ($1, $2)',
       [phone, name]
     );
 
-    return res.json({ customer: created, existed: false });
+    const novo = await db.get('SELECT * FROM customers WHERE id = $1', [result.lastID]);
+    res.json({ customer: novo, existed: false });
   } catch (err) {
     console.error('Erro ao salvar customer:', err);
     res.status(500).json({ error: 'Erro interno ao salvar cliente.' });
   }
 });
-
 
 // Excluir cliente
 app.delete('/api/customers/:id', async (req, res) => {
@@ -113,20 +112,24 @@ app.get('/api/pets', async (req, res) => {
 
 app.post('/api/pets', async (req, res) => {
   const { customer_id, name, breed, info } = req.body;
-  if (!customer_id || !name) return res.status(400).json({ error: 'Cliente e nome do pet são obrigatórios.' });
+
+  if (!customer_id || !name) {
+    return res.status(400).json({ error: 'Cliente e nome do pet são obrigatórios.' });
+  }
 
   try {
-    const pet = await db.get(
-      'INSERT INTO pets (customer_id, name, breed, info) VALUES ($1, $2, $3, $4) RETURNING *',
+    const result = await db.run(
+      'INSERT INTO pets (customer_id, name, breed, info) VALUES ($1, $2, $3, $4)',
       [customer_id, name, breed || null, info || null]
     );
+
+    const pet = await db.get('SELECT * FROM pets WHERE id = $1', [result.lastID]);
     res.json({ pet });
   } catch (err) {
     console.error('Erro ao salvar pet:', err);
     res.status(500).json({ error: 'Erro interno ao salvar pet.' });
   }
 });
-
 
 app.put('/api/pets/:id', async (req, res) => {
   const { name, breed, info } = req.body;
