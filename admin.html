@@ -177,6 +177,7 @@
       justify-content: space-between;
       gap: 10px;
       margin: 8px 0 4px;
+      flex-wrap: wrap;
     }
 
     /* Tabs */
@@ -221,7 +222,7 @@
     label { font-size: 12px; font-weight: 500; color: #555; }
     textarea { min-height: 48px; resize: vertical; }
 
-    .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+    .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
     .error-msg { font-size: 12px; color: #c62828; margin-top: 4px; }
 
     .stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; font-size: 12px; }
@@ -329,10 +330,127 @@
     }
     .badge-selected { background: rgba(249,161,151,0.15); color: #c04a36; }
 
+    /* ===== NOVO: Toggle de visualização (Lista / Cards) ===== */
+    .view-toggle {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid #dde5e8;
+      background: #ffffff;
+      border-radius: 999px;
+      overflow: hidden;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.05);
+    }
+    .toggle-btn {
+      border: none;
+      background: transparent;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #607d8b;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .toggle-btn.active {
+      background: rgba(1,173,183,0.12);
+      color: #015d63;
+      font-weight: 700;
+    }
+    .agenda-actions-right {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* ===== NOVO: Cards da Agenda ===== */
+    .cards-wrapper {
+      margin-top: 10px;
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .agenda-card {
+      background: #ffffff;
+      border: 1px solid #e3eaec;
+      border-radius: 16px;
+      padding: 10px 10px 12px;
+      box-shadow: 0 10px 22px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .agenda-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .agenda-card-time {
+      font-weight: 800;
+      font-size: 14px;
+      color: #16363c;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .agenda-card-date {
+      font-size: 11px;
+      color: #78909c;
+      margin-top: 2px;
+    }
+    .agenda-card-main {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      font-size: 12px;
+      color: #37474f;
+    }
+    .agenda-line {
+      display: flex;
+      gap: 6px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+    .agenda-key {
+      font-size: 11px;
+      color: #78909c;
+      min-width: 72px;
+    }
+    .agenda-val {
+      font-weight: 600;
+      color: #263238;
+    }
+    .agenda-muted {
+      font-weight: 500;
+      color: #546e7a;
+    }
+    .agenda-card-notes {
+      background: #f7fbfc;
+      border: 1px dashed #d7e9ec;
+      border-radius: 12px;
+      padding: 8px;
+      font-size: 12px;
+      color: #455a64;
+      min-height: 38px;
+    }
+    .agenda-card-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+
     @media (max-width: 900px) {
       .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .form-row-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .two-cols { grid-template-columns: 1fr; }
+      .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 640px) {
       .header { align-items: flex-start; }
@@ -340,6 +458,7 @@
       .form-row, .form-row-2 { grid-template-columns: 1fr; }
       .table-wrapper { overflow-x: auto; }
       .container { padding: 16px 14px 18px; }
+      .cards-grid { grid-template-columns: 1fr; }
     }
 
     /* RODAPÉ GLOBAL */
@@ -423,8 +542,8 @@
         <div class="filters-group">
           <span style="font-size:13px;">Data:</span>
           <input type="date" id="filtroData" />
-          <button class="btn btn-light" id="btnHoje">Hoje</button>
-          <button class="btn btn-light" id="btnLimparFiltro">Limpar filtro</button>
+          <button class="btn btn-light" id="btnHoje" type="button">Hoje</button>
+          <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar filtro</button>
         </div>
 
         <div class="filters-group">
@@ -432,24 +551,33 @@
           <input type="text" id="filtroBusca" placeholder="Nome, pet ou telefone" />
         </div>
 
-        <button class="btn btn-light" id="btnExportarCSV">Exportar CSV</button>
+        <button class="btn btn-light" id="btnExportarCSV" type="button">Exportar CSV</button>
 
-        <button class="btn btn-danger btn-small" id="btnLogout">Sair</button>
+        <button class="btn btn-danger btn-small" id="btnLogout" type="button">Sair</button>
       </div>
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" data-tab="tab-agenda"><span>📅</span> Agenda &amp; Mimos</button>
-      <button class="tab-btn" data-tab="tab-clientes"><span>👤</span> Clientes &amp; Pets</button>
-      <button class="tab-btn" data-tab="tab-servicos"><span>🧼</span> Serviços</button>
-      <button class="tab-btn" data-tab="tab-dashboard"><span>📊</span> Dashboard</button>
+      <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agenda &amp; Mimos</button>
+      <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
+      <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
+      <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
     </div>
 
     <!-- TAB: AGENDA -->
     <section id="tab-agenda" class="tab-view active">
       <div class="section-title-row">
         <div class="section-title">Agendamentos do dia</div>
-        <button class="btn btn-light" id="btnNovoAgendamento">+ Novo agendamento</button>
+
+        <div class="agenda-actions-right">
+          <!-- NOVO: Toggle Lista/Cards -->
+          <div class="view-toggle" aria-label="Alternar visualização">
+            <button class="toggle-btn active" id="btnViewList" type="button">📋 Lista</button>
+            <button class="toggle-btn" id="btnViewCards" type="button">🗂️ Cards</button>
+          </div>
+
+          <button class="btn btn-light" id="btnNovoAgendamento" type="button">+ Novo agendamento</button>
+        </div>
       </div>
 
       <div class="form-panel hidden" id="formPanel">
@@ -522,8 +650,8 @@
         <div id="formError" class="error-msg" style="display:none;"></div>
 
         <div class="form-actions">
-          <button class="btn btn-secondary" id="btnCancelarEdicao">Limpar / cancelar</button>
-          <button class="btn" id="btnSalvar">Salvar</button>
+          <button class="btn btn-secondary" id="btnCancelarEdicao" type="button">Limpar / cancelar</button>
+          <button class="btn" id="btnSalvar" type="button">Salvar</button>
         </div>
       </div>
 
@@ -535,7 +663,8 @@
         <div class="stats-item"><span class="stats-label">Patinhas impecáveis:</span> <span class="stats-value" id="statPatinhas">0</span></div>
       </div>
 
-      <div class="table-wrapper">
+      <!-- NOVO: Wrapper Lista -->
+      <div id="agendaListWrapper" class="table-wrapper">
         <table>
           <thead>
           <tr>
@@ -556,6 +685,12 @@
         </table>
         <div id="estadoVazio" class="empty" style="display:none;">Nenhum agendamento encontrado para o filtro atual.</div>
       </div>
+
+      <!-- NOVO: Wrapper Cards -->
+      <div id="agendaCardsWrapper" class="cards-wrapper hidden">
+        <div id="agendaCards" class="cards-grid"></div>
+        <div id="estadoVazioCards" class="empty hidden">Nenhum agendamento encontrado para o filtro atual.</div>
+      </div>
     </section>
 
     <!-- TAB: CLIENTES & PETS -->
@@ -567,7 +702,7 @@
           <div class="subcard-title">
             <span>Clientes</span>
             <span id="badgeClienteSelecionado" class="badge-mini badge-selected hidden">Cliente selecionado</span>
-            <button class="btn btn-secondary btn-small" id="btnNovoCliente">+ Novo cliente</button>
+            <button class="btn btn-secondary btn-small" id="btnNovoCliente" type="button">+ Novo cliente</button>
           </div>
 
           <div id="clienteFormBlock" class="hidden">
@@ -581,8 +716,8 @@
             </div>
             <div id="cliError" class="error-msg" style="display:none;"></div>
             <div class="form-actions">
-              <button class="btn btn-secondary btn-small" id="btnCliLimpar">Limpar</button>
-              <button class="btn btn-small" id="btnCliSalvar">Salvar / Atualizar</button>
+              <button class="btn btn-secondary btn-small" id="btnCliLimpar" type="button">Limpar</button>
+              <button class="btn btn-small" id="btnCliSalvar" type="button">Salvar / Atualizar</button>
             </div>
           </div>
 
@@ -606,7 +741,7 @@
         <div class="subcard hidden" id="petsCard">
           <div class="subcard-title">
             <span>Pets do cliente selecionado</span>
-            <button class="btn btn-secondary btn-small" id="btnNovoPet">+ Novo pet</button>
+            <button class="btn btn-secondary btn-small" id="btnNovoPet" type="button">+ Novo pet</button>
           </div>
           <div class="form-group">
             <label for="petName">Nome do pet</label>
@@ -622,8 +757,8 @@
           </div>
           <div id="petError" class="error-msg" style="display:none;"></div>
           <div class="form-actions">
-            <button class="btn btn-secondary btn-small" id="btnPetLimpar">Limpar</button>
-            <button class="btn btn-small" id="btnPetSalvar">Salvar pet</button>
+            <button class="btn btn-secondary btn-small" id="btnPetLimpar" type="button">Limpar</button>
+            <button class="btn btn-small" id="btnPetSalvar" type="button">Salvar pet</button>
           </div>
 
           <div class="subtable-wrapper" style="margin-top:10px;">
@@ -648,7 +783,7 @@
     <section id="tab-servicos" class="tab-view">
       <div class="section-title-row">
         <div class="section-title">Serviços</div>
-        <button class="btn btn-light" id="btnNovoServico">+ Novo serviço</button>
+        <button class="btn btn-light" id="btnNovoServico" type="button">+ Novo serviço</button>
       </div>
 
       <div class="form-panel hidden" id="serviceFormPanel">
@@ -671,8 +806,8 @@
         <div id="serviceError" class="error-msg" style="display:none;"></div>
 
         <div class="form-actions">
-          <button class="btn btn-secondary" id="btnServiceCancel">Limpar / cancelar</button>
-          <button class="btn" id="btnServiceSave">Salvar</button>
+          <button class="btn btn-secondary" id="btnServiceCancel" type="button">Limpar / cancelar</button>
+          <button class="btn" id="btnServiceSave" type="button">Salvar</button>
         </div>
       </div>
 
@@ -718,7 +853,7 @@
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
               <input type="date" id="dashStart" />
               <input type="date" id="dashEnd" />
-              <button class="btn btn-small" id="dashApply">Aplicar</button>
+              <button class="btn btn-small" id="dashApply" type="button">Aplicar</button>
             </div>
           </div>
         </div>
@@ -868,6 +1003,7 @@
       await renderTabela();
       await loadClientes();
       await loadDashboard();
+      initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
   }
 
@@ -1089,53 +1225,51 @@
   }
 
   function applyCurrencyMask(input) {
-  if (!input) return;
-  let raw = String(input.value || '').replace(/\D/g, '');
+    if (!input) return;
+    let raw = String(input.value || '').replace(/\D/g, '');
 
-  // se usuário apagou tudo, ok
-  if (raw === '') {
-    input.value = '';
-    input.dataset.cents = '';
-    return;
+    // se usuário apagou tudo, ok
+    if (raw === '') {
+      input.value = '';
+      input.dataset.cents = '';
+      return;
+    }
+
+    // permite zero
+    raw = raw.replace(/^0+/, '');
+    if (raw === '') raw = '0';
+
+    input.dataset.cents = raw;
+    input.value = formatCentsToBRL(raw);
   }
 
-  // permite zero
-  raw = raw.replace(/^0+/, '');
-  if (raw === '') raw = '0';
+  function getCentsFromCurrencyInput(input) {
+    if (!input) return null;
 
-  input.dataset.cents = raw;
-  input.value = formatCentsToBRL(raw);
-}
+    // 1) tenta via dataset (máscara)
+    let raw = String(input.dataset?.cents || '').replace(/\D/g, '');
+    if (raw) {
+      const cents = parseInt(raw, 10);
+      return Number.isFinite(cents) ? cents : null;
+    }
 
+    // 2) fallback: tenta parsear pelo texto digitado/colado (ex: "85,00" ou "R$ 85,00" ou "85")
+    const txt = String(input.value || '').trim();
+    if (!txt) return null;
 
-function getCentsFromCurrencyInput(input) {
-  if (!input) return null;
-
-  // 1) tenta via dataset (máscara)
-  let raw = String(input.dataset?.cents || '').replace(/\D/g, '');
-  if (raw) {
-    const cents = parseInt(raw, 10);
-    return Number.isFinite(cents) ? cents : null;
+    const digits = txt.replace(/\s/g, '').replace(/[R$r$]/g, '');
+    // se tiver vírgula, assume centavos; se não tiver, assume reais inteiros
+    if (digits.includes(',')) {
+      const cleaned = digits.replace(/\./g, '').replace(',', '.');
+      const n = Number(cleaned);
+      if (!Number.isFinite(n)) return null;
+      return Math.round(n * 100);
+    } else {
+      const onlyDigits = digits.replace(/\D/g, '');
+      if (!onlyDigits) return null;
+      return parseInt(onlyDigits, 10) * 100;
+    }
   }
-
-  // 2) fallback: tenta parsear pelo texto digitado/colado (ex: "85,00" ou "R$ 85,00" ou "85")
-  const txt = String(input.value || '').trim();
-  if (!txt) return null;
-
-  const digits = txt.replace(/\s/g, '').replace(/[R$r$]/g, '');
-  // se tiver vírgula, assume centavos; se não tiver, assume reais inteiros
-  if (digits.includes(',')) {
-    const cleaned = digits.replace(/\./g, '').replace(',', '.');
-    const n = Number(cleaned);
-    if (!Number.isFinite(n)) return null;
-    return Math.round(n * 100);
-  } else {
-    const onlyDigits = digits.replace(/\D/g, '');
-    if (!onlyDigits) return null;
-    return parseInt(onlyDigits, 10) * 100;
-  }
-}
-
 
   /* ===== TABS ===== */
   const tabButtons = document.querySelectorAll('.tab-btn');
@@ -1159,6 +1293,11 @@ function getCentsFromCurrencyInput(input) {
           }, 60);
         });
       }
+
+      // NOVO: quando voltar para agenda, renderiza conforme view atual
+      if (tabId === 'tab-agenda') {
+        try { renderAgendaByView(ultimaLista || []); } catch (_) {}
+      }
     });
   });
 
@@ -1172,6 +1311,14 @@ function getCentsFromCurrencyInput(input) {
 
   const tbodyAgenda = document.getElementById('tbodyAgenda');
   const estadoVazio = document.getElementById('estadoVazio');
+
+  // NOVO: cards
+  const agendaListWrapper = document.getElementById('agendaListWrapper');
+  const agendaCardsWrapper = document.getElementById('agendaCardsWrapper');
+  const agendaCards = document.getElementById('agendaCards');
+  const estadoVazioCards = document.getElementById('estadoVazioCards');
+  const btnViewList = document.getElementById('btnViewList');
+  const btnViewCards = document.getElementById('btnViewCards');
 
   const statTotal = document.getElementById('statTotal');
   const statTosa = document.getElementById('statTosa');
@@ -1462,6 +1609,7 @@ function getCentsFromCurrencyInput(input) {
       const btnEdit = document.createElement('button');
       btnEdit.textContent = 'Editar';
       btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.type = 'button';
       btnEdit.addEventListener('click', () => {
         fillServiceForm(svc);
         showServiceForm();
@@ -1471,6 +1619,7 @@ function getCentsFromCurrencyInput(input) {
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
       btnDel.className = 'btn btn-small btn-danger';
+      btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
         if (!confirm('Deseja realmente excluir este serviço?')) return;
         try {
@@ -1531,9 +1680,9 @@ function getCentsFromCurrencyInput(input) {
     const id = serviceId.value ? parseInt(serviceId.value, 10) : null;
     const date = serviceDate.value;
     const title = serviceTitle.value.trim();
-    // garante dataset.cents sempre atualizado antes de validar
-applyCurrencyMask(servicePrice);
 
+    // garante dataset.cents sempre atualizado antes de validar
+    applyCurrencyMask(servicePrice);
     const value_cents = getCentsFromCurrencyInput(servicePrice);
 
     if (!date || !title) {
@@ -1573,102 +1722,289 @@ applyCurrencyMask(servicePrice);
   if (btnServiceSave) btnServiceSave.addEventListener('click', saveService);
 
   // Máscara do valor de serviço
-if (servicePrice) {
-  servicePrice.addEventListener('input', () => applyCurrencyMask(servicePrice));
-}
+  if (servicePrice) {
+    servicePrice.addEventListener('input', () => applyCurrencyMask(servicePrice));
+  }
+
+  /* ===== NOVO: Agenda - Toggle Lista/Cards ===== */
+  const AGENDA_VIEW_KEY = 'pf_admin_agenda_view';
+  let agendaView = 'list';
+
+  function initAgendaViewToggle() {
+    try {
+      const saved = localStorage.getItem(AGENDA_VIEW_KEY);
+      if (saved === 'cards' || saved === 'list') agendaView = saved;
+    } catch (_) {}
+
+    applyAgendaViewUI(agendaView);
+
+    if (btnViewList) btnViewList.addEventListener('click', () => setAgendaView('list'));
+    if (btnViewCards) btnViewCards.addEventListener('click', () => setAgendaView('cards'));
+  }
+
+  function setAgendaView(view) {
+    agendaView = (view === 'cards') ? 'cards' : 'list';
+    try { localStorage.setItem(AGENDA_VIEW_KEY, agendaView); } catch (_) {}
+    applyAgendaViewUI(agendaView);
+    renderAgendaByView(ultimaLista || []);
+  }
+
+  function applyAgendaViewUI(view) {
+    if (!agendaListWrapper || !agendaCardsWrapper) return;
+
+    const isCards = (view === 'cards');
+
+    agendaListWrapper.classList.toggle('hidden', isCards);
+    agendaCardsWrapper.classList.toggle('hidden', !isCards);
+
+    if (btnViewList) btnViewList.classList.toggle('active', !isCards);
+    if (btnViewCards) btnViewCards.classList.toggle('active', isCards);
+  }
+
+  function getServiceLabelFromBooking(a) {
+    let serviceLabel = a.service || a.service_title || '-';
+    const sid = a.service_id ?? a.serviceId ?? null;
+
+    if (sid != null) {
+      const svc = servicesCache.find(s => String(s.id) === String(sid));
+      if (svc) serviceLabel = svc.title;
+    } else {
+      const match = servicesCache.find(s => normStr(s.title) === normStr(serviceLabel));
+      if (match) serviceLabel = match.title;
+    }
+    return serviceLabel;
+  }
+
+  function renderAgendaByView(lista) {
+    // vazio: atualiza ambos estados para evitar inconsistências
+    const isEmpty = !lista || !lista.length;
+
+    if (agendaView === 'cards') {
+      renderAgendaCards(lista || []);
+      if (estadoVazio) estadoVazio.style.display = 'none';
+      if (estadoVazioCards) estadoVazioCards.classList.toggle('hidden', !isEmpty);
+    } else {
+      renderAgendaList(lista || []);
+      if (estadoVazioCards) estadoVazioCards.classList.add('hidden');
+      if (estadoVazio) estadoVazio.style.display = isEmpty ? 'block' : 'none';
+    }
+  }
+
+  function renderAgendaList(lista) {
+    tbodyAgenda.innerHTML = '';
+    estadoVazio.style.display = lista.length ? 'none' : 'block';
+
+    lista.forEach(a => {
+      const tr = document.createElement('tr');
+
+      const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
+      const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
+      const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
+      const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
+
+      const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
+
+      const tdMimo = document.createElement('td');
+      tdMimo.textContent = a.prize || '-';
+      tdMimo.className = 'td-mimo';
+
+      const tdStatus = document.createElement('td');
+      const spanStatus = document.createElement('span');
+      const labelStatus = (a.status || 'agendado');
+      spanStatus.textContent = labelStatus;
+      spanStatus.className = 'td-status ' + classStatus(labelStatus);
+      tdStatus.appendChild(spanStatus);
+
+      const tdNotif = document.createElement('td');
+      tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
+
+      const tdObs = document.createElement('td');
+      tdObs.textContent = a.notes || '';
+      tdObs.className = 'td-obs';
+
+      const tdAcoes = document.createElement('td');
+      const divActions = document.createElement('div');
+      divActions.className = 'actions';
+
+      const btnEditar = document.createElement('button');
+      btnEditar.textContent = 'Editar';
+      btnEditar.className = 'btn btn-small btn-secondary';
+      btnEditar.type = 'button';
+      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
+
+      const btnExcluir = document.createElement('button');
+      btnExcluir.textContent = 'Excluir';
+      btnExcluir.className = 'btn btn-small btn-danger';
+      btnExcluir.type = 'button';
+      btnExcluir.addEventListener('click', async () => {
+        if (!confirm('Deseja realmente excluir este agendamento?')) return;
+        try {
+          await apiDelete('/api/bookings/' + a.id);
+          await renderTabela();
+          await loadDashboard();
+        } catch (e) { alert(e.message); }
+      });
+
+      divActions.appendChild(btnEditar);
+      divActions.appendChild(btnExcluir);
+      tdAcoes.appendChild(divActions);
+
+      tr.appendChild(tdData);
+      tr.appendChild(tdHora);
+      tr.appendChild(tdTutor);
+      tr.appendChild(tdPet);
+      tr.appendChild(tdTel);
+      tr.appendChild(tdServ);
+      tr.appendChild(tdMimo);
+      tr.appendChild(tdStatus);
+      tr.appendChild(tdNotif);
+      tr.appendChild(tdObs);
+      tr.appendChild(tdAcoes);
+
+      tbodyAgenda.appendChild(tr);
+    });
+  }
+
+  function renderAgendaCards(lista) {
+    if (!agendaCards) return;
+
+    agendaCards.innerHTML = '';
+    const isEmpty = !lista.length;
+    if (estadoVazioCards) estadoVazioCards.classList.toggle('hidden', !isEmpty);
+
+    lista.forEach(a => {
+      const card = document.createElement('div');
+      card.className = 'agenda-card';
+
+      const top = document.createElement('div');
+      top.className = 'agenda-card-top';
+
+      const left = document.createElement('div');
+      const timeWrap = document.createElement('div');
+      timeWrap.className = 'agenda-card-time';
+      timeWrap.textContent = `⏰ ${a.time || '-'}`;
+
+      const dateWrap = document.createElement('div');
+      dateWrap.className = 'agenda-card-date';
+      dateWrap.textContent = `📅 ${formatDataBr(a.date)}`;
+
+      left.appendChild(timeWrap);
+      left.appendChild(dateWrap);
+
+      const statusWrap = document.createElement('div');
+      const spanStatus = document.createElement('span');
+      const labelStatus = (a.status || 'agendado');
+      spanStatus.textContent = labelStatus;
+      spanStatus.className = 'td-status ' + classStatus(labelStatus);
+      statusWrap.appendChild(spanStatus);
+
+      top.appendChild(left);
+      top.appendChild(statusWrap);
+
+      const main = document.createElement('div');
+      main.className = 'agenda-card-main';
+
+      const serviceLabel = getServiceLabelFromBooking(a);
+
+      const l1 = document.createElement('div');
+      l1.className = 'agenda-line';
+      l1.innerHTML = `<span class="agenda-key">Tutor:</span> <span class="agenda-val">${(a.customer_name || '-')}</span>`;
+
+      const l2 = document.createElement('div');
+      l2.className = 'agenda-line';
+      l2.innerHTML = `<span class="agenda-key">Pet:</span> <span class="agenda-muted">${(a.pet_name || '-')}</span>`;
+
+      const l3 = document.createElement('div');
+      l3.className = 'agenda-line';
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.phone)}</span>`;
+
+      const l4 = document.createElement('div');
+      l4.className = 'agenda-line';
+      l4.innerHTML = `<span class="agenda-key">Serviço:</span> <span class="agenda-val">${serviceLabel}</span>`;
+
+      const l5 = document.createElement('div');
+      l5.className = 'agenda-line';
+      l5.innerHTML = `<span class="agenda-key">Mimo:</span> <span class="agenda-val" style="color:var(--turquesa)">${(a.prize || '-')}</span>`;
+
+      const l6 = document.createElement('div');
+      l6.className = 'agenda-line';
+      l6.innerHTML = `<span class="agenda-key">Notif:</span> <span class="agenda-muted">${a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-'}</span>`;
+
+      main.appendChild(l1);
+      main.appendChild(l2);
+      main.appendChild(l3);
+      main.appendChild(l4);
+      main.appendChild(l5);
+      main.appendChild(l6);
+
+      const notes = document.createElement('div');
+      notes.className = 'agenda-card-notes';
+      notes.textContent = (a.notes || '').trim() ? a.notes : 'Sem observações.';
+
+      const bottom = document.createElement('div');
+      bottom.className = 'agenda-card-bottom';
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      const btnEditar = document.createElement('button');
+      btnEditar.textContent = 'Editar';
+      btnEditar.className = 'btn btn-small btn-secondary';
+      btnEditar.type = 'button';
+      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
+
+      const btnExcluir = document.createElement('button');
+      btnExcluir.textContent = 'Excluir';
+      btnExcluir.className = 'btn btn-small btn-danger';
+      btnExcluir.type = 'button';
+      btnExcluir.addEventListener('click', async () => {
+        if (!confirm('Deseja realmente excluir este agendamento?')) return;
+        try {
+          await apiDelete('/api/bookings/' + a.id);
+          await renderTabela();
+          await loadDashboard();
+        } catch (e) { alert(e.message); }
+      });
+
+      actions.appendChild(btnEditar);
+      actions.appendChild(btnExcluir);
+
+      bottom.appendChild(actions);
+
+      card.appendChild(top);
+      card.appendChild(main);
+      card.appendChild(notes);
+      card.appendChild(bottom);
+
+      agendaCards.appendChild(card);
+    });
+  }
+
   /* ===== Agenda: render e salvar ===== */
   async function renderTabela() {
     try {
       const lista = await fetchBookings();
       ultimaLista = lista;
 
-      tbodyAgenda.innerHTML = '';
-      estadoVazio.style.display = lista.length ? 'none' : 'block';
-
-      lista.forEach(a => {
-        const tr = document.createElement('tr');
-
-        const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
-        const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
-        const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
-        const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-        const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
-
-        // Serviço: preferir service_id; fallback por texto
-        let serviceLabel = a.service || a.service_title || '-';
-        const sid = a.service_id ?? a.serviceId ?? null;
-        if (sid != null) {
-          const svc = servicesCache.find(s => String(s.id) === String(sid));
-          if (svc) serviceLabel = svc.title;
-        } else {
-          const match = servicesCache.find(s => normStr(s.title) === normStr(serviceLabel));
-          if (match) serviceLabel = match.title;
-        }
-        const tdServ = document.createElement('td'); tdServ.textContent = serviceLabel;
-
-        const tdMimo = document.createElement('td');
-        tdMimo.textContent = a.prize || '-';
-        tdMimo.className = 'td-mimo';
-
-        const tdStatus = document.createElement('td');
-        const spanStatus = document.createElement('span');
-        const labelStatus = (a.status || 'agendado');
-        spanStatus.textContent = labelStatus;
-        spanStatus.className = 'td-status ' + classStatus(labelStatus);
-        tdStatus.appendChild(spanStatus);
-
-        const tdNotif = document.createElement('td');
-        tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
-
-        const tdObs = document.createElement('td');
-        tdObs.textContent = a.notes || '';
-        tdObs.className = 'td-obs';
-
-        const tdAcoes = document.createElement('td');
-        const divActions = document.createElement('div');
-        divActions.className = 'actions';
-
-        const btnEditar = document.createElement('button');
-        btnEditar.textContent = 'Editar';
-        btnEditar.className = 'btn btn-small btn-secondary';
-        btnEditar.addEventListener('click', () => preencherFormEdicao(a));
-
-        const btnExcluir = document.createElement('button');
-        btnExcluir.textContent = 'Excluir';
-        btnExcluir.className = 'btn btn-small btn-danger';
-        btnExcluir.addEventListener('click', async () => {
-          if (!confirm('Deseja realmente excluir este agendamento?')) return;
-          try {
-            await apiDelete('/api/bookings/' + a.id);
-            await renderTabela();
-            await loadDashboard();
-          } catch (e) { alert(e.message); }
-        });
-
-        divActions.appendChild(btnEditar);
-        divActions.appendChild(btnExcluir);
-        tdAcoes.appendChild(divActions);
-
-        tr.appendChild(tdData);
-        tr.appendChild(tdHora);
-        tr.appendChild(tdTutor);
-        tr.appendChild(tdPet);
-        tr.appendChild(tdTel);
-        tr.appendChild(tdServ);
-        tr.appendChild(tdMimo);
-        tr.appendChild(tdStatus);
-        tr.appendChild(tdNotif);
-        tr.appendChild(tdObs);
-        tr.appendChild(tdAcoes);
-
-        tbodyAgenda.appendChild(tr);
-      });
-
+      // renderiza conforme view selecionada
+      renderAgendaByView(lista);
       atualizaEstatisticas(lista);
     } catch (e) {
+      // zera listagem e cards
+      ultimaLista = [];
       tbodyAgenda.innerHTML = '';
-      estadoVazio.style.display = 'block';
-      estadoVazio.textContent = 'Erro ao carregar agendamentos: ' + e.message;
+      if (agendaCards) agendaCards.innerHTML = '';
+
+      if (estadoVazio) {
+        estadoVazio.style.display = 'block';
+        estadoVazio.textContent = 'Erro ao carregar agendamentos: ' + e.message;
+      }
+      if (estadoVazioCards) {
+        estadoVazioCards.classList.remove('hidden');
+        estadoVazioCards.textContent = 'Erro ao carregar agendamentos: ' + e.message;
+      }
+
       statTotal.textContent = '0';
       statTosa.textContent = '0';
       statHidratacao.textContent = '0';
@@ -1798,12 +2134,8 @@ if (servicePrice) {
     linhas.push(['ID','Data','Hora','Tutor','Pet','Telefone','Serviço','Mimo','Status','Última Notificação','Observações'].join(';'));
 
     ultimaLista.forEach(a => {
-      let serviceLabel = a.service || a.service_title || '';
-      const sid = a.service_id ?? a.serviceId ?? null;
-      if (sid != null) {
-        const svc = servicesCache.find(s => String(s.id) === String(sid));
-        if (svc) serviceLabel = svc.title;
-      }
+      const serviceLabel = getServiceLabelFromBooking(a);
+
       const cols = [
         a.id,
         formatDataBr(a.date),
@@ -1956,6 +2288,7 @@ if (servicePrice) {
       const btnSel = document.createElement('button');
       btnSel.textContent = 'Selecionar';
       btnSel.className = 'btn btn-small btn-secondary';
+      btnSel.type = 'button';
       btnSel.addEventListener('click', async () => {
         clienteSelecionadoId = c.id;
 
@@ -1973,6 +2306,7 @@ if (servicePrice) {
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
       btnDel.className = 'btn btn-small btn-danger';
+      btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
         if (!confirm('Excluir este cliente? (Os pets relacionados também poderão ser afetados)')) return;
         try {
@@ -2066,6 +2400,7 @@ if (servicePrice) {
       const btnEdit = document.createElement('button');
       btnEdit.textContent = 'Editar';
       btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.type = 'button';
       btnEdit.addEventListener('click', () => {
         petEditIdLocal = p.id;
         petName.value = p.name;
@@ -2076,6 +2411,7 @@ if (servicePrice) {
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
       btnDel.className = 'btn btn-small btn-danger';
+      btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
         if (!confirm('Excluir este pet?')) return;
         try {
