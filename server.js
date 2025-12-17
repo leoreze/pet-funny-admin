@@ -1,39 +1,33 @@
-// backend/server.js
+// backend/server.js (UPDATED)
 const path = require('path');
-const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
-const db = require('./db'); // PostgreSQL
+const db = require('./db');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PUBLIC_DIR_CANDIDATES = [
-  path.join(__dirname, 'public'),
-  path.join(__dirname, '..', 'public'),
-  __dirname,
-];
-const PUBLIC_DIR = PUBLIC_DIR_CANDIDATES.find(p => {
-  try { return fs.existsSync(p) && fs.statSync(p).isDirectory(); } catch { return false; }
-});
-/* =========================
-   STATIC FILES
-========================= */
+// Static files (admin.html, index.html, assets)
+app.use(express.static(__dirname));
 
-// Admin (admin.html, logos etc) + index.html
-app.use(express.static(PUBLIC_DIR));
-
-
-// Rota amigável: /admin -> admin.html
 app.get(['/admin', '/admin/'], (req, res) => {
-  return res.sendFile(path.join(PUBLIC_DIR, 'admin.html'));
+  return res.sendFile(path.join(__dirname, 'admin.html'));
 });
+
+
 /* =========================
-   CLIENTES
+   HELPERS
+========================= */
+function sanitizePhone(phone) {
+  return String(phone || '').replace(/\D/g, '');
+}
+
+/* =========================
+   CUSTOMERS
 ========================= */
 
-// Listar clientes
+// List customers
 app.get('/api/customers', async (req, res) => {
   try {
     const sql = `
@@ -50,14 +44,15 @@ app.get('/api/customers', async (req, res) => {
   }
 });
 
-// Lookup por telefone
+// Lookup by phone
 app.post('/api/customers/lookup', async (req, res) => {
-  const { phone } = req.body;
-  if (!phone) return res.status(400).json({ error: 'Telefone é obrigatório.' });
-
   try {
+    const phone = sanitizePhone(req.body.phone);
+    if (!phone) return res.status(400).json({ error: 'Telefone é obrigatório.' });
+
     const row = await db.get('SELECT * FROM customers WHERE phone = $1', [phone]);
     if (!row) return res.json({ exists: false });
+
     res.json({ exists: true, customer: row });
   } catch (err) {
     console.error('Erro em lookup customers:', err);
@@ -65,42 +60,43 @@ app.post('/api/customers/lookup', async (req, res) => {
   }
 });
 
-// Criar / atualizar cliente
+// Create/update customer (idempotente por phone)
 app.post('/api/customers', async (req, res) => {
-  const { phone, name } = req.body;
-  if (!phone || !name) return res.status(400).json({ error: 'Telefone e nome são obrigatórios.' });
-
   try {
+    const phone = sanitizePhone(req.body.phone);
+    const name = String(req.body.name || '').trim();
+    if (!phone || !name) return res.status(400).json({ error: 'Telefone e nome são obrigatórios.' });
+
     const existing = await db.get('SELECT * FROM customers WHERE phone = $1', [phone]);
 
-    if (existing) {
-      const updated = await db.get(
-        'UPDATE customers SET name = $1 WHERE id = $2 RETURNING *',
-        [name, existing.id]
+    if (!existing) {
+      const ins = await db.get(
+        'INSERT INTO customers (phone, name) VALUES ($1,$2) RETURNING *',
+        [phone, name]
       );
-      return res.json({ customer: updated, existed: true });
+      return res.json({ customer: ins });
     }
 
-    const created = await db.get(
-      'INSERT INTO customers (phone, name) VALUES ($1, $2) RETURNING *',
+    const upd = await db.get(
+      'UPDATE customers SET name = $2 WHERE phone = $1 RETURNING *',
       [phone, name]
     );
-
-    return res.json({ customer: created, existed: false });
+    res.json({ customer: upd });
   } catch (err) {
     console.error('Erro ao salvar customer:', err);
     res.status(500).json({ error: 'Erro interno ao salvar cliente.' });
   }
 });
 
-
-// Excluir cliente
 app.delete('/api/customers/:id', async (req, res) => {
   try {
-    const result = await db.run('DELETE FROM customers WHERE id = $1', [req.params.id]);
-    res.json({ deleted: result.changes > 0 });
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    await db.run('DELETE FROM customers WHERE id = $1', [id]);
+    res.json({ ok: true });
   } catch (err) {
-    console.error('Erro ao excluir cliente:', err);
+    console.error('Erro ao deletar customer:', err);
     res.status(500).json({ error: 'Erro interno ao excluir cliente.' });
   }
 });
@@ -109,14 +105,15 @@ app.delete('/api/customers/:id', async (req, res) => {
    PETS
 ========================= */
 
+// List pets (by customer_id)
 app.get('/api/pets', async (req, res) => {
-  const { customer_id } = req.query;
-  if (!customer_id) return res.json({ pets: [] });
-
   try {
+    const customerId = Number(req.query.customer_id);
+    if (!customerId) return res.status(400).json({ error: 'customer_id é obrigatório.' });
+
     const rows = await db.all(
-      'SELECT * FROM pets WHERE customer_id = $1 ORDER BY name',
-      [customer_id]
+      'SELECT * FROM pets WHERE customer_id = $1 ORDER BY id DESC',
+      [customerId]
     );
     res.json({ pets: rows });
   } catch (err) {
@@ -125,35 +122,42 @@ app.get('/api/pets', async (req, res) => {
   }
 });
 
+// Create pet
 app.post('/api/pets', async (req, res) => {
-  const { customer_id, name, breed, info } = req.body;
-  if (!customer_id || !name) return res.status(400).json({ error: 'Cliente e nome do pet são obrigatórios.' });
-
   try {
-    const pet = await db.get(
-      'INSERT INTO pets (customer_id, name, breed, info) VALUES ($1, $2, $3, $4) RETURNING *',
-      [customer_id, name, breed || null, info || null]
+    const customerId = Number(req.body.customer_id);
+    const name = String(req.body.name || '').trim();
+    const breed = req.body.breed ? String(req.body.breed).trim() : null;
+    const info = req.body.info ? String(req.body.info).trim() : null;
+
+    if (!customerId || !name) return res.status(400).json({ error: 'customer_id e name são obrigatórios.' });
+
+    const row = await db.get(
+      'INSERT INTO pets (customer_id, name, breed, info) VALUES ($1,$2,$3,$4) RETURNING *',
+      [customerId, name, breed, info]
     );
-    res.json({ pet });
+    res.json({ pet: row });
   } catch (err) {
-    console.error('Erro ao salvar pet:', err);
+    console.error('Erro ao criar pet:', err);
     res.status(500).json({ error: 'Erro interno ao salvar pet.' });
   }
 });
 
-
+// Update pet
 app.put('/api/pets/:id', async (req, res) => {
-  const { name, breed, info } = req.body;
-  if (!name) return res.status(400).json({ error: 'Nome do pet é obrigatório.' });
-
   try {
-    await db.run(
-      'UPDATE pets SET name = $1, breed = $2, info = $3 WHERE id = $4',
-      [name, breed || null, info || null, req.params.id]
-    );
+    const id = Number(req.params.id);
+    const name = String(req.body.name || '').trim();
+    const breed = req.body.breed ? String(req.body.breed).trim() : null;
+    const info = req.body.info ? String(req.body.info).trim() : null;
 
-    const pet = await db.get('SELECT * FROM pets WHERE id = $1', [req.params.id]);
-    res.json({ pet });
+    if (!id || !name) return res.status(400).json({ error: 'ID e name são obrigatórios.' });
+
+    const row = await db.get(
+      'UPDATE pets SET name=$2, breed=$3, info=$4 WHERE id=$1 RETURNING *',
+      [id, name, breed, info]
+    );
+    res.json({ pet: row });
   } catch (err) {
     console.error('Erro ao atualizar pet:', err);
     res.status(500).json({ error: 'Erro interno ao atualizar pet.' });
@@ -162,466 +166,339 @@ app.put('/api/pets/:id', async (req, res) => {
 
 app.delete('/api/pets/:id', async (req, res) => {
   try {
-    const result = await db.run('DELETE FROM pets WHERE id = $1', [req.params.id]);
-    res.json({ deleted: result.changes > 0 });
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    await db.run('DELETE FROM pets WHERE id = $1', [id]);
+    res.json({ ok: true });
   } catch (err) {
-    console.error('Erro ao excluir pet:', err);
+    console.error('Erro ao deletar pet:', err);
     res.status(500).json({ error: 'Erro interno ao excluir pet.' });
   }
 });
 
 /* =========================
-   BOOKINGS (AGENDA)
+   SERVICES (value_cents)
 ========================= */
-
-app.post('/api/bookings', async (req, res) => {
-  const { customer_id, pet_id, date, time, service, prize, notes, status } = req.body;
-
-  if (!customer_id || !date || !time || !service || !prize) {
-    return res.status(400).json({
-      error: 'Cliente, data, horário, serviço e mimo são obrigatórios.'
-    });
-  }
-
-  let safePetId = null;
-  if (pet_id !== undefined && pet_id !== null && pet_id !== '') {
-    const parsed = Number(pet_id);
-    safePetId = Number.isFinite(parsed) ? parsed : null;
-  }
-
-  
-  let safeServiceId = null;
-  if (service_id !== undefined && service_id !== null && service_id !== '') {
-    const parsedService = Number(service_id);
-    safeServiceId = Number.isInteger(parsedService) ? parsedService : null;
-  }
-try {
-    const result = await db.run(
-      `
-      INSERT INTO bookings
-        (customer_id, pet_id, date, time, service, prize, notes, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `,
-      [customer_id, safePetId, date, time, service, prize, notes || null, status || 'agendado']
-    );
-
-    res.json({ id: result.lastID });
-  } catch (err) {
-    console.error('Erro ao salvar booking:', err);
-    res.status(500).json({ error: 'Erro interno ao salvar agendamento.' });
-  }
-});
-
-// ================== SERVICES ==================
 
 app.get('/api/services', async (req, res) => {
   try {
-    const { date, search } = req.query;
-    const where = [];
-    const params = [];
-
-    if (date) {
-      params.push(date);
-      where.push(`date = $${params.length}`);
-    }
-
-    if (search) {
-      params.push(`%${String(search).toLowerCase()}%`);
-      where.push(`LOWER(title) LIKE $${params.length}`);
-    }
-
-    const sql = `
-      SELECT
-        id,
-        date,
-        title,
-        value_cents,
-        created_at,
-        updated_at
-      FROM services
-      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-      ORDER BY date DESC, id DESC
-    `;
-
-    const services = await db.all(sql, params);
-    res.json({ services });
-  } catch (e) {
-    console.error('Erro em GET /api/services:', e);
-    res.status(500).json({ error: 'Erro ao buscar serviços.' });
+    const rows = await db.all('SELECT * FROM services ORDER BY date DESC, id DESC');
+    res.json({ services: rows });
+  } catch (err) {
+    console.error('Erro ao listar services:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar serviços.' });
   }
 });
 
 app.post('/api/services', async (req, res) => {
   try {
-    const { date, title, value_cents } = req.body || {};
+    const date = String(req.body.date || '').slice(0, 10);
+    const title = String(req.body.title || '').trim();
+    const value_cents = Number(req.body.value_cents);
 
-    if (!date || !String(title || '').trim()) {
-      return res.status(400).json({ error: 'Campos obrigatórios: date, title.' });
-    }
-
-    const cents = Number(value_cents);
-    if (!Number.isInteger(cents) || cents < 0) {
-      return res.status(400).json({ error: 'Valor inválido.' });
+    if (!date || !title || !Number.isFinite(value_cents)) {
+      return res.status(400).json({ error: 'date, title e value_cents são obrigatórios.' });
     }
 
     const row = await db.get(
       `
-      INSERT INTO services (date, title, value_cents)
-      VALUES ($1, $2, $3)
-      RETURNING id, date, title, value_cents, created_at, updated_at
+      INSERT INTO services (date, title, value_cents, updated_at)
+      VALUES ($1,$2,$3,NOW())
+      RETURNING *
       `,
-      [date, String(title).trim(), cents]
+      [date, title, value_cents]
     );
-
     res.json({ service: row });
-  } catch (e) {
-    console.error('Erro em POST /api/services:', e);
-    res.status(500).json({ error: 'Erro ao salvar serviço.' });
+  } catch (err) {
+    console.error('Erro ao criar service:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar serviço.' });
   }
 });
 
 app.put('/api/services/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: 'ID inválido.' });
-    }
+    const date = String(req.body.date || '').slice(0, 10);
+    const title = String(req.body.title || '').trim();
+    const value_cents = Number(req.body.value_cents);
 
-    const { date, title, value_cents } = req.body || {};
-
-    if (!date || !String(title || '').trim()) {
-      return res.status(400).json({ error: 'Campos obrigatórios: date, title.' });
-    }
-
-    const cents = Number(value_cents);
-    if (!Number.isInteger(cents) || cents < 0) {
-      return res.status(400).json({ error: 'Valor inválido.' });
+    if (!id || !date || !title || !Number.isFinite(value_cents)) {
+      return res.status(400).json({ error: 'id, date, title e value_cents são obrigatórios.' });
     }
 
     const row = await db.get(
       `
       UPDATE services
-      SET
-        date = $1,
-        title = $2,
-        value_cents = $3,
-        updated_at = NOW()
-      WHERE id = $4
-      RETURNING id, date, title, value_cents, created_at, updated_at
+      SET date=$2, title=$3, value_cents=$4, updated_at=NOW()
+      WHERE id=$1
+      RETURNING *
       `,
-      [date, String(title).trim(), cents, id]
+      [id, date, title, value_cents]
     );
-
-    if (!row) return res.status(404).json({ error: 'Serviço não encontrado.' });
-
     res.json({ service: row });
-  } catch (e) {
-    console.error('Erro em PUT /api/services:', e);
-    res.status(500).json({ error: 'Erro ao atualizar serviço.' });
+  } catch (err) {
+    console.error('Erro ao atualizar service:', err);
+    res.status(500).json({ error: 'Erro interno ao atualizar serviço.' });
   }
 });
 
 app.delete('/api/services/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: 'ID inválido.' });
-    }
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
 
-    const row = await db.get('DELETE FROM services WHERE id = $1 RETURNING id', [id]);
-    if (!row) return res.status(404).json({ error: 'Serviço não encontrado.' });
-
+    await db.run('DELETE FROM services WHERE id = $1', [id]);
     res.json({ ok: true });
-  } catch (e) {
-    console.error('Erro em DELETE /api/services:', e);
-    res.status(500).json({ error: 'Erro ao excluir serviço.' });
+  } catch (err) {
+    console.error('Erro ao deletar service:', err);
+    res.status(500).json({ error: 'Erro interno ao excluir serviço.' });
   }
 });
 
 /* =========================
-   BOOKINGS (GET/PUT/DELETE)
+   BOOKINGS
 ========================= */
 
 app.get('/api/bookings', async (req, res) => {
-  const { date, search } = req.query;
-
-  const where = [];
-  const params = [];
-
-  if (date) {
-    params.push(date);
-    where.push(`b.date = $${params.length}`);
-  }
-
-  if (search) {
-    const s = String(search);
-
-    params.push(`%${s}%`);
-    const pName = `$${params.length}`;
-
-    params.push(`%${s}%`);
-    const pPet = `$${params.length}`;
-
-    params.push(`%${s.replace(/\D/g, '')}%`);
-    const pPhone = `$${params.length}`;
-
-    // ILIKE para nome/pet (case-insensitive); phone normal com LIKE
-    where.push(`(c.name ILIKE ${pName} OR p.name ILIKE ${pPet} OR c.phone LIKE ${pPhone})`);
-  }
-
-  const sql = `
-    SELECT
-      b.*,
-      c.name AS customer_name,
-      c.phone,
-      p.name AS pet_name,
-      p.breed AS pet_breed
-    FROM bookings b
-    LEFT JOIN customers c ON c.id = b.customer_id
-    LEFT JOIN pets p ON p.id = b.pet_id
-    LEFT JOIN services s ON s.id = b.service_id
-    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-    ORDER BY b.date ASC, b.time ASC
-  `;
-
   try {
+    const date = String(req.query.date || '').slice(0, 10);
+    const search = String(req.query.search || '').trim();
+
+    // Join para trazer nome do tutor e nome do pet (opcional)
+    let sql = `
+      SELECT
+        b.*,
+        c.name AS customer_name,
+        c.phone AS phone,
+        p.name AS pet_name
+      FROM bookings b
+      JOIN customers c ON c.id = b.customer_id
+      LEFT JOIN pets p ON p.id = b.pet_id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (date) {
+      params.push(date);
+      sql += ` AND b.date = $${params.length}`;
+    }
+
+    if (search) {
+      params.push(`%${search.toLowerCase()}%`);
+      sql += `
+        AND (
+          LOWER(c.name) LIKE $${params.length}
+          OR c.phone LIKE $${params.length}
+          OR LOWER(COALESCE(p.name,'')) LIKE $${params.length}
+          OR LOWER(COALESCE(b.service,'')) LIKE $${params.length}
+        )
+      `;
+    }
+
+    sql += ` ORDER BY b.date DESC, b.time ASC, b.id DESC`;
+
     const rows = await db.all(sql, params);
     res.json({ bookings: rows });
   } catch (err) {
     console.error('Erro ao listar bookings:', err);
-    res.status(500).json({ error: 'Erro ao buscar agendamentos.' });
+    res.status(500).json({ error: 'Erro interno ao buscar agendamentos.' });
+  }
+});
+
+app.post('/api/bookings', async (req, res) => {
+  try {
+    const customer_id = Number(req.body.customer_id);
+    const pet_id = req.body.pet_id != null ? Number(req.body.pet_id) : null;
+    const service_id = req.body.service_id != null ? Number(req.body.service_id) : null;
+
+    const service = req.body.service ? String(req.body.service).trim() : null;
+    const date = String(req.body.date || '').slice(0, 10);
+    const time = String(req.body.time || '').slice(0, 5);
+    const prize = String(req.body.prize || '').trim();
+    const notes = req.body.notes ? String(req.body.notes).trim() : null;
+    const status = req.body.status ? String(req.body.status).trim() : 'agendado';
+    const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
+
+    if (!customer_id || !date || !time || !prize) {
+      return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
+    }
+
+    const row = await db.get(
+      `
+      INSERT INTO bookings (customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      RETURNING *
+      `,
+      [customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at]
+    );
+    res.json({ booking: row });
+  } catch (err) {
+    console.error('Erro ao criar booking:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar agendamento.' });
   }
 });
 
 app.put('/api/bookings/:id', async (req, res) => {
-  const {
-    customer_id,
-    pet_id,
-    date,
-    time,
-    service,
-    prize,
-    notes,
-    status,
-    last_notification_at
-  } = req.body;
+  try {
+    const id = Number(req.params.id);
+    const customer_id = Number(req.body.customer_id);
+    const pet_id = req.body.pet_id != null ? Number(req.body.pet_id) : null;
+    const service_id = req.body.service_id != null ? Number(req.body.service_id) : null;
 
-  let safePetId = null;
-  if (pet_id !== undefined && pet_id !== null && pet_id !== '') {
-    const parsed = Number(pet_id);
-    safePetId = Number.isInteger(parsed) ? parsed : null;
-  }
+    const service = req.body.service ? String(req.body.service).trim() : null;
+    const date = String(req.body.date || '').slice(0, 10);
+    const time = String(req.body.time || '').slice(0, 5);
+    const prize = String(req.body.prize || '').trim();
+    const notes = req.body.notes ? String(req.body.notes).trim() : null;
+    const status = req.body.status ? String(req.body.status).trim() : 'agendado';
+    const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
-  
-  let safeServiceId = null;
-  if (service_id !== undefined && service_id !== null && service_id !== '') {
-    const parsedService = Number(service_id);
-    safeServiceId = Number.isInteger(parsedService) ? parsedService : null;
-  }
-try {
-    await db.run(
+    if (!id || !customer_id || !date || !time || !prize) {
+      return res.status(400).json({ error: 'id, customer_id, date, time e prize são obrigatórios.' });
+    }
+
+    const row = await db.get(
       `
-      UPDATE bookings SET
-        customer_id = $1,
-        pet_id = $2,
-        date = $3,
-        time = $4,
-        service = $5,
-        prize = $6,
-        notes = $8,
-        status = $9,
-        last_notification_at = $10
-      WHERE id = $11
+      UPDATE bookings
+      SET customer_id=$2, pet_id=$3, service_id=$4, service=$5, date=$6, time=$7, prize=$8, notes=$9, status=$10, last_notification_at=$11
+      WHERE id=$1
+      RETURNING *
       `,
-      [
-        customer_id,
-        safePetId,
-        date,
-        time,
-        service,
-        prize,
-        notes || null,
-        status || 'agendado',
-        last_notification_at || null,
-        req.params.id
-      ]
+      [id, customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at]
     );
-
-    res.json({ success: true });
+    res.json({ booking: row });
   } catch (err) {
     console.error('Erro ao atualizar booking:', err);
-    res.status(500).json({ error: 'Erro ao atualizar agendamento.' });
+    res.status(500).json({ error: 'Erro interno ao atualizar agendamento.' });
   }
 });
 
 app.delete('/api/bookings/:id', async (req, res) => {
   try {
-    await db.run('DELETE FROM bookings WHERE id = $1', [req.params.id]);
-    res.json({ success: true });
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    await db.run('DELETE FROM bookings WHERE id = $1', [id]);
+    res.json({ ok: true });
   } catch (err) {
-    console.error('Erro ao excluir booking:', err);
-    res.status(500).json({ error: 'Erro ao excluir agendamento.' });
+    console.error('Erro ao deletar booking:', err);
+    res.status(500).json({ error: 'Erro interno ao excluir agendamento.' });
   }
 });
 
-
 /* =========================
-   RAÇAS DE CÃES (dog_breeds)
+   BREEDS (dog_breeds) - NOVO CRUD
 ========================= */
 
-// Listar raças (filtros: active=1, size=pequeno|medio|grande, q=busca)
 app.get('/api/breeds', async (req, res) => {
-  const { active, size, q } = req.query;
-
-  const where = [];
-  const params = [];
-  let i = 1;
-
-  if (active === '1' || active === 'true') {
-    where.push(`is_active = TRUE`);
-  }
-  if (size && ['pequeno','medio','grande'].includes(String(size))) {
-    where.push(`size = $${i++}`);
-    params.push(String(size));
-  }
-  if (q && String(q).trim()) {
-    where.push(`(name ILIKE $${i} OR history ILIKE $${i} OR characteristics ILIKE $${i})`);
-    params.push(`%${String(q).trim()}%`);
-    i++;
-  }
-
-  const sql = `
-    SELECT *
-    FROM dog_breeds
-    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-    ORDER BY name ASC
-  `;
-
   try {
+    const q = String(req.query.q || '').trim();
+    const active = String(req.query.active || '').trim(); // "1" para apenas ativos
+
+    let sql = `SELECT * FROM dog_breeds WHERE 1=1`;
+    const params = [];
+
+    if (active === '1') sql += ` AND is_active = TRUE`;
+
+    if (q) {
+      params.push(`%${q.toLowerCase()}%`);
+      sql += ` AND (LOWER(name) LIKE $${params.length} OR LOWER(size) LIKE $${params.length} OR LOWER(coat) LIKE $${params.length})`;
+    }
+
+    sql += ` ORDER BY name ASC`;
     const rows = await db.all(sql, params);
     res.json({ breeds: rows });
   } catch (err) {
-    console.error('Erro ao listar dog_breeds:', err);
-    res.status(500).json({ error: 'Erro ao buscar raças.' });
+    console.error('Erro ao listar breeds:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar raças.' });
   }
 });
 
-// Criar raça
 app.post('/api/breeds', async (req, res) => {
-  const { name, history, size, coat, characteristics, is_active } = req.body || {};
-
-  if (!name || !String(name).trim()) {
-    return res.status(400).json({ error: 'Nome da raça é obrigatório.' });
-  }
-  if (!['pequeno','medio','grande'].includes(String(size))) {
-    return res.status(400).json({ error: 'Porte inválido (pequeno|medio|grande).' });
-  }
-  if (!['curta','media','longa'].includes(String(coat))) {
-    return res.status(400).json({ error: 'Pelagem inválida (curta|media|longa).' });
-  }
-
   try {
-    const r = await db.run(
+    const name = String(req.body.name || '').trim();
+    const history = String(req.body.history || '').trim();
+    const size = String(req.body.size || '').trim(); // pequeno|medio|grande
+    const coat = String(req.body.coat || '').trim(); // curta|media|longa
+    const characteristics = String(req.body.characteristics || '').trim();
+    const is_active = req.body.is_active === false ? false : true;
+
+    if (!name || !size || !coat) {
+      return res.status(400).json({ error: 'name, size e coat são obrigatórios.' });
+    }
+
+    const row = await db.get(
       `
-      INSERT INTO dog_breeds (name, history, size, coat, characteristics, is_active)
-      VALUES ($1,$2,$3,$4,$5,$6)
-      RETURNING id
+      INSERT INTO dog_breeds (name, history, size, coat, characteristics, is_active, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      RETURNING *
       `,
-      [
-        String(name).trim(),
-        history ? String(history).trim() : null,
-        String(size),
-        String(coat),
-        characteristics ? String(characteristics).trim() : null,
-        is_active === false ? false : true,
-      ]
+      [name, history, size, coat, characteristics, is_active]
     );
-    res.json({ success: true, id: r.lastID });
+
+    res.json({ breed: row });
   } catch (err) {
-    console.error('Erro ao criar dog_breed:', err);
-    // unique violation
-    if (err.code === '23505') return res.status(409).json({ error: 'Raça já existe.' });
-    res.status(500).json({ error: 'Erro ao criar raça.' });
+    console.error('Erro ao criar breed:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar raça (pode ser nome duplicado).' });
   }
 });
 
-// Atualizar raça
 app.put('/api/breeds/:id', async (req, res) => {
-  const { name, history, size, coat, characteristics, is_active } = req.body || {};
-  const id = Number(req.params.id);
-
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido.' });
-  if (!name || !String(name).trim()) return res.status(400).json({ error: 'Nome da raça é obrigatório.' });
-  if (!['pequeno','medio','grande'].includes(String(size))) return res.status(400).json({ error: 'Porte inválido.' });
-  if (!['curta','media','longa'].includes(String(coat))) return res.status(400).json({ error: 'Pelagem inválida.' });
-
   try {
-    await db.run(
+    const id = Number(req.params.id);
+    const name = String(req.body.name || '').trim();
+    const history = String(req.body.history || '').trim();
+    const size = String(req.body.size || '').trim();
+    const coat = String(req.body.coat || '').trim();
+    const characteristics = String(req.body.characteristics || '').trim();
+    const is_active = req.body.is_active === false ? false : true;
+
+    if (!id || !name || !size || !coat) {
+      return res.status(400).json({ error: 'id, name, size e coat são obrigatórios.' });
+    }
+
+    const row = await db.get(
       `
-      UPDATE dog_breeds SET
-        name = $1,
-        history = $2,
-        size = $3,
-        coat = $4,
-        characteristics = $5,
-        is_active = $6,
-        updated_at = NOW()
-      WHERE id = $7
+      UPDATE dog_breeds
+      SET name=$2, history=$3, size=$4, coat=$5, characteristics=$6, is_active=$7, updated_at=NOW()
+      WHERE id=$1
+      RETURNING *
       `,
-      [
-        String(name).trim(),
-        history ? String(history).trim() : null,
-        String(size),
-        String(coat),
-        characteristics ? String(characteristics).trim() : null,
-        is_active === false ? false : true,
-        id,
-      ]
+      [id, name, history, size, coat, characteristics, is_active]
     );
-    res.json({ success: true });
+
+    res.json({ breed: row });
   } catch (err) {
-    console.error('Erro ao atualizar dog_breed:', err);
-    if (err.code === '23505') return res.status(409).json({ error: 'Nome já existe.' });
-    res.status(500).json({ error: 'Erro ao atualizar raça.' });
+    console.error('Erro ao atualizar breed:', err);
+    res.status(500).json({ error: 'Erro interno ao atualizar raça.' });
   }
 });
 
-// Excluir raça
 app.delete('/api/breeds/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido.' });
-
   try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
     await db.run('DELETE FROM dog_breeds WHERE id = $1', [id]);
-    res.json({ success: true });
+    res.json({ ok: true });
   } catch (err) {
-    console.error('Erro ao excluir dog_breed:', err);
-    res.status(500).json({ error: 'Erro ao excluir raça.' });
+    console.error('Erro ao deletar breed:', err);
+    res.status(500).json({ error: 'Erro interno ao excluir raça.' });
   }
 });
 
 /* =========================
-   ROTAS DE PÁGINAS
+   START
 ========================= */
+const port = process.env.PORT || 3000;
 
-app.get('/', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
-
-/* =========================
-   START SERVER (aguarda initDb)
-========================= */
-const PORT = process.env.PORT || 4000;
-
-(async () => {
+(async () => {        
   try {
     await db.initDb();
-    console.log('Banco inicializado com sucesso');
-
-    app.listen(PORT, () => {
-      console.log('🚀 Pet Funny API rodando na porta', PORT);
-    });
-  } catch (err) {
-    console.error('Erro fatal ao inicializar banco:', err);
+    app.listen(port, () => console.log('PetFunny API rodando na porta', port));
+  } catch (e) {
+    console.error('Erro fatal ao inicializar banco:', e);
     process.exit(1);
   }
 })();
