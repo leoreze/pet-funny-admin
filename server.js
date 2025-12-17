@@ -11,6 +11,11 @@ app.use(express.json());
 // Static files (admin.html, index.html, assets)
 app.use(express.static(__dirname));
 
+app.get(['/admin', '/admin/'], (req, res) => {
+  return res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+
 /* =========================
    HELPERS
 ========================= */
@@ -488,7 +493,7 @@ app.delete('/api/breeds/:id', async (req, res) => {
 ========================= */
 const port = process.env.PORT || 3000;
 
-(async () => {
+(async () => {        
   try {
     await db.initDb();
     app.listen(port, () => console.log('PetFunny API rodando na porta', port));
