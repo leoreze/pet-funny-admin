@@ -158,12 +158,10 @@
 
     /* Toolbars por aba */
     .agenda-filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      justify-content: center;
-      flex: 1;
+   background: #f7fbfc;
+  border: 1px solid #e0edf0;
+  border-radius: 14px;
+  padding: 10px 12px;
     }
     .tab-toolbar {
       display: flex;
@@ -580,23 +578,43 @@
     <!-- TAB: AGENDA -->
     <section id="tab-agenda" class="tab-view active">
       <div class="section-title-row">
-        <div class="section-title">Agendamentos do dia</div>
+         <div class="section-title">Agendamentos & Mimos</div>
 
-        <div class="agenda-filters">
-          <div class="filters-group">
-            <span style="font-size:13px;">Data:</span>
-            <input type="date" id="filtroData" />
-            <button class="btn btn-light" id="btnHoje" type="button">Hoje</button>
-            <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar</button>
-          </div>
+         <div class="agenda-actions-right">
+      <div class="view-toggle">
+        <button class="toggle-btn active" id="btnViewList" type="button">📋 Lista</button>
+        <button class="toggle-btn" id="btnViewCards" type="button">🗂️ Cards</button>
+      </div>
 
-          <div class="filters-group">
-            <span style="font-size:13px;">Buscar:</span>
-            <input type="text" id="filtroBusca" placeholder="Nome, pet ou telefone" />
-          </div>
+      <button class="btn btn-light" id="btnNovoAgendamento" type="button">
+        + Novo agendamento
+      </button>
+    </div>
 
-          <button class="btn btn-light" id="btnExportarCSV" type="button">Exportar CSV</button>
-        </div>
+        <!-- FILTROS (APENAS DA AGENDA) -->
+  <div class="agenda-filters" style="margin: 8px 0 14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+    <div class="filters-group">
+      <label style="font-size:12px;">Data</label>
+      <input type="date" id="filtroData" />
+    </div>
+
+    <button class="btn btn-light" id="btnHoje" type="button">Hoje</button>
+    <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar</button>
+
+    <div class="filters-group" style="flex:1; min-width:200px;">
+      <label style="font-size:12px;">Buscar</label>
+      <input
+        type="text"
+        id="filtroBusca"
+        placeholder="Nome do tutor, pet ou telefone"
+        style="width:100%;"
+      />
+    </div>
+
+    <button class="btn btn-light" id="btnExportarCSV" type="button">
+      Exportar CSV
+    </button>
+  </div>
 
         <div class="agenda-actions-right">
           <!-- NOVO: Toggle Lista/Cards -->
