@@ -156,6 +156,30 @@
     .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
     .filters-group { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 
+    /* Toolbars por aba */
+    .agenda-filters {
+   background: #f7fbfc;
+  border: 1px solid #e0edf0;
+  border-radius: 14px;
+  padding: 10px 12px;
+    }
+    .tab-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0 6px;
+    }
+    .tab-toolbar-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      flex: 1;
+    }
+
+
     input[type="date"], input[type="text"], input[type="time"], select, textarea {
       padding: 7px 9px;
       border-radius: 10px;
@@ -539,20 +563,6 @@
       </div>
 
       <div class="filters">
-        <div class="filters-group">
-          <span style="font-size:13px;">Data:</span>
-          <input type="date" id="filtroData" />
-          <button class="btn btn-light" id="btnHoje" type="button">Hoje</button>
-          <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar filtro</button>
-        </div>
-
-        <div class="filters-group">
-          <span style="font-size:13px;">Pesquisar:</span>
-          <input type="text" id="filtroBusca" placeholder="Nome, pet ou telefone" />
-        </div>
-
-        <button class="btn btn-light" id="btnExportarCSV" type="button">Exportar CSV</button>
-
         <button class="btn btn-danger btn-small" id="btnLogout" type="button">Sair</button>
       </div>
     </div>
@@ -561,15 +571,16 @@
       <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agenda &amp; Mimos</button>
       <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
       <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
+      <button class="tab-btn" data-tab="tab-racas" type="button"><span>🐶</span> Raças de Cães</button>
       <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
     </div>
 
     <!-- TAB: AGENDA -->
     <section id="tab-agenda" class="tab-view active">
       <div class="section-title-row">
-        <div class="section-title">Agendamentos do dia</div>
+         <div class="section-title">Agendamentos & Mimos</div>
 
-        <div class="agenda-actions-right">
+           <div class="agenda-actions-right">
           <!-- NOVO: Toggle Lista/Cards -->
           <div class="view-toggle" aria-label="Alternar visualização">
             <button class="toggle-btn active" id="btnViewList" type="button">📋 Lista</button>
@@ -579,6 +590,35 @@
           <button class="btn btn-light" id="btnNovoAgendamento" type="button">+ Novo agendamento</button>
         </div>
       </div>
+
+ 
+
+        <!-- FILTROS (APENAS DA AGENDA) -->
+  <div class="agenda-filters" style="margin: 8px 0 14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+    <div class="filters-group">
+      <label style="font-size:12px;">Data</label>
+      <input type="date" id="filtroData" />
+    </div>
+
+    <button class="btn btn-light" id="btnHoje" type="button">Hoje</button>
+    <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar</button>
+
+    <div class="filters-group" style="flex:1; min-width:200px;">
+      <label style="font-size:12px;">Buscar</label>
+      <input
+        type="text"
+        id="filtroBusca"
+        placeholder="Nome do tutor, pet ou telefone"
+        style="width:100%;"
+      />
+    </div>
+
+    <button class="btn btn-light" id="btnExportarCSV" type="button">
+      Exportar CSV
+    </button>
+  </div>
+
+      
 
       <div class="form-panel hidden" id="formPanel">
         <input type="hidden" id="bookingId" />
@@ -696,6 +736,13 @@
     <!-- TAB: CLIENTES & PETS -->
     <section id="tab-clientes" class="tab-view">
       <div class="section-title">Clientes &amp; Pets</div>
+      <div class="tab-toolbar">
+        <div class="filters-group">
+          <span style="font-size:13px;">Buscar:</span>
+          <input type="text" id="filtroClientes" placeholder="Nome do tutor ou telefone" />
+          <button class="btn btn-light" id="btnLimparClientes" type="button">Limpar</button>
+        </div>
+      </div>
       <div class="two-cols">
         <!-- CLIENTES -->
         <div class="subcard">
@@ -783,6 +830,13 @@
     <section id="tab-servicos" class="tab-view">
       <div class="section-title-row">
         <div class="section-title">Serviços</div>
+        <div class="tab-toolbar-inline">
+          <div class="filters-group">
+            <span style="font-size:13px;">Buscar:</span>
+            <input type="text" id="filtroServicos" placeholder="Título do serviço" />
+            <button class="btn btn-light" id="btnLimparServicos" type="button">Limpar</button>
+          </div>
+        </div>
         <button class="btn btn-light" id="btnNovoServico" type="button">+ Novo serviço</button>
       </div>
 
@@ -830,7 +884,76 @@
       </div>
     </section>
 
-    <!-- TAB: DASHBOARD -->
+    
+    <!-- TAB: RAÇAS DE CÃES -->
+    <section id="tab-racas" class="tab-view">
+      <div class="section-title-row">
+        <div class="section-title">Raças de Cães (Catálogo)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="breedSearch" placeholder="Buscar raça..." style="min-width:220px;" />
+          <button class="btn btn-light" id="btnNovoBreed" type="button">+ Nova raça</button>
+        </div>
+      </div>
+
+      <div class="form-panel hidden" id="breedFormPanel">
+        <input type="hidden" id="breedId" />
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="breedName">Raça (nome)</label>
+            <input type="text" id="breedName" placeholder="Ex: Shih Tzu" />
+          </div>
+          <div class="form-group">
+            <label for="breedSize">Porte</label>
+            <select id="breedSize">
+              <option value="pequeno">Pequeno</option>
+              <option value="medio">Médio</option>
+              <option value="grande">Grande</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="breedCoat">Pelagem</label>
+            <select id="breedCoat">
+              <option value="curta">Curta</option>
+              <option value="media">Média</option>
+              <option value="longa">Longa</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="breedHistory">História (breve)</label>
+          <textarea id="breedHistory" placeholder="Resumo histórico e especificidades relevantes (temperamento, origem, cuidados)."></textarea>
+        </div>
+
+        <div id="breedError" class="error-msg" style="display:none;"></div>
+
+        <div class="form-actions">
+          <button class="btn btn-secondary" id="btnBreedCancel" type="button">Limpar / cancelar</button>
+          <button class="btn" id="btnBreedSave" type="button">Salvar</button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Raça</th>
+              <th>Porte</th>
+              <th>Pelagem</th>
+              <th>História</th>
+              <th>Criado em</th>
+              <th>Atualizado em</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyBreeds"></tbody>
+        </table>
+        <div id="breedsEmpty" class="empty" style="display:none;">Nenhuma raça cadastrada ainda.</div>
+      </div>
+    </section>
+
+<!-- TAB: DASHBOARD -->
     <section id="tab-dashboard" class="tab-view">
       <div class="section-title-row">
         <div class="section-title">Dashboard de Indicadores</div>
@@ -1002,6 +1125,7 @@
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
+      await loadBreeds();
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
@@ -1275,12 +1399,6 @@
   const tabButtons = document.querySelectorAll('.tab-btn');
   const tabViews = document.querySelectorAll('.tab-view');
 
-  function activateTab(tabId) {
-    const btn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
-    if (btn) btn.click();
-  }
-
-
   tabButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       tabButtons.forEach(b => b.classList.remove('active'));
@@ -1290,6 +1408,7 @@
       tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
 
       if (tabId === 'tab-servicos') loadServices().catch(console.error);
+      if (tabId === 'tab-racas') loadBreeds().catch(console.error);
 
       if (tabId === 'tab-dashboard') {
         loadDashboard().finally(() => {
@@ -1385,10 +1504,11 @@
   let petEditIdLocal = null;
 
   function setEditMode(isEdit) {
+    // Em edição: mantém Tutor/Telefone travados, mas permite editar Pet e Mimo
     formPhone.disabled = isEdit;
     formNome.disabled = isEdit;
-    formPetSelect.disabled = isEdit;
-    formPrize.disabled = isEdit;
+    formPetSelect.disabled = false;
+    formPrize.disabled = false;
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
@@ -1569,6 +1689,12 @@
   const tbodyServices = document.getElementById('tbodyServices');
   const servicesEmpty = document.getElementById('servicesEmpty');
 
+  // Filtro de busca (Serviços)
+  const filtroServicos = document.getElementById('filtroServicos');
+  const btnLimparServicos = document.getElementById('btnLimparServicos');
+  let filtroServicosTxt = '';
+
+
   let servicesCache = []; // [{id,title,value_cents,...}]
 
   function showServiceForm() { serviceFormPanel.classList.remove('hidden'); }
@@ -1596,9 +1722,16 @@
 
   function renderServices() {
     tbodyServices.innerHTML = '';
-    servicesEmpty.style.display = servicesCache.length ? 'none' : 'block';
 
-    servicesCache.forEach(svc => {
+    const list = (servicesCache || []).filter(s => {
+      if (!filtroServicosTxt) return true;
+      const hay = normStr((s.title || ''));
+      return hay.includes(filtroServicosTxt);
+    });
+
+    servicesEmpty.style.display = list.length ? 'none' : 'block';
+
+    list.forEach(svc => {
       const tr = document.createElement('tr');
 
       const tdId = document.createElement('td'); tdId.textContent = svc.id;
@@ -1731,6 +1864,213 @@
   if (servicePrice) {
     servicePrice.addEventListener('input', () => applyCurrencyMask(servicePrice));
   }
+
+
+  if (filtroServicos) {
+    filtroServicos.addEventListener('input', () => {
+      filtroServicosTxt = normStr(filtroServicos.value);
+      renderServices();
+    });
+  }
+  if (btnLimparServicos) {
+    btnLimparServicos.addEventListener('click', () => {
+      if (filtroServicos) filtroServicos.value = '';
+      filtroServicosTxt = '';
+      renderServices();
+    });
+  }
+
+
+  /* ===== Raças de Cães (CRUD) ===== */
+  const btnNovoBreed = document.getElementById('btnNovoBreed');
+  const breedSearch = document.getElementById('breedSearch');
+  const breedFormPanel = document.getElementById('breedFormPanel');
+  const breedId = document.getElementById('breedId');
+  const breedName = document.getElementById('breedName');
+  const breedSize = document.getElementById('breedSize');
+  const breedCoat = document.getElementById('breedCoat');
+  const breedHistory = document.getElementById('breedHistory');
+  const breedError = document.getElementById('breedError');
+  const btnBreedCancel = document.getElementById('btnBreedCancel');
+  const btnBreedSave = document.getElementById('btnBreedSave');
+  const tbodyBreeds = document.getElementById('tbodyBreeds');
+  const breedsEmpty = document.getElementById('breedsEmpty');
+
+  let breedsCache = []; // [{id,name,size,coat,history,created_at,updated_at}]
+
+  function showBreedForm() { breedFormPanel.classList.remove('hidden'); }
+  function hideBreedForm() { breedFormPanel.classList.add('hidden'); }
+
+  function clearBreedForm() {
+    breedId.value = '';
+    breedName.value = '';
+    breedSize.value = 'pequeno';
+    breedCoat.value = 'curta';
+    breedHistory.value = '';
+    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
+  }
+
+  function fillBreedForm(b) {
+    breedId.value = b.id;
+    breedName.value = b.name || '';
+    breedSize.value = (b.size || 'pequeno');
+    breedCoat.value = (b.coat || 'curta');
+    breedHistory.value = b.history || '';
+    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
+  }
+
+  function humanSize(v) {
+    const s = normStr(v);
+    if (s === 'pequeno') return 'Pequeno';
+    if (s === 'medio' || s === 'médio') return 'Médio';
+    if (s === 'grande') return 'Grande';
+    return v || '-';
+  }
+
+  function humanCoat(v) {
+    const s = normStr(v);
+    if (s === 'curta') return 'Curta';
+    if (s === 'media' || s === 'média') return 'Média';
+    if (s === 'longa') return 'Longa';
+    return v || '-';
+  }
+
+  function renderBreeds() {
+    if (!tbodyBreeds) return;
+    tbodyBreeds.innerHTML = '';
+
+    const q = normStr(breedSearch?.value || '');
+    const list = !q ? breedsCache : breedsCache.filter(b =>
+      normStr(b.name).includes(q) ||
+      normStr(b.size).includes(q) ||
+      normStr(b.coat).includes(q) ||
+      normStr(b.history).includes(q)
+    );
+
+    if (breedsEmpty) breedsEmpty.style.display = list.length ? 'none' : 'block';
+
+    list.forEach(b => {
+      const tr = document.createElement('tr');
+
+      const tdId = document.createElement('td'); tdId.textContent = b.id;
+      const tdName = document.createElement('td'); tdName.textContent = b.name || '-';
+      const tdSize = document.createElement('td'); tdSize.textContent = humanSize(b.size);
+      const tdCoat = document.createElement('td'); tdCoat.textContent = humanCoat(b.coat);
+
+      const tdHist = document.createElement('td');
+      const full = (b.history || '').trim();
+      tdHist.textContent = full.length > 140 ? (full.slice(0, 140) + '…') : (full || '-');
+      tdHist.className = 'td-obs';
+      tdHist.title = full;
+
+      const tdCreated = document.createElement('td'); tdCreated.textContent = b.created_at ? formatDateTimeBr(b.created_at) : '-';
+      const tdUpdated = document.createElement('td'); tdUpdated.textContent = b.updated_at ? formatDateTimeBr(b.updated_at) : '-';
+
+      const tdAcoes = document.createElement('td');
+      const divActions = document.createElement('div'); divActions.className = 'actions';
+
+      const btnEdit = document.createElement('button');
+      btnEdit.textContent = 'Editar';
+      btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.type = 'button';
+      btnEdit.addEventListener('click', () => {
+        fillBreedForm(b);
+        showBreedForm();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      const btnDel = document.createElement('button');
+      btnDel.textContent = 'Excluir';
+      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.type = 'button';
+      btnDel.addEventListener('click', async () => {
+        if (!confirm('Deseja realmente excluir esta raça?')) return;
+        try {
+          await apiDelete('/api/breeds/' + b.id);
+          await loadBreeds();
+        } catch (e) { alert(e.message); }
+      });
+
+      divActions.appendChild(btnEdit);
+      divActions.appendChild(btnDel);
+      tdAcoes.appendChild(divActions);
+
+      tr.appendChild(tdId);
+      tr.appendChild(tdName);
+      tr.appendChild(tdSize);
+      tr.appendChild(tdCoat);
+      tr.appendChild(tdHist);
+      tr.appendChild(tdCreated);
+      tr.appendChild(tdUpdated);
+      tr.appendChild(tdAcoes);
+
+      tbodyBreeds.appendChild(tr);
+    });
+  }
+
+  async function loadBreeds() {
+    try {
+      const data = await apiGet('/api/breeds');
+      breedsCache = data.breeds || [];
+      renderBreeds();
+    } catch (e) {
+      breedsCache = [];
+      renderBreeds();
+      if (breedsEmpty) {
+        breedsEmpty.style.display = 'block';
+        breedsEmpty.textContent = 'Erro ao carregar raças: ' + e.message;
+      }
+    }
+  }
+
+  async function saveBreed() {
+    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
+
+    const id = breedId.value ? parseInt(breedId.value, 10) : null;
+    const name = (breedName.value || '').trim();
+    const size = breedSize.value;
+    const coat = breedCoat.value;
+    const history = (breedHistory.value || '').trim();
+
+    if (!name) {
+      if (breedError) { breedError.textContent = 'Informe o nome da raça.'; breedError.style.display = 'block'; }
+      return;
+    }
+    if (!size || !coat) {
+      if (breedError) { breedError.textContent = 'Informe porte e pelagem.'; breedError.style.display = 'block'; }
+      return;
+    }
+
+    try {
+      const body = { name, size, coat, history };
+      if (!id) await apiPost('/api/breeds', body);
+      else await apiPut('/api/breeds/' + id, body);
+
+      clearBreedForm();
+      hideBreedForm();
+      await loadBreeds();
+    } catch (e) {
+      if (breedError) { breedError.textContent = e.message; breedError.style.display = 'block'; }
+    }
+  }
+
+  if (btnNovoBreed) {
+    btnNovoBreed.addEventListener('click', () => {
+      clearBreedForm();
+      showBreedForm();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  if (btnBreedCancel) btnBreedCancel.addEventListener('click', () => { clearBreedForm(); hideBreedForm(); });
+  if (btnBreedSave) btnBreedSave.addEventListener('click', saveBreed);
+
+  if (breedSearch) {
+    breedSearch.addEventListener('input', () => {
+      clearTimeout(window.__breedTimer);
+      window.__breedTimer = setTimeout(() => renderBreeds(), 120);
+    });
+  }
+
 
   /* ===== NOVO: Agenda - Toggle Lista/Cards ===== */
   const AGENDA_VIEW_KEY = 'pf_admin_agenda_view';
@@ -2025,7 +2365,7 @@
     formPhone.value = '';
     formNome.value = '';
     formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
-    formPrize.value = 'Tosa Higiênica';
+    formPrize.value = '';
     formService.value = '';
     formDate.value = '';
     formTime.value = '';
@@ -2062,8 +2402,19 @@
     const status = formStatus.value;
     const notes = formNotes.value.trim();
 
-    if (!date || !time || !prize || !serviceIdSelected) {
-      formError.textContent = 'Data, horário, serviço e mimo são obrigatórios.';
+    if (!date || !time || !serviceIdSelected) {
+      formError.textContent = 'Data, horário e serviço são obrigatórios.';
+      formError.style.display = 'block';
+      return;
+    }
+    if (!prize) {
+      formError.textContent = 'Selecione um mimo (Roleta).';
+      formError.style.display = 'block';
+      return;
+    }
+    // Novo agendamento: Pet obrigatório
+    if (!id && !petIdNum) {
+      formError.textContent = 'Para NOVO agendamento, selecione um pet.';
       formError.style.display = 'block';
       return;
     }
@@ -2224,54 +2575,13 @@
   formPhone.addEventListener('blur', async () => {
     const phoneDigits = sanitizePhone(formPhone.value.trim());
     if (!phoneDigits) return;
-
-    // Só aplica a regra de "precisa cadastrar cliente/pets" quando for NOVO agendamento
-    const isNewBooking = !String(bookingId.value || '').trim();
-
     try {
       const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
-
       if (lookup.exists && lookup.customer) {
         formNome.value = lookup.customer.name || '';
         await loadPetsForCustomer(lookup.customer.id);
-        return;
       }
-
-      // Cliente não existe
-      if (isNewBooking) {
-        // limpa campos dependentes
-        formNome.value = '';
-        formPetSelect.innerHTML = '<option value="">(Selecione um pet)</option>';
-
-        // avisa no próprio formulário
-        formError.textContent = 'Cliente não cadastrado. Cadastre o cliente e pelo menos 1 pet na aba “Clientes & Pets” antes de criar o agendamento.';
-        formError.style.display = 'block';
-
-        const go = confirm('Cliente não encontrado. Para criar um NOVO agendamento, é necessário cadastrar o cliente e pelo menos 1 pet. Deseja ir agora para a aba “Clientes & Pets” para fazer o cadastro?');
-        if (go) {
-          activateTab('tab-clientes');
-
-          // Prefill do cadastro (sem depender de variáveis/const declaradas depois)
-          const cliPhoneEl = document.getElementById('cliPhone');
-          const cliNameEl = document.getElementById('cliName');
-          const clienteFormBlockEl = document.getElementById('clienteFormBlock');
-          const petsCardEl = document.getElementById('petsCard');
-          const badgeSelEl = document.getElementById('badgeClienteSelecionado');
-
-          if (clienteFormBlockEl) clienteFormBlockEl.classList.remove('hidden');
-          if (petsCardEl) petsCardEl.classList.add('hidden');
-          if (badgeSelEl) badgeSelEl.classList.add('hidden');
-
-          if (cliPhoneEl) cliPhoneEl.value = formatTelefone(phoneDigits);
-          if (cliNameEl) {
-            cliNameEl.value = '';
-            cliNameEl.focus();
-          }
-        }
-      }
-    } catch (_) {
-      // se lookup falhar, não bloqueia — apenas mantém silencioso
-    }
+    } catch (_) {}
   });
 
   // ===== CLIENTES & PETS =====
@@ -2281,6 +2591,12 @@
   const btnCliLimpar = document.getElementById('btnCliLimpar');
   const btnCliSalvar = document.getElementById('btnCliSalvar');
   const tbodyClientes = document.getElementById('tbodyClientes');
+
+  // Filtro de busca (Clientes & Pets)
+  const filtroClientes = document.getElementById('filtroClientes');
+  const btnLimparClientes = document.getElementById('btnLimparClientes');
+  let filtroClientesTxt = '';
+
 
   const clienteFormBlock = document.getElementById('clienteFormBlock');
   const btnNovoCliente = document.getElementById('btnNovoCliente');
@@ -2305,6 +2621,20 @@
 
   cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
 
+  if (filtroClientes) {
+    filtroClientes.addEventListener('input', () => {
+      filtroClientesTxt = normStr(filtroClientes.value);
+      renderClientes();
+    });
+  }
+  if (btnLimparClientes) {
+    btnLimparClientes.addEventListener('click', () => {
+      if (filtroClientes) filtroClientes.value = '';
+      filtroClientesTxt = '';
+      renderClientes();
+    });
+  }
+
   racas.forEach(r => {
     const opt = document.createElement('option');
     opt.value = r;
@@ -2320,7 +2650,14 @@
 
   function renderClientes() {
     tbodyClientes.innerHTML = '';
-    clientesCache.forEach(c => {
+
+    const list = (clientesCache || []).filter(c => {
+      if (!filtroClientesTxt) return true;
+      const hay = normStr((c.name || '') + ' ' + (c.phone || ''));
+      return hay.includes(filtroClientesTxt);
+    });
+
+    list.forEach(c => {
       const tr = document.createElement('tr');
 
       const tdId = document.createElement('td'); tdId.textContent = c.id;
@@ -2518,6 +2855,7 @@
       limparPetsForm();
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadClientes();
+      await loadBreeds();
       await loadDashboard();
     } catch (e) {
       petError.textContent = e.message;
