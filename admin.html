@@ -561,6 +561,7 @@
       <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agenda &amp; Mimos</button>
       <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
       <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
+      <button class="tab-btn" data-tab="tab-racas" type="button"><span>🐶</span> Raças de Cães</button>
       <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
     </div>
 
@@ -830,92 +831,76 @@
       </div>
     </section>
 
-    <section id="tab-racas" class="tab-content">
-  <div class="section-title-row">
-    <div class="section-title">Raças de Cães</div>
-    <button class="btn btn-light" id="btnNovaRaca" type="button">+ Nova raça</button>
-  </div>
-
-  <div class="form-panel hidden" id="breedFormPanel">
-    <input type="hidden" id="breedId" />
-
-    <div class="form-row-2">
-      <div class="form-group">
-        <label for="breedName">Raça (nome)</label>
-        <input id="breedName" type="text" placeholder="Ex: Golden Retriever" />
+    
+    <!-- TAB: RAÇAS DE CÃES -->
+    <section id="tab-racas" class="tab-view">
+      <div class="section-title-row">
+        <div class="section-title">Raças de Cães (Catálogo)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="breedSearch" placeholder="Buscar raça..." style="min-width:220px;" />
+          <button class="btn btn-light" id="btnNovoBreed" type="button">+ Nova raça</button>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="breedSize">Porte</label>
-        <select id="breedSize">
-          <option value="pequeno">Pequeno</option>
-          <option value="medio">Médio</option>
-          <option value="grande">Grande</option>
-        </select>
+      <div class="form-panel hidden" id="breedFormPanel">
+        <input type="hidden" id="breedId" />
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="breedName">Raça (nome)</label>
+            <input type="text" id="breedName" placeholder="Ex: Shih Tzu" />
+          </div>
+          <div class="form-group">
+            <label for="breedSize">Porte</label>
+            <select id="breedSize">
+              <option value="pequeno">Pequeno</option>
+              <option value="medio">Médio</option>
+              <option value="grande">Grande</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="breedCoat">Pelagem</label>
+            <select id="breedCoat">
+              <option value="curta">Curta</option>
+              <option value="media">Média</option>
+              <option value="longa">Longa</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="breedHistory">História (breve)</label>
+          <textarea id="breedHistory" placeholder="Resumo histórico e especificidades relevantes (temperamento, origem, cuidados)."></textarea>
+        </div>
+
+        <div id="breedError" class="error-msg" style="display:none;"></div>
+
+        <div class="form-actions">
+          <button class="btn btn-secondary" id="btnBreedCancel" type="button">Limpar / cancelar</button>
+          <button class="btn" id="btnBreedSave" type="button">Salvar</button>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="breedCoat">Pelagem</label>
-        <select id="breedCoat">
-          <option value="curta">Curta</option>
-          <option value="media">Média</option>
-          <option value="longa">Longa</option>
-        </select>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Raça</th>
+              <th>Porte</th>
+              <th>Pelagem</th>
+              <th>História</th>
+              <th>Criado em</th>
+              <th>Atualizado em</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyBreeds"></tbody>
+        </table>
+        <div id="breedsEmpty" class="empty" style="display:none;">Nenhuma raça cadastrada ainda.</div>
       </div>
-    </div>
+    </section>
 
-    <div class="form-group">
-      <label for="breedHistory">História (breve)</label>
-      <textarea id="breedHistory" placeholder="Origem, função original, contexto histórico..."></textarea>
-    </div>
-
-    <div class="form-group">
-      <label for="breedChar">Especificidades</label>
-      <textarea id="breedChar" placeholder="Temperamento, cuidados, predisposições, particularidades..."></textarea>
-    </div>
-
-    <div class="form-row-2">
-      <div class="form-group">
-        <label for="breedActive">Ativo</label>
-        <select id="breedActive">
-          <option value="1">Sim</option>
-          <option value="0">Não</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="breedSearch">Pesquisar</label>
-        <input id="breedSearch" type="text" placeholder="Buscar por nome, porte ou pelagem..." />
-      </div>
-    </div>
-
-    <div id="breedError" class="error-msg" style="display:none;"></div>
-
-    <div class="form-actions">
-      <button class="btn btn-secondary" id="btnBreedCancel" type="button">Cancelar</button>
-      <button class="btn" id="btnBreedSave" type="button">Salvar</button>
-    </div>
-  </div>
-
-  <div class="table-wrapper">
-    <table>
-      <thead>
-        <tr>
-          <th>Nome</th>
-          <th>Porte</th>
-          <th>Pelagem</th>
-          <th>Ativo</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-      <tbody id="breedsTbody"></tbody>
-    </table>
-    <div id="breedsEmpty" class="empty" style="display:none;">Nenhuma raça cadastrada.</div>
-  </div>
-</section>
-
-
-    <!-- TAB: DASHBOARD -->
+<!-- TAB: DASHBOARD -->
     <section id="tab-dashboard" class="tab-view">
       <div class="section-title-row">
         <div class="section-title">Dashboard de Indicadores</div>
@@ -1087,6 +1072,7 @@
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
+      await loadBreeds();
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
@@ -1147,185 +1133,6 @@
   btnLogout.addEventListener('click', () => {
     if (confirm('Deseja sair do painel?')) doLogout();
   });
-
-  let BREEDS_CACHE = [];
-
-async function fetchBreeds(query = '') {
-  const data = await apiGet('/api/breeds', { q: query });
-  BREEDS_CACHE = data.breeds || [];
-  renderBreedsTable();
-  await refreshBreedsSelectForPets();
-}
-
-function renderBreedsTable() {
-  const tbody = document.getElementById('breedsTbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  const empty = document.getElementById('breedsEmpty');
-  if (empty) empty.style.display = BREEDS_CACHE.length ? 'none' : 'block';
-
-  BREEDS_CACHE.forEach(b => {
-    const tr = document.createElement('tr');
-
-    const tdName = document.createElement('td');
-    tdName.textContent = b.name;
-
-    const tdSize = document.createElement('td');
-    tdSize.textContent = b.size;
-
-    const tdCoat = document.createElement('td');
-    tdCoat.textContent = b.coat;
-
-    const tdActive = document.createElement('td');
-    tdActive.textContent = b.is_active ? 'Sim' : 'Não';
-
-    const tdActions = document.createElement('td');
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-
-    const btnEdit = document.createElement('button');
-    btnEdit.className = 'btn btn-small btn-secondary';
-    btnEdit.type = 'button';
-    btnEdit.textContent = 'Editar';
-    btnEdit.addEventListener('click', () => {
-      openBreedForm(b);
-    });
-
-    const btnDel = document.createElement('button');
-    btnDel.className = 'btn btn-small btn-danger';
-    btnDel.type = 'button';
-    btnDel.textContent = 'Excluir';
-    btnDel.addEventListener('click', async () => {
-      if (!confirm('Excluir esta raça?')) return;
-      try {
-        await apiDelete('/api/breeds/' + b.id);
-        await fetchBreeds(document.getElementById('breedSearch')?.value || '');
-      } catch (e) {
-        alert(e.message);
-      }
-    });
-
-    actions.appendChild(btnEdit);
-    actions.appendChild(btnDel);
-    tdActions.appendChild(actions);
-
-    tr.appendChild(tdName);
-    tr.appendChild(tdSize);
-    tr.appendChild(tdCoat);
-    tr.appendChild(tdActive);
-    tr.appendChild(tdActions);
-
-    tbody.appendChild(tr);
-  });
-}
-
-function openBreedForm(breed = null) {
-  const panel = document.getElementById('breedFormPanel');
-  if (!panel) return;
-
-  document.getElementById('breedError').style.display = 'none';
-
-  if (!breed) {
-    document.getElementById('breedId').value = '';
-    document.getElementById('breedName').value = '';
-    document.getElementById('breedSize').value = 'pequeno';
-    document.getElementById('breedCoat').value = 'curta';
-    document.getElementById('breedHistory').value = '';
-    document.getElementById('breedChar').value = '';
-    document.getElementById('breedActive').value = '1';
-  } else {
-    document.getElementById('breedId').value = breed.id;
-    document.getElementById('breedName').value = breed.name || '';
-    document.getElementById('breedSize').value = breed.size || 'pequeno';
-    document.getElementById('breedCoat').value = breed.coat || 'curta';
-    document.getElementById('breedHistory').value = breed.history || '';
-    document.getElementById('breedChar').value = breed.characteristics || '';
-    document.getElementById('breedActive').value = breed.is_active ? '1' : '0';
-  }
-
-  panel.classList.remove('hidden');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function closeBreedForm() {
-  const panel = document.getElementById('breedFormPanel');
-  if (!panel) return;
-  panel.classList.add('hidden');
-}
-
-async function saveBreed() {
-  const err = document.getElementById('breedError');
-  err.style.display = 'none';
-  err.textContent = '';
-
-  const id = document.getElementById('breedId').value ? Number(document.getElementById('breedId').value) : null;
-  const name = String(document.getElementById('breedName').value || '').trim();
-  const size = document.getElementById('breedSize').value;
-  const coat = document.getElementById('breedCoat').value;
-  const history = String(document.getElementById('breedHistory').value || '').trim();
-  const characteristics = String(document.getElementById('breedChar').value || '').trim();
-  const is_active = document.getElementById('breedActive').value === '1';
-
-  if (!name || !size || !coat) {
-    err.textContent = 'Preencha nome, porte e pelagem.';
-    err.style.display = 'block';
-    return;
-  }
-
-  try {
-    const payload = { name, size, coat, history, characteristics, is_active };
-
-    if (!id) await apiPost('/api/breeds', payload);
-    else await apiPut('/api/breeds/' + id, payload);
-
-    closeBreedForm();
-    await fetchBreeds(document.getElementById('breedSearch')?.value || '');
-  } catch (e) {
-    err.textContent = e.message;
-    err.style.display = 'block';
-  }
-}
-
-async function refreshBreedsSelectForPets() {
-  // alimenta o select do cadastro de pets com raças ativas do banco
-  const select = document.getElementById('petBreed');
-  if (!select) return;
-
-  try {
-    const data = await apiGet('/api/breeds', { active: 1 });
-    const breeds = data.breeds || [];
-    select.innerHTML = '';
-
-    breeds.forEach(b => {
-      const opt = document.createElement('option');
-      opt.value = b.name;
-      opt.textContent = b.name;
-      select.appendChild(opt);
-    });
-
-    // fallback se não vier nada
-    if (!breeds.length) {
-      const opt = document.createElement('option');
-      opt.value = 'SRD (Sem Raça Definida)';
-      opt.textContent = 'SRD (Sem Raça Definida)';
-      select.appendChild(opt);
-    }
-  } catch (_) {}
-}
-
-// WIREUP
-document.getElementById('btnNovaRaca')?.addEventListener('click', () => openBreedForm(null));
-document.getElementById('btnBreedCancel')?.addEventListener('click', closeBreedForm);
-document.getElementById('btnBreedSave')?.addEventListener('click', saveBreed);
-
-document.getElementById('breedSearch')?.addEventListener('input', () => {
-  clearTimeout(window.__breedSearchTimer);
-  window.__breedSearchTimer = setTimeout(() => {
-    fetchBreeds(document.getElementById('breedSearch').value || '');
-  }, 180);
-});
-
 
   // ===== API HELPERS =====
   async function apiGet(path, params) {
@@ -1548,6 +1355,7 @@ document.getElementById('breedSearch')?.addEventListener('input', () => {
       tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
 
       if (tabId === 'tab-servicos') loadServices().catch(console.error);
+      if (tabId === 'tab-racas') loadBreeds().catch(console.error);
 
       if (tabId === 'tab-dashboard') {
         loadDashboard().finally(() => {
@@ -1989,6 +1797,198 @@ document.getElementById('breedSearch')?.addEventListener('input', () => {
   if (servicePrice) {
     servicePrice.addEventListener('input', () => applyCurrencyMask(servicePrice));
   }
+
+
+  /* ===== Raças de Cães (CRUD) ===== */
+  const btnNovoBreed = document.getElementById('btnNovoBreed');
+  const breedSearch = document.getElementById('breedSearch');
+  const breedFormPanel = document.getElementById('breedFormPanel');
+  const breedId = document.getElementById('breedId');
+  const breedName = document.getElementById('breedName');
+  const breedSize = document.getElementById('breedSize');
+  const breedCoat = document.getElementById('breedCoat');
+  const breedHistory = document.getElementById('breedHistory');
+  const breedError = document.getElementById('breedError');
+  const btnBreedCancel = document.getElementById('btnBreedCancel');
+  const btnBreedSave = document.getElementById('btnBreedSave');
+  const tbodyBreeds = document.getElementById('tbodyBreeds');
+  const breedsEmpty = document.getElementById('breedsEmpty');
+
+  let breedsCache = []; // [{id,name,size,coat,history,created_at,updated_at}]
+
+  function showBreedForm() { breedFormPanel.classList.remove('hidden'); }
+  function hideBreedForm() { breedFormPanel.classList.add('hidden'); }
+
+  function clearBreedForm() {
+    breedId.value = '';
+    breedName.value = '';
+    breedSize.value = 'pequeno';
+    breedCoat.value = 'curta';
+    breedHistory.value = '';
+    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
+  }
+
+  function fillBreedForm(b) {
+    breedId.value = b.id;
+    breedName.value = b.name || '';
+    breedSize.value = (b.size || 'pequeno');
+    breedCoat.value = (b.coat || 'curta');
+    breedHistory.value = b.history || '';
+    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
+  }
+
+  function humanSize(v) {
+    const s = normStr(v);
+    if (s === 'pequeno') return 'Pequeno';
+    if (s === 'medio' || s === 'médio') return 'Médio';
+    if (s === 'grande') return 'Grande';
+    return v || '-';
+  }
+
+  function humanCoat(v) {
+    const s = normStr(v);
+    if (s === 'curta') return 'Curta';
+    if (s === 'media' || s === 'média') return 'Média';
+    if (s === 'longa') return 'Longa';
+    return v || '-';
+  }
+
+  function renderBreeds() {
+    if (!tbodyBreeds) return;
+    tbodyBreeds.innerHTML = '';
+
+    const q = normStr(breedSearch?.value || '');
+    const list = !q ? breedsCache : breedsCache.filter(b =>
+      normStr(b.name).includes(q) ||
+      normStr(b.size).includes(q) ||
+      normStr(b.coat).includes(q) ||
+      normStr(b.history).includes(q)
+    );
+
+    if (breedsEmpty) breedsEmpty.style.display = list.length ? 'none' : 'block';
+
+    list.forEach(b => {
+      const tr = document.createElement('tr');
+
+      const tdId = document.createElement('td'); tdId.textContent = b.id;
+      const tdName = document.createElement('td'); tdName.textContent = b.name || '-';
+      const tdSize = document.createElement('td'); tdSize.textContent = humanSize(b.size);
+      const tdCoat = document.createElement('td'); tdCoat.textContent = humanCoat(b.coat);
+
+      const tdHist = document.createElement('td');
+      const full = (b.history || '').trim();
+      tdHist.textContent = full.length > 140 ? (full.slice(0, 140) + '…') : (full || '-');
+      tdHist.className = 'td-obs';
+      tdHist.title = full;
+
+      const tdCreated = document.createElement('td'); tdCreated.textContent = b.created_at ? formatDateTimeBr(b.created_at) : '-';
+      const tdUpdated = document.createElement('td'); tdUpdated.textContent = b.updated_at ? formatDateTimeBr(b.updated_at) : '-';
+
+      const tdAcoes = document.createElement('td');
+      const divActions = document.createElement('div'); divActions.className = 'actions';
+
+      const btnEdit = document.createElement('button');
+      btnEdit.textContent = 'Editar';
+      btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.type = 'button';
+      btnEdit.addEventListener('click', () => {
+        fillBreedForm(b);
+        showBreedForm();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      const btnDel = document.createElement('button');
+      btnDel.textContent = 'Excluir';
+      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.type = 'button';
+      btnDel.addEventListener('click', async () => {
+        if (!confirm('Deseja realmente excluir esta raça?')) return;
+        try {
+          await apiDelete('/api/breeds/' + b.id);
+          await loadBreeds();
+        } catch (e) { alert(e.message); }
+      });
+
+      divActions.appendChild(btnEdit);
+      divActions.appendChild(btnDel);
+      tdAcoes.appendChild(divActions);
+
+      tr.appendChild(tdId);
+      tr.appendChild(tdName);
+      tr.appendChild(tdSize);
+      tr.appendChild(tdCoat);
+      tr.appendChild(tdHist);
+      tr.appendChild(tdCreated);
+      tr.appendChild(tdUpdated);
+      tr.appendChild(tdAcoes);
+
+      tbodyBreeds.appendChild(tr);
+    });
+  }
+
+  async function loadBreeds() {
+    try {
+      const data = await apiGet('/api/breeds');
+      breedsCache = data.breeds || [];
+      renderBreeds();
+    } catch (e) {
+      breedsCache = [];
+      renderBreeds();
+      if (breedsEmpty) {
+        breedsEmpty.style.display = 'block';
+        breedsEmpty.textContent = 'Erro ao carregar raças: ' + e.message;
+      }
+    }
+  }
+
+  async function saveBreed() {
+    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
+
+    const id = breedId.value ? parseInt(breedId.value, 10) : null;
+    const name = (breedName.value || '').trim();
+    const size = breedSize.value;
+    const coat = breedCoat.value;
+    const history = (breedHistory.value || '').trim();
+
+    if (!name) {
+      if (breedError) { breedError.textContent = 'Informe o nome da raça.'; breedError.style.display = 'block'; }
+      return;
+    }
+    if (!size || !coat) {
+      if (breedError) { breedError.textContent = 'Informe porte e pelagem.'; breedError.style.display = 'block'; }
+      return;
+    }
+
+    try {
+      const body = { name, size, coat, history };
+      if (!id) await apiPost('/api/breeds', body);
+      else await apiPut('/api/breeds/' + id, body);
+
+      clearBreedForm();
+      hideBreedForm();
+      await loadBreeds();
+    } catch (e) {
+      if (breedError) { breedError.textContent = e.message; breedError.style.display = 'block'; }
+    }
+  }
+
+  if (btnNovoBreed) {
+    btnNovoBreed.addEventListener('click', () => {
+      clearBreedForm();
+      showBreedForm();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  if (btnBreedCancel) btnBreedCancel.addEventListener('click', () => { clearBreedForm(); hideBreedForm(); });
+  if (btnBreedSave) btnBreedSave.addEventListener('click', saveBreed);
+
+  if (breedSearch) {
+    breedSearch.addEventListener('input', () => {
+      clearTimeout(window.__breedTimer);
+      window.__breedTimer = setTimeout(() => renderBreeds(), 120);
+    });
+  }
+
 
   /* ===== NOVO: Agenda - Toggle Lista/Cards ===== */
   const AGENDA_VIEW_KEY = 'pf_admin_agenda_view';
@@ -2735,6 +2735,7 @@ document.getElementById('breedSearch')?.addEventListener('input', () => {
       limparPetsForm();
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadClientes();
+      await loadBreeds();
       await loadDashboard();
     } catch (e) {
       petError.textContent = e.message;

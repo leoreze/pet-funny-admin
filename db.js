@@ -1,50 +1,174 @@
-// backend/db.js (UPDATED)
+// backend/db.js
 const { Pool } = require('pg');
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error('DATABASE_URL não definido no ambiente.');
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL não definida nas variáveis de ambiente');
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const pool = new Pool({
-  connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionString: process.env.DATABASE_URL,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 });
 
-async function run(sql, params = []) {
+/* =========================
+   DB helpers
+========================= */
+async function query(sql, params = []) {
   return pool.query(sql, params);
 }
 
 async function all(sql, params = []) {
-  const res = await pool.query(sql, params);
-  return res.rows;
+  const res = await query(sql, params);
+  return res.rows || [];
 }
 
 async function get(sql, params = []) {
-  const res = await pool.query(sql, params);
-  return res.rows[0] || null;
+  const res = await query(sql, params);
+  return res.rows?.[0] || null;
+}
+
+async function run(sql, params = []) {
+  const res = await query(sql, params);
+  return {
+    lastID: res.rows?.[0]?.id ? Number(res.rows[0].id) : undefined,
+    changes: res.rowCount,
+  };
 }
 
 /* =========================
-   INIT DB (idempotente)
+   Schema utilities
+========================= */
+async function columnExists(table, column) {
+  const row = await get(
+    `
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
+    LIMIT 1
+    `,
+    [table, column]
+  );
+  return !!row;
+}
+
+async function addColumnIfMissing(table, column, definitionSql) {
+  const exists = await columnExists(table, column);
+  if (exists) return;
+  await query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definitionSql};`);
+}
+
+async function tableExists(table) {
+  const row = await get(
+    `
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = $1
+    LIMIT 1
+    `,
+    [table]
+  );
+  return !!row;
+}
+
+/* =========================
+   Breeds seed (extenso; pode expandir)
+   Campos:
+   - name (raça)
+   - history (breve)
+   - size: pequeno|médio|grande
+   - coat: curta|média|longa
+========================= */
+const BREEDS_SEED = [
+  // Pequeno
+  { name:'Affenpinscher', size:'pequeno', coat:'média', history:'Raça alemã antiga, criada como caçador de roedores em casas e estábulos; hoje é cão de companhia vivaz.' },
+  { name:'Bichon Frisé', size:'pequeno', coat:'longa', history:'Cão de companhia do Mediterrâneo, popular em cortes europeias; pelagem encaracolada e temperamento alegre.' },
+  { name:'Biewer Terrier', size:'pequeno', coat:'longa', history:'Variante moderna do Yorkshire Terrier desenvolvida na Alemanha; conhecido pelo padrão tricolor e sociabilidade.' },
+  { name:'Boston Terrier', size:'pequeno', coat:'curta', history:'Desenvolvido nos EUA como cão de companhia; apelidado de “American Gentleman” pelo temperamento equilibrado.' },
+  { name:'Cavalier King Charles Spaniel', size:'pequeno', coat:'longa', history:'Spaniel de companhia ligado à nobreza britânica; criado para convivência e afeto.' },
+  { name:'Chihuahua', size:'pequeno', coat:'curta', history:'Originário do México; uma das menores raças do mundo, muito alerta e ligado ao tutor.' },
+  { name:'Dachshund', size:'pequeno', coat:'curta', history:'Criado na Alemanha para caça em tocas (texugo); corpo alongado e coragem marcante.' },
+  { name:'Fox Terrier (Smooth)', size:'pequeno', coat:'curta', history:'Terrier britânico usado na caça à raposa; enérgico, inteligente e esportivo.' },
+  { name:'Fox Terrier (Wire)', size:'pequeno', coat:'média', history:'Versão de pelagem dura do Fox Terrier; historicamente usado para caça e controle de pragas.' },
+  { name:'French Bulldog (Bulldog Francês)', size:'pequeno', coat:'curta', history:'Popularizado na França a partir de cães do tipo bulldog; excelente companhia, dócil e adaptável.' },
+  { name:'Havanese (Bichon Havanês)', size:'pequeno', coat:'longa', history:'Cão de companhia associado a Cuba; conhecido por alegria, inteligência e pelagem sedosa.' },
+  { name:'Italian Greyhound (Galgo Italiano)', size:'pequeno', coat:'curta', history:'Pequeno lebrel de companhia presente desde a antiguidade; elegante, sensível e rápido.' },
+  { name:'Jack Russell Terrier', size:'pequeno', coat:'curta', history:'Terrier britânico para trabalho e caça; muita energia e grande drive.' },
+  { name:'Lhasa Apso', size:'pequeno', coat:'longa', history:'Originário do Tibete, usado como cão sentinela em monastérios; independente e leal.' },
+  { name:'Maltês', size:'pequeno', coat:'longa', history:'Raça antiga do Mediterrâneo, criada para companhia; pelagem branca longa e temperamento dócil.' },
+  { name:'Miniature Pinscher (Pinscher Miniatura)', size:'pequeno', coat:'curta', history:'Desenvolvido na Alemanha; cão compacto, alerta e confiante, associado ao controle de pragas.' },
+  { name:'Papillon', size:'pequeno', coat:'longa', history:'Spaniel miniatura europeu; famoso pelas orelhas “em borboleta” e facilidade de treino.' },
+  { name:'Pekingese (Pequinês)', size:'pequeno', coat:'longa', history:'Cão de companhia imperial chinês; postura altiva e forte vínculo com a família.' },
+  { name:'Pomeranian (Spitz Alemão Anão)', size:'pequeno', coat:'longa', history:'Derivado do Spitz alemão; popular como companhia, muito alerta e expressivo.' },
+  { name:'Poodle (Toy)', size:'pequeno', coat:'média', history:'Variedade de companhia do Poodle; altamente inteligente e treinável.' },
+  { name:'Poodle (Miniatura)', size:'pequeno', coat:'média', history:'Variedade menor do Poodle, historicamente ligada a trabalho na água; hoje também companhia.' },
+  { name:'Pug', size:'pequeno', coat:'curta', history:'Raça antiga da China, criada para companhia; famosa pelo focinho curto e personalidade afetiva.' },
+  { name:'Shih Tzu', size:'pequeno', coat:'longa', history:'Raça de companhia do Tibete/China; desenvolvida para vida em palácios, sociável e carinhosa.' },
+  { name:'Yorkshire Terrier', size:'pequeno', coat:'longa', history:'Criado na Inglaterra para caça de roedores; hoje é popular como cão de colo, cheio de atitude.' },
+  { name:'West Highland White Terrier', size:'pequeno', coat:'média', history:'Terrier escocês para caça de pequenos animais; ativo, corajoso e comunicativo.' },
+  { name:'Schnauzer (Miniatura)', size:'pequeno', coat:'média', history:'Versão pequena do Schnauzer alemão, usado em fazendas; inteligente, alerta e protetor.' },
+
+  // Médio
+  { name:'Australian Shepherd', size:'médio', coat:'média', history:'Cão de pastoreio popularizado nos EUA; muito inteligente e ativo, exige estímulos.' },
+  { name:'Basenji', size:'médio', coat:'curta', history:'Raça africana antiga; conhecida por vocalização incomum e comportamento independente.' },
+  { name:'Beagle', size:'médio', coat:'curta', history:'Farejador britânico criado para caça; sociável e com forte instinto de olfato.' },
+  { name:'Border Collie', size:'médio', coat:'média', history:'Considerado um dos melhores cães de pastoreio; extremamente inteligente e focado.' },
+  { name:'Boxer', size:'médio', coat:'curta', history:'Desenvolvido na Alemanha; cão versátil, leal e brincalhão, historicamente usado em trabalho e guarda.' },
+  { name:'Bulldog Inglês', size:'médio', coat:'curta', history:'Antigo cão de trabalho associado a esportes históricos; hoje é companhia calma e apegada.' },
+  { name:'Cocker Spaniel (Inglês)', size:'médio', coat:'longa', history:'Spaniel britânico de caça; hoje é muito popular como cão de família, sensível e ativo.' },
+  { name:'Dalmatian (Dálmata)', size:'médio', coat:'curta', history:'Historicamente ligado a carruagens e companhia de cavalos; atlético e resistente.' },
+  { name:'English Springer Spaniel', size:'médio', coat:'longa', history:'Spaniel de caça britânico; energético, sociável e muito treinável.' },
+  { name:'German Spitz (Spitz Alemão)', size:'médio', coat:'longa', history:'Família Spitz europeia antiga; alerta, vocal e bom cão de alarme.' },
+  { name:'Shetland Sheepdog (Sheltie)', size:'médio', coat:'longa', history:'Pastoreio das ilhas Shetland; lembra um Collie em miniatura, inteligente e sensível.' },
+  { name:'Siberian Husky', size:'médio', coat:'média', history:'Cão de trenó do nordeste asiático; resistente, sociável e com alta energia.' },
+  { name:'Staffordshire Bull Terrier', size:'médio', coat:'curta', history:'Terrier britânico; conhecido por coragem e afeto com pessoas quando bem socializado.' },
+  { name:'Whippet', size:'médio', coat:'curta', history:'Lebrel britânico para corrida; dócil em casa e muito veloz ao ar livre.' },
+  { name:'Shiba Inu', size:'médio', coat:'média', history:'Raça japonesa antiga; alerta e independente, historicamente usada na caça.' },
+  { name:'Akita (Americano/Japonês)', size:'grande', coat:'média', history:'Raça japonesa de caça e guarda; leal e reservada, exige socialização.' },
+
+  // Grande
+  { name:'German Shepherd (Pastor Alemão)', size:'grande', coat:'média', history:'Desenvolvido na Alemanha para trabalho; amplamente usado em polícia/serviço pela inteligência.' },
+  { name:'Golden Retriever', size:'grande', coat:'longa', history:'Criado na Escócia para resgate na água; dócil, confiável e excelente cão de família.' },
+  { name:'Labrador Retriever', size:'grande', coat:'curta', history:'Originário do Canadá; versátil para trabalho e companhia, muito amigável.' },
+  { name:'Rottweiler', size:'grande', coat:'curta', history:'Raça alemã de trabalho e guarda; forte, estável e leal quando bem treinado.' },
+  { name:'Doberman Pinscher', size:'grande', coat:'curta', history:'Criado na Alemanha para proteção; inteligente, atlético e altamente treinável.' },
+  { name:'Bernese Mountain Dog (Boiadeiro Bernês)', size:'grande', coat:'longa', history:'Cão de trabalho suíço para fazenda e tração; calmo, afetuoso e robusto.' },
+  { name:'Great Dane (Dogue Alemão)', size:'grande', coat:'curta', history:'Conhecido pelo porte gigante; historicamente usado como cão de caça e guarda, hoje também companhia.' },
+  { name:'Boxer (Grande)', size:'médio', coat:'curta', history:'Entrada duplicada intencional? Não. (mantém como Boxer médio; remova se necessário).' },
+];
+
+function uniqueBreeds(seed) {
+  const map = new Map();
+  for (const b of seed) {
+    const key = String(b.name || '').trim().toLowerCase();
+    if (!key) continue;
+    if (map.has(key)) continue;
+    map.set(key, b);
+  }
+  // remove registros “placeholder”
+  return Array.from(map.values()).filter(b => !String(b.history || '').includes('Entrada duplicada'));
+}
+
+/* =========================
+   Init / Migration
 ========================= */
 async function initDb() {
-  // ====== CUSTOMERS ======
-  await run(`
+  // customers
+  await query(`
     CREATE TABLE IF NOT EXISTS customers (
-      id BIGSERIAL PRIMARY KEY,
-      phone TEXT UNIQUE NOT NULL,
+      id SERIAL PRIMARY KEY,
+      phone TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
 
-  // ====== PETS ======
-  // (server.js atual usa campo "info". Vamos padronizar o DB para "info")
-  await run(`
+  // pets
+  await query(`
     CREATE TABLE IF NOT EXISTS pets (
-      id BIGSERIAL PRIMARY KEY,
-      customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      id SERIAL PRIMARY KEY,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       breed TEXT,
       info TEXT,
@@ -52,15 +176,11 @@ async function initDb() {
     );
   `);
 
-  // MIGRAÇÃO defensiva (caso tabela antiga esteja com notes)
-  await run(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS info TEXT;`);
-
-  // ====== SERVICES ======
-  // (admin/server usam value_cents; mantemos is_active para soft-delete)
-  await run(`
+  // services (value_cents + active)
+  await query(`
     CREATE TABLE IF NOT EXISTS services (
-      id BIGSERIAL PRIMARY KEY,
-      date DATE NOT NULL DEFAULT CURRENT_DATE,
+      id SERIAL PRIMARY KEY,
+      date DATE NOT NULL,
       title TEXT NOT NULL,
       value_cents INTEGER NOT NULL DEFAULT 0,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -69,22 +189,19 @@ async function initDb() {
     );
   `);
 
-  // Migrations defensivas
-  await run(`ALTER TABLE services ADD COLUMN IF NOT EXISTS value_cents INTEGER NOT NULL DEFAULT 0;`);
-  await run(`ALTER TABLE services ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;`);
-  await run(`ALTER TABLE services ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
-  await run(`ALTER TABLE services ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_services_date ON services(date);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_services_title_lower ON services ((lower(title)));`);
 
-  // ====== BOOKINGS ======
-  await run(`
+  // bookings (compat: mantém service TEXT, mas adiciona service_id)
+  await query(`
     CREATE TABLE IF NOT EXISTS bookings (
-      id BIGSERIAL PRIMARY KEY,
-      customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-      pet_id BIGINT REFERENCES pets(id) ON DELETE SET NULL,
-      service_id BIGINT REFERENCES services(id) ON DELETE SET NULL,
-      service TEXT, -- compat
-      date DATE NOT NULL,
-      time TIME NOT NULL,
+      id SERIAL PRIMARY KEY,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      pet_id INTEGER REFERENCES pets(id) ON DELETE SET NULL,
+      service_id INTEGER REFERENCES services(id) ON DELETE SET NULL,
+      date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      service TEXT,
       prize TEXT NOT NULL,
       notes TEXT,
       status TEXT NOT NULL DEFAULT 'agendado',
@@ -93,86 +210,58 @@ async function initDb() {
     );
   `);
 
-  // Migrations defensivas
-  await run(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service_id BIGINT REFERENCES services(id) ON DELETE SET NULL;`);
-  await run(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service TEXT;`);
-  await run(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS last_notification_at TIMESTAMPTZ;`);
+  // garante colunas em bases antigas
+  await addColumnIfMissing('bookings', 'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
+  await addColumnIfMissing('bookings', 'service', 'TEXT');
+  await addColumnIfMissing('services', 'value_cents', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing('services', 'is_active', 'BOOLEAN NOT NULL DEFAULT TRUE');
+  await addColumnIfMissing('services', 'updated_at', 'TIMESTAMPTZ NOT NULL DEFAULT NOW()');
 
-  // ====== DOG BREEDS (NOVA TABELA) ======
-  await run(`
-    CREATE TABLE IF NOT EXISTS dog_breeds (
-      id BIGSERIAL PRIMARY KEY,
+  // indices
+  await query(`CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_pets_customer_id ON pets(customer_id);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(date);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_service_id ON bookings(service_id);`);
+
+  // breeds table
+  await query(`
+    CREATE TABLE IF NOT EXISTS breeds (
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
-      history TEXT NOT NULL DEFAULT '',
-      size TEXT NOT NULL CHECK (size IN ('pequeno','medio','grande')),
-      coat TEXT NOT NULL CHECK (coat IN ('curta','media','longa')),
-      characteristics TEXT NOT NULL DEFAULT '',
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      history TEXT,
+      size TEXT NOT NULL CHECK (size IN ('pequeno','médio','grande')),
+      coat TEXT NOT NULL CHECK (coat IN ('curta','média','longa')),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_breeds_size ON breeds(size);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_breeds_coat ON breeds(coat);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_breeds_name_lower ON breeds ((lower(name)));`);
 
-  // Índices
-  await run(`CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_pets_customer_id ON pets(customer_id);`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_services_active ON services(is_active);`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_bookings_date_time ON bookings(date, time);`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_breeds_active ON dog_breeds(is_active);`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_breeds_name ON dog_breeds(name);`);
-
-  // ====== SEED BREEDS (inicial) ======
-  // Catálogo inicial (principais raças + SRD). Você pode expandir pelo Admin.
-  const seed = [
-    // Pequeno
-    { name:'Chihuahua', size:'pequeno', coat:'curta', history:'Originário do México; associado a cães de companhia desde civilizações pré-colombianas.', characteristics:'Alerta, fiel, pode ser territorial; sensível ao frio.' },
-    { name:'Poodle (Toy/Miniatura)', size:'pequeno', coat:'media', history:'Raízes na Europa; desenvolvido como cão de água/caça e depois popularizado como companhia.', characteristics:'Muito inteligente; pelagem cresce continuamente; exige tosa e escovação.' },
-    { name:'Yorkshire Terrier', size:'pequeno', coat:'longa', history:'Inglaterra; criado para controle de roedores em fábricas e minas.', characteristics:'Corajoso, enérgico; pelagem longa e fina; tende a ser vocal.' },
-    { name:'Shih Tzu', size:'pequeno', coat:'longa', history:'China; cão de companhia ligado à corte imperial.', characteristics:'Afetuoso; pode ter sensibilidade respiratória; demanda grooming frequente.' },
-    { name:'Lhasa Apso', size:'pequeno', coat:'longa', history:'Tibete; cão sentinela em mosteiros.', characteristics:'Independente, desconfiado com estranhos; pelagem longa.' },
-    { name:'Maltês', size:'pequeno', coat:'longa', history:'Mediterrâneo; companhia de nobreza.', characteristics:'Dócil, sociável; exige cuidados com pelagem e lacrimejamento.' },
-    { name:'Pug', size:'pequeno', coat:'curta', history:'China; cão de companhia antigo.', characteristics:'Braquicefálico; sensível ao calor; tendência a ganho de peso.' },
-    { name:'Pinscher Miniatura', size:'pequeno', coat:'curta', history:'Alemanha; cão de alerta e controle de roedores.', characteristics:'Muito ativo; pode ser teimoso; precisa de socialização.' },
-    { name:'Dachshund', size:'pequeno', coat:'curta', history:'Alemanha; criado para caça a animais de toca.', characteristics:'Corpo alongado; risco de problemas de coluna; personalidade marcante.' },
-    { name:'Spitz Alemão (Pomerânia)', size:'pequeno', coat:'longa', history:'Alemanha; cão do grupo Spitz popularizado como companhia.', characteristics:'Vocal, inteligente; pelagem densa; exige escovação.' },
-
-    // Médio
-    { name:'Beagle', size:'medio', coat:'curta', history:'Reino Unido; cão de caça por faro.', characteristics:'Excelente olfato; pode ser escapista; amigável.' },
-    { name:'Border Collie', size:'medio', coat:'media', history:'Reino Unido; desenvolvido para pastoreio.', characteristics:'Altíssima inteligência; precisa de estímulo mental e físico.' },
-    { name:'Bulldog Francês', size:'medio', coat:'curta', history:'França; companhia, derivado de Bulldogs menores.', characteristics:'Braquicefálico; sensível ao calor; muito sociável.' },
-    { name:'Cocker Spaniel', size:'medio', coat:'media', history:'Inglaterra; caça de aves.', characteristics:'Alegre; orelhas exigem higiene; pode ter predisposição a otites.' },
-    { name:'Schnauzer (Médio)', size:'medio', coat:'media', history:'Alemanha; cão de trabalho e guarda.', characteristics:'Protetor; pelagem áspera; precisa de trimming/tosa.' },
-    { name:'Basset Hound', size:'medio', coat:'curta', history:'França; caça por faro.', characteristics:'Calmo; orelhas longas; tendência a sobrepeso.' },
-
-    // Grande
-    { name:'Labrador Retriever', size:'grande', coat:'curta', history:'Canadá (Terra Nova); cão de água e caça.', characteristics:'Muito dócil; ótimo para famílias; tendência a obesidade.' },
-    { name:'Golden Retriever', size:'grande', coat:'media', history:'Escócia; caça e recuperação.', characteristics:'Afetuoso; precisa de escovação; excelente temperamento.' },
-    { name:'Pastor Alemão', size:'grande', coat:'media', history:'Alemanha; desenvolvido para trabalho e guarda.', characteristics:'Inteligente; protetor; requer socialização e atividade.' },
-    { name:'Rottweiler', size:'grande', coat:'curta', history:'Alemanha; condução/guarda de gado.', characteristics:'Forte; leal; exige manejo e socialização.' },
-    { name:'Boxer', size:'grande', coat:'curta', history:'Alemanha; cão de trabalho e companhia.', characteristics:'Brincalhão; energético; pode roncar e babar.' },
-    { name:'Husky Siberiano', size:'grande', coat:'media', history:'Sibéria; trenós e trabalho.', characteristics:'Independente; precisa de exercício; sensível ao calor.' },
-
-    // SRD
-    { name:'SRD (Sem Raça Definida)', size:'medio', coat:'curta', history:'Mistura genética natural; grande variação regional.', characteristics:'Variável; muitas vezes mais resistente; porte/pelagem podem variar.' },
-  ];
-
-  for (const b of seed) {
-    await run(
-      `
-      INSERT INTO dog_breeds (name, history, size, coat, characteristics, is_active)
-      VALUES ($1,$2,$3,$4,$5,TRUE)
-      ON CONFLICT (name) DO NOTHING;
-      `,
-      [b.name, b.history, b.size, b.coat, b.characteristics]
-    );
+  // seed breeds (somente se vazio)
+  const c = await get(`SELECT COUNT(*)::int AS n FROM breeds;`);
+  if ((c?.n || 0) === 0) {
+    const seed = uniqueBreeds(BREEDS_SEED);
+    for (const b of seed) {
+      await query(
+        `INSERT INTO breeds (name, history, size, coat) VALUES ($1,$2,$3,$4) ON CONFLICT (name) DO NOTHING;`,
+        [b.name, b.history || null, b.size, b.coat]
+      );
+    }
+    console.log(`✔ breeds seeded: ${seed.length}`);
+  } else {
+    console.log('✔ breeds table ready (seed skipped)');
   }
 }
 
 module.exports = {
   pool,
-  run,
+  initDb,
   all,
   get,
-  initDb,
+  run,
+  query,
 };
