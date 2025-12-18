@@ -561,6 +561,110 @@ app.delete('/api/breeds/:id', async (req, res) => {
   }
 });
 
+/* =========================
+   MIMOS (prêmios da roleta)
+========================= */
+
+app.get('/api/mimos', async (req, res) => {
+  try {
+    const onlyActive = String(req.query.active || '').trim() === '1';
+    const at = req.query.at ? String(req.query.at) : null; // ISO opcional
+
+    if (onlyActive) {
+      const rows = await db.all(
+        `SELECT id, title, description, value_cents, starts_at, ends_at, is_active, updated_at
+         FROM mimos
+         WHERE is_active = TRUE
+           AND (starts_at IS NULL OR starts_at <= COALESCE($1::timestamptz, NOW()))
+           AND (ends_at   IS NULL OR ends_at   >= COALESCE($1::timestamptz, NOW()))
+         ORDER BY COALESCE(starts_at, NOW()) DESC, id DESC`,
+        [at]
+      );
+      return res.json({ mimos: rows });
+    }
+
+    const rows = await db.all(
+      `SELECT id, title, description, value_cents, starts_at, ends_at, is_active, updated_at
+       FROM mimos
+       ORDER BY id DESC`
+    );
+    res.json({ mimos: rows });
+  } catch (err) {
+    console.error('Erro ao listar mimos:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar mimos.' });
+  }
+});
+
+app.post('/api/mimos', async (req, res) => {
+  try {
+    const title = String(req.body.title || '').trim();
+    const description = String(req.body.description || '').trim();
+    const value_cents = Number(req.body.value_cents ?? 0);
+    const starts_at = req.body.starts_at ? String(req.body.starts_at) : null;
+    const ends_at = req.body.ends_at ? String(req.body.ends_at) : null;
+    const is_active = req.body.is_active === false ? false : true;
+
+    if (!title) return res.status(400).json({ error: 'Informe o título.' });
+    if (!Number.isFinite(value_cents) || value_cents < 0) return res.status(400).json({ error: 'Valor inválido.' });
+
+    const row = await db.get(
+      `INSERT INTO mimos (title, description, value_cents, starts_at, ends_at, is_active, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,NOW())
+       RETURNING id, title, description, value_cents, starts_at, ends_at, is_active, updated_at`,
+      [title, description, Math.round(value_cents), starts_at, ends_at, is_active]
+    );
+    res.json({ mimo: row });
+  } catch (err) {
+    console.error('Erro ao criar mimo:', err);
+    res.status(500).json({ error: 'Erro interno ao criar mimo.' });
+  }
+});
+
+app.put('/api/mimos/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'ID inválido.' });
+
+    const title = String(req.body.title || '').trim();
+    const description = String(req.body.description || '').trim();
+    const value_cents = Number(req.body.value_cents ?? 0);
+    const starts_at = req.body.starts_at ? String(req.body.starts_at) : null;
+    const ends_at = req.body.ends_at ? String(req.body.ends_at) : null;
+    const is_active = req.body.is_active === false ? false : true;
+
+    if (!title) return res.status(400).json({ error: 'Informe o título.' });
+    if (!Number.isFinite(value_cents) || value_cents < 0) return res.status(400).json({ error: 'Valor inválido.' });
+
+    const row = await db.get(
+      `UPDATE mimos
+       SET title=$1, description=$2, value_cents=$3, starts_at=$4, ends_at=$5, is_active=$6, updated_at=NOW()
+       WHERE id=$7
+       RETURNING id, title, description, value_cents, starts_at, ends_at, is_active, updated_at`,
+      [title, description, Math.round(value_cents), starts_at, ends_at, is_active, id]
+    );
+
+    if (!row) return res.status(404).json({ error: 'Mimo não encontrado.' });
+    res.json({ mimo: row });
+  } catch (err) {
+    console.error('Erro ao atualizar mimo:', err);
+    res.status(500).json({ error: 'Erro interno ao atualizar mimo.' });
+  }
+});
+
+app.delete('/api/mimos/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'ID inválido.' });
+
+    await db.run(`DELETE FROM mimos WHERE id=$1`, [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao excluir mimo:', err);
+    res.status(500).json({ error: 'Erro interno ao excluir mimo.' });
+  }
+});
+
+
 
 /* =========================
    OPENING HOURS (horário de funcionamento)
