@@ -156,6 +156,32 @@
     .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
     .filters-group { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 
+    /* Toolbars por aba */
+    .agenda-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+    .tab-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0 6px;
+    }
+    .tab-toolbar-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      flex: 1;
+    }
+
+
     input[type="date"], input[type="text"], input[type="time"], select, textarea {
       padding: 7px 9px;
       border-radius: 10px;
@@ -539,20 +565,6 @@
       </div>
 
       <div class="filters">
-        <div class="filters-group">
-          <span style="font-size:13px;">Data:</span>
-          <input type="date" id="filtroData" />
-          <button class="btn btn-light" id="btnHoje" type="button">Hoje</button>
-          <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar filtro</button>
-        </div>
-
-        <div class="filters-group">
-          <span style="font-size:13px;">Pesquisar:</span>
-          <input type="text" id="filtroBusca" placeholder="Nome, pet ou telefone" />
-        </div>
-
-        <button class="btn btn-light" id="btnExportarCSV" type="button">Exportar CSV</button>
-
         <button class="btn btn-danger btn-small" id="btnLogout" type="button">Sair</button>
       </div>
     </div>
@@ -569,6 +581,22 @@
     <section id="tab-agenda" class="tab-view active">
       <div class="section-title-row">
         <div class="section-title">Agendamentos do dia</div>
+
+        <div class="agenda-filters">
+          <div class="filters-group">
+            <span style="font-size:13px;">Data:</span>
+            <input type="date" id="filtroData" />
+            <button class="btn btn-light" id="btnHoje" type="button">Hoje</button>
+            <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar</button>
+          </div>
+
+          <div class="filters-group">
+            <span style="font-size:13px;">Buscar:</span>
+            <input type="text" id="filtroBusca" placeholder="Nome, pet ou telefone" />
+          </div>
+
+          <button class="btn btn-light" id="btnExportarCSV" type="button">Exportar CSV</button>
+        </div>
 
         <div class="agenda-actions-right">
           <!-- NOVO: Toggle Lista/Cards -->
@@ -697,6 +725,13 @@
     <!-- TAB: CLIENTES & PETS -->
     <section id="tab-clientes" class="tab-view">
       <div class="section-title">Clientes &amp; Pets</div>
+      <div class="tab-toolbar">
+        <div class="filters-group">
+          <span style="font-size:13px;">Buscar:</span>
+          <input type="text" id="filtroClientes" placeholder="Nome do tutor ou telefone" />
+          <button class="btn btn-light" id="btnLimparClientes" type="button">Limpar</button>
+        </div>
+      </div>
       <div class="two-cols">
         <!-- CLIENTES -->
         <div class="subcard">
@@ -784,6 +819,13 @@
     <section id="tab-servicos" class="tab-view">
       <div class="section-title-row">
         <div class="section-title">Serviços</div>
+        <div class="tab-toolbar-inline">
+          <div class="filters-group">
+            <span style="font-size:13px;">Buscar:</span>
+            <input type="text" id="filtroServicos" placeholder="Título do serviço" />
+            <button class="btn btn-light" id="btnLimparServicos" type="button">Limpar</button>
+          </div>
+        </div>
         <button class="btn btn-light" id="btnNovoServico" type="button">+ Novo serviço</button>
       </div>
 
@@ -1635,6 +1677,12 @@
   const tbodyServices = document.getElementById('tbodyServices');
   const servicesEmpty = document.getElementById('servicesEmpty');
 
+  // Filtro de busca (Serviços)
+  const filtroServicos = document.getElementById('filtroServicos');
+  const btnLimparServicos = document.getElementById('btnLimparServicos');
+  let filtroServicosTxt = '';
+
+
   let servicesCache = []; // [{id,title,value_cents,...}]
 
   function showServiceForm() { serviceFormPanel.classList.remove('hidden'); }
@@ -1662,9 +1710,16 @@
 
   function renderServices() {
     tbodyServices.innerHTML = '';
-    servicesEmpty.style.display = servicesCache.length ? 'none' : 'block';
 
-    servicesCache.forEach(svc => {
+    const list = (servicesCache || []).filter(s => {
+      if (!filtroServicosTxt) return true;
+      const hay = normStr((s.title || ''));
+      return hay.includes(filtroServicosTxt);
+    });
+
+    servicesEmpty.style.display = list.length ? 'none' : 'block';
+
+    list.forEach(svc => {
       const tr = document.createElement('tr');
 
       const tdId = document.createElement('td'); tdId.textContent = svc.id;
@@ -1796,6 +1851,21 @@
   // Máscara do valor de serviço
   if (servicePrice) {
     servicePrice.addEventListener('input', () => applyCurrencyMask(servicePrice));
+  }
+
+
+  if (filtroServicos) {
+    filtroServicos.addEventListener('input', () => {
+      filtroServicosTxt = normStr(filtroServicos.value);
+      renderServices();
+    });
+  }
+  if (btnLimparServicos) {
+    btnLimparServicos.addEventListener('click', () => {
+      if (filtroServicos) filtroServicos.value = '';
+      filtroServicosTxt = '';
+      renderServices();
+    });
   }
 
 
@@ -2499,6 +2569,12 @@
   const btnCliSalvar = document.getElementById('btnCliSalvar');
   const tbodyClientes = document.getElementById('tbodyClientes');
 
+  // Filtro de busca (Clientes & Pets)
+  const filtroClientes = document.getElementById('filtroClientes');
+  const btnLimparClientes = document.getElementById('btnLimparClientes');
+  let filtroClientesTxt = '';
+
+
   const clienteFormBlock = document.getElementById('clienteFormBlock');
   const btnNovoCliente = document.getElementById('btnNovoCliente');
 
@@ -2522,6 +2598,20 @@
 
   cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
 
+  if (filtroClientes) {
+    filtroClientes.addEventListener('input', () => {
+      filtroClientesTxt = normStr(filtroClientes.value);
+      renderClientes();
+    });
+  }
+  if (btnLimparClientes) {
+    btnLimparClientes.addEventListener('click', () => {
+      if (filtroClientes) filtroClientes.value = '';
+      filtroClientesTxt = '';
+      renderClientes();
+    });
+  }
+
   racas.forEach(r => {
     const opt = document.createElement('option');
     opt.value = r;
@@ -2537,7 +2627,14 @@
 
   function renderClientes() {
     tbodyClientes.innerHTML = '';
-    clientesCache.forEach(c => {
+
+    const list = (clientesCache || []).filter(c => {
+      if (!filtroClientesTxt) return true;
+      const hay = normStr((c.name || '') + ' ' + (c.phone || ''));
+      return hay.includes(filtroClientesTxt);
+    });
+
+    list.forEach(c => {
       const tr = document.createElement('tr');
 
       const tdId = document.createElement('td'); tdId.textContent = c.id;
