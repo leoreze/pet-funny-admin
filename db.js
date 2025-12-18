@@ -171,6 +171,9 @@ async function initDb() {
      - Não quebra com NOT NULL / CHECK (size/coat etc.)
      - Se der ruim, ignora a linha (não derruba server)
   ------------------------- */
+ // ... dentro do initDb(), depois de garantir dog_breeds e o índice
+
+try {
   await query(`
     DO $$
     DECLARE
@@ -203,7 +206,6 @@ async function initDb() {
         RETURN;
       END IF;
 
-      -- detecta colunas extras existentes no dog_breeds real
       SELECT EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='size'
@@ -224,7 +226,6 @@ async function initDb() {
         WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='updated_at'
       ) INTO has_updated_at;
 
-      -- defaults válidos já existentes (evita CHECK constraint)
       IF has_size THEN
         SELECT size FROM dog_breeds WHERE size IS NOT NULL LIMIT 1 INTO size_default;
         IF size_default IS NULL THEN size_default := 'PEQUENO'; END IF;
@@ -235,51 +236,23 @@ async function initDb() {
         IF coat_default IS NULL THEN coat_default := 'CURTA'; END IF;
       END IF;
 
-      -- INSERT completo (quando possível)
       cols := 'name, history';
       vals := '$1, $2';
 
-      IF has_size THEN
-        cols := cols || ', size';
-        vals := vals || ', $3';
-      END IF;
-
-      IF has_coat THEN
-        cols := cols || ', coat';
-        vals := vals || ', $4';
-      END IF;
-
-      IF has_is_active THEN
-        cols := cols || ', is_active';
-        vals := vals || ', $5';
-      END IF;
-
-      IF has_updated_at THEN
-        cols := cols || ', updated_at';
-        vals := vals || ', NOW()';
-      END IF;
+      IF has_size THEN cols := cols || ', size'; vals := vals || ', $3'; END IF;
+      IF has_coat THEN cols := cols || ', coat'; vals := vals || ', $4'; END IF;
+      IF has_is_active THEN cols := cols || ', is_active'; vals := vals || ', $5'; END IF;
+      IF has_updated_at THEN cols := cols || ', updated_at'; vals := vals || ', NOW()'; END IF;
 
       sql := 'INSERT INTO dog_breeds (' || cols || ') VALUES (' || vals || ')
               ON CONFLICT (LOWER(name)) DO NOTHING';
 
-      -- INSERT sem coat (fallback para CHECK coat)
       cols_no_coat := 'name, history';
       vals_no_coat := '$1, $2';
 
-      IF has_size THEN
-        cols_no_coat := cols_no_coat || ', size';
-        vals_no_coat := vals_no_coat || ', $3';
-      END IF;
-
-      IF has_is_active THEN
-        cols_no_coat := cols_no_coat || ', is_active';
-        vals_no_coat := vals_no_coat || ', $4';
-      END IF;
-
-      IF has_updated_at THEN
-        cols_no_coat := cols_no_coat || ', updated_at';
-        vals_no_coat := vals_no_coat || ', NOW()';
-      END IF;
+      IF has_size THEN cols_no_coat := cols_no_coat || ', size'; vals_no_coat := vals_no_coat || ', $3'; END IF;
+      IF has_is_active THEN cols_no_coat := cols_no_coat || ', is_active'; vals_no_coat := vals_no_coat || ', $4'; END IF;
+      IF has_updated_at THEN cols_no_coat := cols_no_coat || ', updated_at'; vals_no_coat := vals_no_coat || ', NOW()'; END IF;
 
       sql_no_coat := 'INSERT INTO dog_breeds (' || cols_no_coat || ') VALUES (' || vals_no_coat || ')
                       ON CONFLICT (LOWER(name)) DO NOTHING';
@@ -287,14 +260,12 @@ async function initDb() {
       FOR r IN
         SELECT name, history FROM breeds
       LOOP
-        -- JSON cast seguro
         BEGIN
           j := COALESCE(r.history::jsonb, '[]'::jsonb);
         EXCEPTION WHEN others THEN
           j := '[]'::jsonb;
         END;
 
-        -- tenta insert completo; se violar CHECK/NOT NULL, tenta fallback sem coat; se falhar, ignora
         BEGIN
           IF has_size AND has_coat AND has_is_active THEN
             EXECUTE sql USING r.name, j, size_default, coat_default, TRUE;
@@ -326,14 +297,20 @@ async function initDb() {
               EXECUTE sql_min USING r.name, j;
             END IF;
           EXCEPTION WHEN others THEN
-            PERFORM 1; -- ignora
+            PERFORM 1;
           END;
         EXCEPTION WHEN others THEN
-          PERFORM 1; -- ignora
+          PERFORM 1;
         END;
       END LOOP;
     END $$;
   `);
+
+  console.log('✔ Migração breeds -> dog_breeds concluída (best-effort)');
+} catch (err) {
+  // IMPORTANTE: não derrubar o servidor por causa de raças
+  console.warn('⚠️ Migração breeds -> dog_breeds falhou (ignorada para não derrubar o serviço):', err?.message || err);
+}
 
   /* -------------------------
      opening_hours
