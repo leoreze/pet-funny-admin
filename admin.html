@@ -1504,10 +1504,11 @@
   let petEditIdLocal = null;
 
   function setEditMode(isEdit) {
+    // Em edição: mantém Tutor/Telefone travados, mas permite editar Pet e Mimo
     formPhone.disabled = isEdit;
     formNome.disabled = isEdit;
-    formPetSelect.disabled = isEdit;
-    formPrize.disabled = isEdit;
+    formPetSelect.disabled = false;
+    formPrize.disabled = false;
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
@@ -2364,7 +2365,7 @@
     formPhone.value = '';
     formNome.value = '';
     formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
-    formPrize.value = 'Tosa Higiênica';
+    formPrize.value = '';
     formService.value = '';
     formDate.value = '';
     formTime.value = '';
@@ -2401,8 +2402,19 @@
     const status = formStatus.value;
     const notes = formNotes.value.trim();
 
-    if (!date || !time || !prize || !serviceIdSelected) {
-      formError.textContent = 'Data, horário, serviço e mimo são obrigatórios.';
+    if (!date || !time || !serviceIdSelected) {
+      formError.textContent = 'Data, horário e serviço são obrigatórios.';
+      formError.style.display = 'block';
+      return;
+    }
+    if (!prize) {
+      formError.textContent = 'Selecione um mimo (Roleta).';
+      formError.style.display = 'block';
+      return;
+    }
+    // Novo agendamento: Pet obrigatório
+    if (!id && !petIdNum) {
+      formError.textContent = 'Para NOVO agendamento, selecione um pet.';
       formError.style.display = 'block';
       return;
     }
