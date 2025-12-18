@@ -156,6 +156,30 @@
     .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
     .filters-group { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 
+    /* Toolbars por aba */
+    .agenda-filters {
+   background: #f7fbfc;
+  border: 1px solid #e0edf0;
+  border-radius: 14px;
+  padding: 10px 12px;
+    }
+    .tab-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0 6px;
+    }
+    .tab-toolbar-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      flex: 1;
+    }
+
+
     input[type="date"], input[type="text"], input[type="time"], select, textarea {
       padding: 7px 9px;
       border-radius: 10px;
@@ -539,20 +563,6 @@
       </div>
 
       <div class="filters">
-        <div class="filters-group">
-          <span style="font-size:13px;">Data:</span>
-          <input type="date" id="filtroData" />
-          <button class="btn btn-light" id="btnHoje" type="button">Hoje</button>
-          <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar filtro</button>
-        </div>
-
-        <div class="filters-group">
-          <span style="font-size:13px;">Pesquisar:</span>
-          <input type="text" id="filtroBusca" placeholder="Nome, pet ou telefone" />
-        </div>
-
-        <button class="btn btn-light" id="btnExportarCSV" type="button">Exportar CSV</button>
-
         <button class="btn btn-danger btn-small" id="btnLogout" type="button">Sair</button>
       </div>
     </div>
@@ -560,17 +570,18 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agenda &amp; Mimos</button>
       <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
-      <button class="tab-btn" data-tab="opening-hours">Horário de Funcionamento</button>
       <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
+      <button class="tab-btn" data-tab="tab-racas" type="button"><span>🐶</span> Raças de Cães</button>
+      <button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
       <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
     </div>
 
     <!-- TAB: AGENDA -->
     <section id="tab-agenda" class="tab-view active">
       <div class="section-title-row">
-        <div class="section-title">Agendamentos do dia</div>
+         <div class="section-title">Agendamentos & Mimos</div>
 
-        <div class="agenda-actions-right">
+           <div class="agenda-actions-right">
           <!-- NOVO: Toggle Lista/Cards -->
           <div class="view-toggle" aria-label="Alternar visualização">
             <button class="toggle-btn active" id="btnViewList" type="button">📋 Lista</button>
@@ -580,6 +591,35 @@
           <button class="btn btn-light" id="btnNovoAgendamento" type="button">+ Novo agendamento</button>
         </div>
       </div>
+
+ 
+
+        <!-- FILTROS (APENAS DA AGENDA) -->
+  <div class="agenda-filters" style="margin: 8px 0 14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+    <div class="filters-group">
+      <label style="font-size:12px;">Data</label>
+      <input type="date" id="filtroData" />
+    </div>
+
+    <button class="btn btn-light" id="btnHoje" type="button">Hoje</button>
+    <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar</button>
+
+    <div class="filters-group" style="flex:1; min-width:200px;">
+      <label style="font-size:12px;">Buscar</label>
+      <input
+        type="text"
+        id="filtroBusca"
+        placeholder="Nome do tutor, pet ou telefone"
+        style="width:100%;"
+      />
+    </div>
+
+    <button class="btn btn-light" id="btnExportarCSV" type="button">
+      Exportar CSV
+    </button>
+  </div>
+
+      
 
       <div class="form-panel hidden" id="formPanel">
         <input type="hidden" id="bookingId" />
@@ -697,6 +737,13 @@
     <!-- TAB: CLIENTES & PETS -->
     <section id="tab-clientes" class="tab-view">
       <div class="section-title">Clientes &amp; Pets</div>
+      <div class="tab-toolbar">
+        <div class="filters-group">
+          <span style="font-size:13px;">Buscar:</span>
+          <input type="text" id="filtroClientes" placeholder="Nome do tutor ou telefone" />
+          <button class="btn btn-light" id="btnLimparClientes" type="button">Limpar</button>
+        </div>
+      </div>
       <div class="two-cols">
         <!-- CLIENTES -->
         <div class="subcard">
@@ -784,6 +831,13 @@
     <section id="tab-servicos" class="tab-view">
       <div class="section-title-row">
         <div class="section-title">Serviços</div>
+        <div class="tab-toolbar-inline">
+          <div class="filters-group">
+            <span style="font-size:13px;">Buscar:</span>
+            <input type="text" id="filtroServicos" placeholder="Título do serviço" />
+            <button class="btn btn-light" id="btnLimparServicos" type="button">Limpar</button>
+          </div>
+        </div>
         <button class="btn btn-light" id="btnNovoServico" type="button">+ Novo serviço</button>
       </div>
 
@@ -831,7 +885,115 @@
       </div>
     </section>
 
-    <!-- TAB: DASHBOARD -->
+    
+    <!-- TAB: RAÇAS DE CÃES -->
+    <section id="tab-racas" class="tab-view">
+      <div class="section-title-row">
+        <div class="section-title">Raças de Cães (Catálogo)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="breedSearch" placeholder="Buscar raça..." style="min-width:220px;" />
+          <button class="btn btn-light" id="btnNovoBreed" type="button">+ Nova raça</button>
+        </div>
+      </div>
+
+      <div class="form-panel hidden" id="breedFormPanel">
+        <input type="hidden" id="breedId" />
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="breedName">Raça (nome)</label>
+            <input type="text" id="breedName" placeholder="Ex: Shih Tzu" />
+          </div>
+          <div class="form-group">
+            <label for="breedSize">Porte</label>
+            <select id="breedSize">
+              <option value="pequeno">Pequeno</option>
+              <option value="medio">Médio</option>
+              <option value="grande">Grande</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="breedCoat">Pelagem</label>
+            <select id="breedCoat">
+              <option value="curta">Curta</option>
+              <option value="media">Média</option>
+              <option value="longa">Longa</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="breedHistory">História (breve)</label>
+          <textarea id="breedHistory" placeholder="Resumo histórico e especificidades relevantes (temperamento, origem, cuidados)."></textarea>
+        </div>
+
+        <div id="breedError" class="error-msg" style="display:none;"></div>
+
+        <div class="form-actions">
+          <button class="btn btn-secondary" id="btnBreedCancel" type="button">Limpar / cancelar</button>
+          <button class="btn" id="btnBreedSave" type="button">Salvar</button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Raça</th>
+              <th>Porte</th>
+              <th>Pelagem</th>
+              <th>História</th>
+              <th>Criado em</th>
+              <th>Atualizado em</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyBreeds"></tbody>
+        </table>
+        <div id="breedsEmpty" class="empty" style="display:none;">Nenhuma raça cadastrada ainda.</div>
+      </div>
+    </section>
+
+
+    <!-- TAB: HORÁRIO DE FUNCIONAMENTO -->
+    <section id="tab-horarios" class="tab-view">
+      <div class="section-title-row">
+        <div class="section-title">Horário de Funcionamento</div>
+        <button class="btn btn-light" id="btnHoursReload" type="button">Recarregar</button>
+      </div>
+
+      <div class="form-panel" style="margin-top:6px;">
+        <div style="font-size:12px;color:#546e7a;line-height:1.35;">
+          Configure por dia: abertura, fechamento, dia fechado e a capacidade máxima de agendamentos por <strong>slot de 30 minutos</strong>.
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Dia</th>
+              <th>Fechado</th>
+              <th>Abertura</th>
+              <th>Fechamento</th>
+              <th>Max. por 30 min</th>
+              <th>Atualizado em</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyHours"></tbody>
+        </table>
+        <div id="hoursEmpty" class="empty" style="display:none;">Não foi possível carregar o horário de funcionamento.</div>
+      </div>
+
+      <div class="form-actions" style="margin-top:10px;">
+        <button class="btn btn-secondary" id="btnHoursResetDefault" type="button">Restaurar padrão</button>
+        <button class="btn" id="btnHoursSave" type="button">Salvar Horários</button>
+      </div>
+
+      <div id="hoursMsg" class="login-footer-hint" style="margin-top:8px;"></div>
+    </section>
+
+<!-- TAB: DASHBOARD -->
     <section id="tab-dashboard" class="tab-view">
       <div class="section-title-row">
         <div class="section-title">Dashboard de Indicadores</div>
@@ -1003,6 +1165,8 @@
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
+      await loadBreeds();
+      await loadOpeningHours();
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
@@ -1174,6 +1338,114 @@
     return { start, end };
   }
 
+  
+  /* ===== Validação de Data/Horário (mesmas regras do index.html) ===== */
+  const todayISO = new Date().toISOString().split('T')[0];
+
+  function validarDiaHora(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+
+    const date = new Date(dateStr + 'T' + timeStr + ':00');
+    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
+
+    const diaSemana = date.getDay();
+    const parts = String(timeStr).split(':');
+    const hh = parseInt(parts[0], 10);
+    const mm = parseInt(parts[1] || '0', 10);
+
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
+
+    // Admin também deve seguir a regra do cliente: somente 00 ou 30
+    if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
+
+    const minutos = hh * 60 + mm;
+    const inicio = 7 * 60 + 30;
+
+    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+    if (diaSemana >= 1 && diaSemana <= 5) {
+      const fim = 17 * 60 + 30;
+      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+    }
+    if (diaSemana === 6) {
+      const fim = 13 * 60;
+      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+    }
+
+    // Não permite agendar no passado (comparando data/hora local)
+    const now = new Date();
+    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+
+    return null;
+  }
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function buildRangeForDate(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return null;
+    const day = d.getDay();
+    if (day === 0) return { closed: true };
+    const startMin = 7 * 60 + 30;
+    const endMin = (day === 6) ? (13 * 60) : (17 * 60 + 30);
+    return { closed: false, startMin, endMin };
+  }
+
+  function normalizeHHMM(t) {
+    const s = String(t || '').trim();
+    const m = s.match(/^(\d{1,2}):(\d{1,2})/);
+    if (!m) return null;
+    const hh = pad2(parseInt(m[1], 10));
+    const mm = pad2(parseInt(m[2], 10));
+    return `${hh}:${mm}`;
+  }
+
+  function isActiveBookingStatus(status) {
+    const s = normStr(status);
+    // status "cancelado" não ocupa slot
+    return s !== 'cancelado';
+  }
+
+  async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
+    const data = await apiGet('/api/bookings', { date: dateStr });
+    const list = data.bookings || [];
+    const set = new Set();
+
+    list.forEach(b => {
+      if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
+      if (!isActiveBookingStatus(b.status)) return;
+      const t = normalizeHHMM(b.time);
+      if (t) set.add(t);
+    });
+
+    return set;
+  }
+
+  function minutesToHHMM(totalMin) {
+    const hh = Math.floor(totalMin / 60);
+    const mm = totalMin % 60;
+    return `${pad2(hh)}:${pad2(mm)}`;
+  }
+
+  function clampToRange(timeStr, range) {
+    const t = normalizeHHMM(timeStr);
+    if (!t || !range || range.closed) return null;
+    const [hh, mm] = t.split(':').map(n => parseInt(n, 10));
+    let total = hh * 60 + mm;
+
+    // arredonda para o slot mais próximo (00/30)
+    total = Math.round(total / 30) * 30;
+
+    if (total < range.startMin) total = range.startMin;
+    if (total > range.endMin) total = range.endMin;
+
+    // garante que não sai do padrão 00/30 depois do clamp
+    total = Math.round(total / 30) * 30;
+
+    return minutesToHHMM(total);
+  }
+
+
   function classStatus(status) {
     const s = normStr(status);
     if (s === 'agendado') return 'status-agendado';
@@ -1285,6 +1557,9 @@
       tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
 
       if (tabId === 'tab-servicos') loadServices().catch(console.error);
+      if (tabId === 'tab-racas') loadBreeds().catch(console.error);
+
+      if (tabId === 'tab-horarios') loadOpeningHours().catch(console.error);
 
       if (tabId === 'tab-dashboard') {
         loadDashboard().finally(() => {
@@ -1338,6 +1613,28 @@
   const formService = document.getElementById('formService');
   const formDate = document.getElementById('formDate');
   const formTime = document.getElementById('formTime');
+
+  // Regras padrão (mesmas do cliente)
+  if (formDate) formDate.min = todayISO;
+  if (formTime) formTime.step = 1800; // 30 minutos
+
+
+  // Revalida e aplica limites quando a data/horário mudam
+  if (formDate) {
+    formDate.addEventListener('change', async () => {
+      const excludeId = bookingId && bookingId.value ? Number(bookingId.value) : null;
+      await refreshBookingDateTimeState(excludeId);
+    });
+  }
+
+  if (formTime) {
+    // arredonda para 00/30 e aplica faixa do dia
+    formTime.addEventListener('blur', () => {
+      const range = buildRangeForDate(formDate ? formDate.value : '');
+      const clamped = clampToRange(formTime.value, range);
+      if (clamped) formTime.value = clamped;
+    });
+  }
   const formStatus = document.getElementById('formStatus');
   const formNotes = document.getElementById('formNotes');
   const formError = document.getElementById('formError');
@@ -1380,10 +1677,54 @@
   let petEditIdLocal = null;
 
   function setEditMode(isEdit) {
+    // Em edição: mantém Tutor/Telefone travados, mas permite editar Pet e Mimo
     formPhone.disabled = isEdit;
     formNome.disabled = isEdit;
-    formPetSelect.disabled = isEdit;
-    formPrize.disabled = isEdit;
+    formPetSelect.disabled = false;
+    formPrize.disabled = false;
+  }
+
+  /* ===== Estado de disponibilidade (Admin) ===== */
+  let occupiedTimesSet = new Set();
+
+  async function refreshBookingDateTimeState(excludeBookingId) {
+    if (!formDate || !formTime) return;
+
+    const dateStr = formDate.value;
+    if (!dateStr) return;
+
+    const range = buildRangeForDate(dateStr);
+    if (!range || range.closed) {
+      formTime.disabled = true;
+      formTime.value = '';
+      occupiedTimesSet = new Set();
+      return;
+    }
+
+    formTime.disabled = false;
+    formTime.step = 1800; // 30 min
+
+    formTime.min = minutesToHHMM(range.startMin);
+    formTime.max = minutesToHHMM(range.endMin);
+
+    // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
+    try {
+      occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+    } catch (e) {
+      console.warn('Falha ao carregar horários ocupados:', e);
+      occupiedTimesSet = new Set();
+    }
+
+    // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
+    if (formTime.value) {
+      const clamped = clampToRange(formTime.value, range);
+      if (clamped) formTime.value = clamped;
+    }
+  }
+
+  function isTimeOccupied(timeStr) {
+    const t = normalizeHHMM(timeStr);
+    return !!t && occupiedTimesSet.has(t);
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
@@ -1519,7 +1860,10 @@
       const txt = booking.service || booking.service_title || '';
       const match = servicesCache.find(s => normStr(s.title) === normStr(txt));
       formService.value = match ? String(match.id) : '';
-    }
+      
+    // Atualiza limites e disponibilidade para a data (exclui o próprio agendamento)
+    refreshBookingDateTimeState(booking.id);
+  }
 
     formDate.value = booking.date || '';
     formTime.value = booking.time || '';
@@ -1548,6 +1892,7 @@
     }
 
     mostrarFormAgenda();
+    refreshBookingDateTimeState(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -1563,6 +1908,12 @@
   const btnServiceSave = document.getElementById('btnServiceSave');
   const tbodyServices = document.getElementById('tbodyServices');
   const servicesEmpty = document.getElementById('servicesEmpty');
+
+  // Filtro de busca (Serviços)
+  const filtroServicos = document.getElementById('filtroServicos');
+  const btnLimparServicos = document.getElementById('btnLimparServicos');
+  let filtroServicosTxt = '';
+
 
   let servicesCache = []; // [{id,title,value_cents,...}]
 
@@ -1591,9 +1942,16 @@
 
   function renderServices() {
     tbodyServices.innerHTML = '';
-    servicesEmpty.style.display = servicesCache.length ? 'none' : 'block';
 
-    servicesCache.forEach(svc => {
+    const list = (servicesCache || []).filter(s => {
+      if (!filtroServicosTxt) return true;
+      const hay = normStr((s.title || ''));
+      return hay.includes(filtroServicosTxt);
+    });
+
+    servicesEmpty.style.display = list.length ? 'none' : 'block';
+
+    list.forEach(svc => {
       const tr = document.createElement('tr');
 
       const tdId = document.createElement('td'); tdId.textContent = svc.id;
@@ -1726,6 +2084,213 @@
   if (servicePrice) {
     servicePrice.addEventListener('input', () => applyCurrencyMask(servicePrice));
   }
+
+
+  if (filtroServicos) {
+    filtroServicos.addEventListener('input', () => {
+      filtroServicosTxt = normStr(filtroServicos.value);
+      renderServices();
+    });
+  }
+  if (btnLimparServicos) {
+    btnLimparServicos.addEventListener('click', () => {
+      if (filtroServicos) filtroServicos.value = '';
+      filtroServicosTxt = '';
+      renderServices();
+    });
+  }
+
+
+  /* ===== Raças de Cães (CRUD) ===== */
+  const btnNovoBreed = document.getElementById('btnNovoBreed');
+  const breedSearch = document.getElementById('breedSearch');
+  const breedFormPanel = document.getElementById('breedFormPanel');
+  const breedId = document.getElementById('breedId');
+  const breedName = document.getElementById('breedName');
+  const breedSize = document.getElementById('breedSize');
+  const breedCoat = document.getElementById('breedCoat');
+  const breedHistory = document.getElementById('breedHistory');
+  const breedError = document.getElementById('breedError');
+  const btnBreedCancel = document.getElementById('btnBreedCancel');
+  const btnBreedSave = document.getElementById('btnBreedSave');
+  const tbodyBreeds = document.getElementById('tbodyBreeds');
+  const breedsEmpty = document.getElementById('breedsEmpty');
+
+  let breedsCache = []; // [{id,name,size,coat,history,created_at,updated_at}]
+
+  function showBreedForm() { breedFormPanel.classList.remove('hidden'); }
+  function hideBreedForm() { breedFormPanel.classList.add('hidden'); }
+
+  function clearBreedForm() {
+    breedId.value = '';
+    breedName.value = '';
+    breedSize.value = 'pequeno';
+    breedCoat.value = 'curta';
+    breedHistory.value = '';
+    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
+  }
+
+  function fillBreedForm(b) {
+    breedId.value = b.id;
+    breedName.value = b.name || '';
+    breedSize.value = (b.size || 'pequeno');
+    breedCoat.value = (b.coat || 'curta');
+    breedHistory.value = b.history || '';
+    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
+  }
+
+  function humanSize(v) {
+    const s = normStr(v);
+    if (s === 'pequeno') return 'Pequeno';
+    if (s === 'medio' || s === 'médio') return 'Médio';
+    if (s === 'grande') return 'Grande';
+    return v || '-';
+  }
+
+  function humanCoat(v) {
+    const s = normStr(v);
+    if (s === 'curta') return 'Curta';
+    if (s === 'media' || s === 'média') return 'Média';
+    if (s === 'longa') return 'Longa';
+    return v || '-';
+  }
+
+  function renderBreeds() {
+    if (!tbodyBreeds) return;
+    tbodyBreeds.innerHTML = '';
+
+    const q = normStr(breedSearch?.value || '');
+    const list = !q ? breedsCache : breedsCache.filter(b =>
+      normStr(b.name).includes(q) ||
+      normStr(b.size).includes(q) ||
+      normStr(b.coat).includes(q) ||
+      normStr(b.history).includes(q)
+    );
+
+    if (breedsEmpty) breedsEmpty.style.display = list.length ? 'none' : 'block';
+
+    list.forEach(b => {
+      const tr = document.createElement('tr');
+
+      const tdId = document.createElement('td'); tdId.textContent = b.id;
+      const tdName = document.createElement('td'); tdName.textContent = b.name || '-';
+      const tdSize = document.createElement('td'); tdSize.textContent = humanSize(b.size);
+      const tdCoat = document.createElement('td'); tdCoat.textContent = humanCoat(b.coat);
+
+      const tdHist = document.createElement('td');
+      const full = (b.history || '').trim();
+      tdHist.textContent = full.length > 140 ? (full.slice(0, 140) + '…') : (full || '-');
+      tdHist.className = 'td-obs';
+      tdHist.title = full;
+
+      const tdCreated = document.createElement('td'); tdCreated.textContent = b.created_at ? formatDateTimeBr(b.created_at) : '-';
+      const tdUpdated = document.createElement('td'); tdUpdated.textContent = b.updated_at ? formatDateTimeBr(b.updated_at) : '-';
+
+      const tdAcoes = document.createElement('td');
+      const divActions = document.createElement('div'); divActions.className = 'actions';
+
+      const btnEdit = document.createElement('button');
+      btnEdit.textContent = 'Editar';
+      btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.type = 'button';
+      btnEdit.addEventListener('click', () => {
+        fillBreedForm(b);
+        showBreedForm();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      const btnDel = document.createElement('button');
+      btnDel.textContent = 'Excluir';
+      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.type = 'button';
+      btnDel.addEventListener('click', async () => {
+        if (!confirm('Deseja realmente excluir esta raça?')) return;
+        try {
+          await apiDelete('/api/breeds/' + b.id);
+          await loadBreeds();
+        } catch (e) { alert(e.message); }
+      });
+
+      divActions.appendChild(btnEdit);
+      divActions.appendChild(btnDel);
+      tdAcoes.appendChild(divActions);
+
+      tr.appendChild(tdId);
+      tr.appendChild(tdName);
+      tr.appendChild(tdSize);
+      tr.appendChild(tdCoat);
+      tr.appendChild(tdHist);
+      tr.appendChild(tdCreated);
+      tr.appendChild(tdUpdated);
+      tr.appendChild(tdAcoes);
+
+      tbodyBreeds.appendChild(tr);
+    });
+  }
+
+  async function loadBreeds() {
+    try {
+      const data = await apiGet('/api/breeds');
+      breedsCache = data.breeds || [];
+      renderBreeds();
+    } catch (e) {
+      breedsCache = [];
+      renderBreeds();
+      if (breedsEmpty) {
+        breedsEmpty.style.display = 'block';
+        breedsEmpty.textContent = 'Erro ao carregar raças: ' + e.message;
+      }
+    }
+  }
+
+  async function saveBreed() {
+    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
+
+    const id = breedId.value ? parseInt(breedId.value, 10) : null;
+    const name = (breedName.value || '').trim();
+    const size = breedSize.value;
+    const coat = breedCoat.value;
+    const history = (breedHistory.value || '').trim();
+
+    if (!name) {
+      if (breedError) { breedError.textContent = 'Informe o nome da raça.'; breedError.style.display = 'block'; }
+      return;
+    }
+    if (!size || !coat) {
+      if (breedError) { breedError.textContent = 'Informe porte e pelagem.'; breedError.style.display = 'block'; }
+      return;
+    }
+
+    try {
+      const body = { name, size, coat, history };
+      if (!id) await apiPost('/api/breeds', body);
+      else await apiPut('/api/breeds/' + id, body);
+
+      clearBreedForm();
+      hideBreedForm();
+      await loadBreeds();
+    } catch (e) {
+      if (breedError) { breedError.textContent = e.message; breedError.style.display = 'block'; }
+    }
+  }
+
+  if (btnNovoBreed) {
+    btnNovoBreed.addEventListener('click', () => {
+      clearBreedForm();
+      showBreedForm();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  if (btnBreedCancel) btnBreedCancel.addEventListener('click', () => { clearBreedForm(); hideBreedForm(); });
+  if (btnBreedSave) btnBreedSave.addEventListener('click', saveBreed);
+
+  if (breedSearch) {
+    breedSearch.addEventListener('input', () => {
+      clearTimeout(window.__breedTimer);
+      window.__breedTimer = setTimeout(() => renderBreeds(), 120);
+    });
+  }
+
 
   /* ===== NOVO: Agenda - Toggle Lista/Cards ===== */
   const AGENDA_VIEW_KEY = 'pf_admin_agenda_view';
@@ -2020,7 +2585,7 @@
     formPhone.value = '';
     formNome.value = '';
     formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
-    formPrize.value = 'Tosa Higiênica';
+    formPrize.value = '';
     formService.value = '';
     formDate.value = '';
     formTime.value = '';
@@ -2054,11 +2619,39 @@
 
     const date = formDate.value;
     const time = formTime.value;
+
+    // Validação de data/horário (mesmas regras do cliente)
+    const dtMsg = validarDiaHora(date, time);
+    if (dtMsg) {
+      formError.textContent = dtMsg;
+      formError.style.display = 'block';
+      return;
+    }
+
+    // Carrega horários ocupados do dia e bloqueia conflito
+    await refreshBookingDateTimeState(id);
+    if (isTimeOccupied(time)) {
+      formError.textContent = 'Horário indisponível para esta data. Selecione outro horário.';
+      formError.style.display = 'block';
+      return;
+    }
+
     const status = formStatus.value;
     const notes = formNotes.value.trim();
 
-    if (!date || !time || !prize || !serviceIdSelected) {
-      formError.textContent = 'Data, horário, serviço e mimo são obrigatórios.';
+    if (!date || !time || !serviceIdSelected) {
+      formError.textContent = 'Data, horário e serviço são obrigatórios.';
+      formError.style.display = 'block';
+      return;
+    }
+    if (!prize) {
+      formError.textContent = 'Selecione um mimo (Roleta).';
+      formError.style.display = 'block';
+      return;
+    }
+    // Novo agendamento: Pet obrigatório
+    if (!id && !petIdNum) {
+      formError.textContent = 'Para NOVO agendamento, selecione um pet.';
       formError.style.display = 'block';
       return;
     }
@@ -2069,15 +2662,16 @@
     }
 
     try {
-      let customer;
+      let customer = null;
       try {
         const lookup = await apiPost('/api/customers/lookup', { phone });
         if (lookup.exists && lookup.customer) customer = lookup.customer;
       } catch (_) {}
 
       if (!customer) {
-        const cRes = await apiPost('/api/customers', { phone, name: nome });
-        customer = cRes.customer;
+        formError.textContent = 'Cliente não cadastrado. Cadastre o tutor e os pets na aba "Clientes & Pets" antes de criar o agendamento.';
+        formError.style.display = 'block';
+        return;
       }
 
       const body = {
@@ -2210,7 +2804,11 @@
   btnNovoAgendamento.addEventListener('click', () => {
     limparForm();
     formDate.value = toISODateOnly(new Date());
+    // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
+    formPetSelect.disabled = true;
+    formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
     mostrarFormAgenda();
+    refreshBookingDateTimeState(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
@@ -2219,13 +2817,42 @@
   formPhone.addEventListener('blur', async () => {
     const phoneDigits = sanitizePhone(formPhone.value.trim());
     if (!phoneDigits) return;
+
     try {
       const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
+
       if (lookup.exists && lookup.customer) {
+        // Cliente existe: preenche nome e carrega pets para seleção
         formNome.value = lookup.customer.name || '';
+        formPetSelect.disabled = false;
         await loadPetsForCustomer(lookup.customer.id);
+
+        // Se o cliente não tem pets, força cadastro antes de agendar
+        if (formPetSelect.options.length <= 1) {
+          formPetSelect.disabled = true;
+          formPetSelect.innerHTML = '<option value="">(Cadastre ao menos 1 pet para este cliente)</option>';
+          formError.textContent = 'Cliente encontrado, mas sem pets cadastrados. Cadastre os pets na aba "Clientes & Pets" antes de agendar.';
+          formError.style.display = 'block';
+        } else {
+          formError.style.display = 'none';
+          formError.textContent = '';
+        }
+      } else {
+        // Cliente não existe: avisa e orienta cadastro
+        formNome.value = '';
+        formPetSelect.disabled = true;
+        formPetSelect.innerHTML = '<option value="">(Cadastre o cliente e os pets primeiro)</option>';
+
+        formError.textContent = 'Cliente não cadastrado. Vá na aba "Clientes & Pets" para cadastrar o tutor e os pets antes de criar o agendamento.';
+        formError.style.display = 'block';
       }
-    } catch (_) {}
+    } catch (e) {
+      // Em caso de erro na API, mantém o fluxo mas informa
+      formPetSelect.disabled = true;
+      formPetSelect.innerHTML = '<option value="">(Erro ao buscar cliente)</option>';
+      formError.textContent = 'Erro ao buscar cliente pelo telefone. Tente novamente. Detalhe: ' + (e.message || e);
+      formError.style.display = 'block';
+    }
   });
 
   // ===== CLIENTES & PETS =====
@@ -2235,6 +2862,12 @@
   const btnCliLimpar = document.getElementById('btnCliLimpar');
   const btnCliSalvar = document.getElementById('btnCliSalvar');
   const tbodyClientes = document.getElementById('tbodyClientes');
+
+  // Filtro de busca (Clientes & Pets)
+  const filtroClientes = document.getElementById('filtroClientes');
+  const btnLimparClientes = document.getElementById('btnLimparClientes');
+  let filtroClientesTxt = '';
+
 
   const clienteFormBlock = document.getElementById('clienteFormBlock');
   const btnNovoCliente = document.getElementById('btnNovoCliente');
@@ -2259,6 +2892,20 @@
 
   cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
 
+  if (filtroClientes) {
+    filtroClientes.addEventListener('input', () => {
+      filtroClientesTxt = normStr(filtroClientes.value);
+      renderClientes();
+    });
+  }
+  if (btnLimparClientes) {
+    btnLimparClientes.addEventListener('click', () => {
+      if (filtroClientes) filtroClientes.value = '';
+      filtroClientesTxt = '';
+      renderClientes();
+    });
+  }
+
   racas.forEach(r => {
     const opt = document.createElement('option');
     opt.value = r;
@@ -2274,7 +2921,14 @@
 
   function renderClientes() {
     tbodyClientes.innerHTML = '';
-    clientesCache.forEach(c => {
+
+    const list = (clientesCache || []).filter(c => {
+      if (!filtroClientesTxt) return true;
+      const hay = normStr((c.name || '') + ' ' + (c.phone || ''));
+      return hay.includes(filtroClientesTxt);
+    });
+
+    list.forEach(c => {
       const tr = document.createElement('tr');
 
       const tdId = document.createElement('td'); tdId.textContent = c.id;
@@ -2322,6 +2976,7 @@
           }
           await loadClientes();
           await loadDashboard();
+          await renderTabela();
         } catch (e) { alert(e.message); }
       });
 
@@ -2373,6 +3028,8 @@
       await loadClientes();
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadDashboard();
+      await renderTabela();
+
     } catch (e) {
       cliError.textContent = e.message;
       cliError.style.display = 'block';
@@ -2420,6 +3077,7 @@
           await loadPetsForClienteTab(clienteSelecionadoId);
           await loadClientes();
           await loadDashboard();
+          await renderTabela();
         } catch (e) { alert(e.message); }
       });
 
@@ -2472,7 +3130,9 @@
       limparPetsForm();
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadClientes();
+      await loadBreeds();
       await loadDashboard();
+      await renderTabela();
     } catch (e) {
       petError.textContent = e.message;
       petError.style.display = 'block';
@@ -2637,40 +3297,197 @@
     renderCharts(bookings);
   }
 
-  // ===== Início =====
+  
+  /* =========================
+     HORÁRIO DE FUNCIONAMENTO (Admin)
+  ========================= */
+  const tbodyHours = document.getElementById('tbodyHours');
+  const hoursEmpty = document.getElementById('hoursEmpty');
+  const btnHoursSave = document.getElementById('btnHoursSave');
+  const btnHoursReload = document.getElementById('btnHoursReload');
+  const btnHoursResetDefault = document.getElementById('btnHoursResetDefault');
+  const hoursMsg = document.getElementById('hoursMsg');
+
+  const DOW_LABEL = {
+    0: 'Domingo',
+    1: 'Segunda',
+    2: 'Terça',
+    3: 'Quarta',
+    4: 'Quinta',
+    5: 'Sexta',
+    6: 'Sábado'
+  };
+
+  let openingHoursCache = []; // [{dow,is_closed,open_time,close_time,max_per_half_hour,updated_at}]
+
+  function normalizeHHMM(v, fallback) {
+    const s = String(v || '').trim();
+    if (/^([01]\d|2[0-3]):[0-5]\d$/.test(s)) return s;
+    return fallback;
+  }
+
+  function getDefaultOpeningHours() {
+    return [
+      { dow: 1, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
+      { dow: 2, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
+      { dow: 3, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
+      { dow: 4, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
+      { dow: 5, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
+      { dow: 6, is_closed: false, open_time: '07:30', close_time: '13:00', max_per_half_hour: 1 },
+      { dow: 0, is_closed: true,  open_time: null,   close_time: null,   max_per_half_hour: 0 },
+    ];
+  }
+
+  function renderOpeningHoursTable() {
+    if (!tbodyHours) return;
+
+    tbodyHours.innerHTML = '';
+    const rowsByDow = new Map((openingHoursCache || []).map(r => [Number(r.dow), r]));
+
+    for (const dow of [1,2,3,4,5,6,0]) {
+      const r = rowsByDow.get(dow) || { dow, is_closed: true, open_time: null, close_time: null, max_per_half_hour: 0, updated_at: null };
+
+      const tr = document.createElement('tr');
+
+      const tdDay = document.createElement('td');
+      tdDay.textContent = DOW_LABEL[dow] || String(dow);
+
+      const tdClosed = document.createElement('td');
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.checked = !!r.is_closed;
+      chk.dataset.dow = String(dow);
+      chk.addEventListener('change', () => {
+        const openEl = document.getElementById('oh_open_' + dow);
+        const closeEl = document.getElementById('oh_close_' + dow);
+        const capEl = document.getElementById('oh_cap_' + dow);
+        const isClosed = chk.checked;
+        if (openEl) openEl.disabled = isClosed;
+        if (closeEl) closeEl.disabled = isClosed;
+        if (capEl) capEl.disabled = isClosed;
+        if (isClosed) {
+          if (capEl) capEl.value = '0';
+        } else {
+          if (capEl && (Number(capEl.value || 0) === 0)) capEl.value = '1';
+        }
+      });
+      tdClosed.appendChild(chk);
+
+      const tdOpen = document.createElement('td');
+      const open = document.createElement('input');
+      open.type = 'time';
+      open.id = 'oh_open_' + dow;
+      open.value = r.open_time ? String(r.open_time).slice(0,5) : '07:30';
+      open.disabled = !!r.is_closed;
+      tdOpen.appendChild(open);
+
+      const tdClose = document.createElement('td');
+      const close = document.createElement('input');
+      close.type = 'time';
+      close.id = 'oh_close_' + dow;
+      close.value = r.close_time ? String(r.close_time).slice(0,5) : '17:30';
+      close.disabled = !!r.is_closed;
+      tdClose.appendChild(close);
+
+      const tdCap = document.createElement('td');
+      const cap = document.createElement('input');
+      cap.type = 'number';
+      cap.min = '0';
+      cap.step = '1';
+      cap.id = 'oh_cap_' + dow;
+      cap.value = String(r.max_per_half_hour != null ? r.max_per_half_hour : (r.is_closed ? 0 : 1));
+      cap.disabled = !!r.is_closed;
+      cap.style.maxWidth = '110px';
+      tdCap.appendChild(cap);
+
+      const tdUpd = document.createElement('td');
+      tdUpd.textContent = r.updated_at ? formatDateTimeBr(r.updated_at) : '-';
+
+      tr.appendChild(tdDay);
+      tr.appendChild(tdClosed);
+      tr.appendChild(tdOpen);
+      tr.appendChild(tdClose);
+      tr.appendChild(tdCap);
+      tr.appendChild(tdUpd);
+
+      tbodyHours.appendChild(tr);
+    }
+
+    if (hoursEmpty) hoursEmpty.style.display = 'none';
+  }
+
+  async function loadOpeningHours() {
+    if (!tbodyHours) return;
+    if (hoursMsg) hoursMsg.textContent = '';
+
+    try {
+      const data = await apiGet('/api/opening-hours');
+      openingHoursCache = data.opening_hours || [];
+      renderOpeningHoursTable();
+    } catch (e) {
+      console.error(e);
+      openingHoursCache = [];
+      tbodyHours.innerHTML = '';
+      if (hoursEmpty) {
+        hoursEmpty.style.display = 'block';
+        hoursEmpty.textContent = 'Erro ao carregar: ' + e.message;
+      }
+    }
+  }
+
+  function collectOpeningHoursFromUI() {
+    const out = [];
+    for (const dow of [0,1,2,3,4,5,6]) {
+      const chk = document.querySelector(`input[type="checkbox"][data-dow="${dow}"]`);
+      const is_closed = !!chk?.checked;
+
+      const openEl = document.getElementById('oh_open_' + dow);
+      const closeEl = document.getElementById('oh_close_' + dow);
+      const capEl = document.getElementById('oh_cap_' + dow);
+
+      let open_time = openEl ? normalizeHHMM(openEl.value, '07:30') : '07:30';
+      let close_time = closeEl ? normalizeHHMM(closeEl.value, '17:30') : '17:30';
+      let max_per_half_hour = capEl ? Number(capEl.value) : 1;
+
+      if (!Number.isFinite(max_per_half_hour) || max_per_half_hour < 0) max_per_half_hour = 0;
+
+      if (is_closed) {
+        open_time = null;
+        close_time = null;
+        max_per_half_hour = 0;
+      } else {
+        if (max_per_half_hour === 0) max_per_half_hour = 1;
+      }
+
+      out.push({ dow, is_closed, open_time, close_time, max_per_half_hour });
+    }
+    return out;
+  }
+
+  async function saveOpeningHours(rows) {
+    if (hoursMsg) hoursMsg.textContent = '';
+    try {
+      const payload = { opening_hours: rows };
+      const data = await apiPut('/api/opening-hours', payload);
+      openingHoursCache = data.opening_hours || [];
+      renderOpeningHoursTable();
+      if (hoursMsg) hoursMsg.textContent = 'Horários salvos com sucesso.';
+    } catch (e) {
+      alert(e.message);
+      if (hoursMsg) hoursMsg.textContent = 'Erro ao salvar: ' + e.message;
+    }
+  }
+
+  if (btnHoursReload) btnHoursReload.addEventListener('click', loadOpeningHours);
+  if (btnHoursSave) btnHoursSave.addEventListener('click', () => saveOpeningHours(collectOpeningHoursFromUI()));
+  if (btnHoursResetDefault) btnHoursResetDefault.addEventListener('click', () => {
+    openingHoursCache = getDefaultOpeningHours().map(r => ({...r, updated_at: null}));
+    renderOpeningHoursTable();
+    if (hoursMsg) hoursMsg.textContent = 'Padrão carregado (clique em Salvar para gravar).';
+  });
+
+// ===== Início =====
   tryAutoLogin();
 </script>
-<!-- TAB: Horário de Funcionamento -->
-<section id="tab-opening-hours" class="tab-content" style="display:none;">
-  <div class="tab-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-    <h2 style="margin:0;">Horário de Funcionamento</h2>
-    <div style="display:flex; gap:8px;">
-      <button id="btnHoursReload" class="btn">Recarregar</button>
-      <button id="btnHoursSave" class="btn btn-primary">Salvar</button>
-    </div>
-  </div>
-
-  <p style="margin-top:8px; opacity:.85;">
-    Configure abertura/fechamento por dia e o limite máximo de agendamentos simultâneos por intervalo de 30 minutos.
-  </p>
-
-  <div class="card" style="padding:12px; overflow:auto;">
-    <table class="table" style="min-width:720px;">
-      <thead>
-        <tr>
-          <th>Dia</th>
-          <th>Fechado?</th>
-          <th>Abertura</th>
-          <th>Fechamento</th>
-          <th>Máx. por 30 min</th>
-        </tr>
-      </thead>
-      <tbody id="hoursTbody"></tbody>
-    </table>
-  </div>
-
-  <div id="hoursMsg" class="msg" style="display:none; margin-top:10px;"></div>
-</section>
-
 </body>
 </html>
