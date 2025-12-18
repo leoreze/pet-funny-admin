@@ -2425,15 +2425,16 @@
     }
 
     try {
-      let customer;
+      let customer = null;
       try {
         const lookup = await apiPost('/api/customers/lookup', { phone });
         if (lookup.exists && lookup.customer) customer = lookup.customer;
       } catch (_) {}
 
       if (!customer) {
-        const cRes = await apiPost('/api/customers', { phone, name: nome });
-        customer = cRes.customer;
+        formError.textContent = 'Cliente não cadastrado. Cadastre o tutor e os pets na aba "Clientes & Pets" antes de criar o agendamento.';
+        formError.style.display = 'block';
+        return;
       }
 
       const body = {
@@ -2566,6 +2567,9 @@
   btnNovoAgendamento.addEventListener('click', () => {
     limparForm();
     formDate.value = toISODateOnly(new Date());
+    // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
+    formPetSelect.disabled = true;
+    formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
     mostrarFormAgenda();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
@@ -2575,13 +2579,42 @@
   formPhone.addEventListener('blur', async () => {
     const phoneDigits = sanitizePhone(formPhone.value.trim());
     if (!phoneDigits) return;
+
     try {
       const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
+
       if (lookup.exists && lookup.customer) {
+        // Cliente existe: preenche nome e carrega pets para seleção
         formNome.value = lookup.customer.name || '';
+        formPetSelect.disabled = false;
         await loadPetsForCustomer(lookup.customer.id);
+
+        // Se o cliente não tem pets, força cadastro antes de agendar
+        if (formPetSelect.options.length <= 1) {
+          formPetSelect.disabled = true;
+          formPetSelect.innerHTML = '<option value="">(Cadastre ao menos 1 pet para este cliente)</option>';
+          formError.textContent = 'Cliente encontrado, mas sem pets cadastrados. Cadastre os pets na aba "Clientes & Pets" antes de agendar.';
+          formError.style.display = 'block';
+        } else {
+          formError.style.display = 'none';
+          formError.textContent = '';
+        }
+      } else {
+        // Cliente não existe: avisa e orienta cadastro
+        formNome.value = '';
+        formPetSelect.disabled = true;
+        formPetSelect.innerHTML = '<option value="">(Cadastre o cliente e os pets primeiro)</option>';
+
+        formError.textContent = 'Cliente não cadastrado. Vá na aba "Clientes & Pets" para cadastrar o tutor e os pets antes de criar o agendamento.';
+        formError.style.display = 'block';
       }
-    } catch (_) {}
+    } catch (e) {
+      // Em caso de erro na API, mantém o fluxo mas informa
+      formPetSelect.disabled = true;
+      formPetSelect.innerHTML = '<option value="">(Erro ao buscar cliente)</option>';
+      formError.textContent = 'Erro ao buscar cliente pelo telefone. Tente novamente. Detalhe: ' + (e.message || e);
+      formError.style.display = 'block';
+    }
   });
 
   // ===== CLIENTES & PETS =====
