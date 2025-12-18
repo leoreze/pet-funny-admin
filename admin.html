@@ -580,6 +580,17 @@
       <div class="section-title-row">
          <div class="section-title">Agendamentos & Mimos</div>
 
+           <div class="agenda-actions-right">
+          <!-- NOVO: Toggle Lista/Cards -->
+          <div class="view-toggle" aria-label="Alternar visualização">
+            <button class="toggle-btn active" id="btnViewList" type="button">📋 Lista</button>
+            <button class="toggle-btn" id="btnViewCards" type="button">🗂️ Cards</button>
+          </div>
+
+          <button class="btn btn-light" id="btnNovoAgendamento" type="button">+ Novo agendamento</button>
+        </div>
+      </div>
+
  
 
         <!-- FILTROS (APENAS DA AGENDA) -->
@@ -607,16 +618,7 @@
     </button>
   </div>
 
-        <div class="agenda-actions-right">
-          <!-- NOVO: Toggle Lista/Cards -->
-          <div class="view-toggle" aria-label="Alternar visualização">
-            <button class="toggle-btn active" id="btnViewList" type="button">📋 Lista</button>
-            <button class="toggle-btn" id="btnViewCards" type="button">🗂️ Cards</button>
-          </div>
-
-          <button class="btn btn-light" id="btnNovoAgendamento" type="button">+ Novo agendamento</button>
-        </div>
-      </div>
+      
 
       <div class="form-panel hidden" id="formPanel">
         <input type="hidden" id="bookingId" />
