@@ -4,93 +4,73 @@ const express = require('express');
 const cors = require('cors');
 const db = require('./db'); // PostgreSQL
 
-/* =========================
-   HORÁRIO DE FUNCIONAMENTO
-========================= */
-
-function parseISODateToDow(isoDate) {
-  // isoDate: YYYY-MM-DD (sem timezone)
-  const d = new Date(isoDate + 'T00:00:00');
-  if (Number.isNaN(d.getTime())) return null;
-  return d.getDay(); // 0=Dom ... 6=Sáb
-}
-
-function isHalfHourSlot(timeHHMM) {
-  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(timeHHMM || ''));
-  if (!m) return false;
-  const mins = Number(m[2]);
-  return mins === 0 || mins === 30;
-}
-
-async function getOpeningHoursForDate(dateISO) {
-  const dow = parseISODateToDow(dateISO);
-  if (dow == null) return null;
-  const row = await db.get(`SELECT * FROM opening_hours WHERE day_of_week=$1`, [dow]);
-  return row || null;
-}
-
-async function assertWithinBusinessRules({ dateISO, timeHHMM, excludeBookingId = null }) {
-  // 1) regra de meia hora
-  if (!isHalfHourSlot(timeHHMM)) {
-    const err = new Error('Horário inválido. Selecione um horário de 30 em 30 minutos.');
-    err.statusCode = 400;
-    throw err;
-  }
-
-  // 2) busca configuração do dia
-  const oh = await getOpeningHoursForDate(dateISO);
-  if (!oh) {
-    const err = new Error('Horário de funcionamento não configurado para este dia.');
-    err.statusCode = 400;
-    throw err;
-  }
-  if (oh.is_closed) {
-    const err = new Error('A unidade está fechada nesta data. Selecione outro dia.');
-    err.statusCode = 400;
-    throw err;
-  }
-  if (!oh.open_time || !oh.close_time) {
-    const err = new Error('Horário de abertura/fechamento não definido para este dia.');
-    err.statusCode = 400;
-    throw err;
-  }
-
-  // 3) dentro do intervalo [open, close)
-  const open = String(oh.open_time).slice(0,5);
-  const close = String(oh.close_time).slice(0,5);
-  if (!(timeHHMM >= open && timeHHMM < close)) {
-    const err = new Error(`Fora do horário de funcionamento. Disponível: ${open}–${close}.`);
-    err.statusCode = 400;
-    throw err;
-  }
-
-  // 4) capacidade do slot (mesma data/hora)
-  const cap = Number(oh.capacity_per_slot || 1);
-  const whereExclude = excludeBookingId ? ' AND id <> $3' : '';
-  const params = excludeBookingId ? [dateISO, timeHHMM, Number(excludeBookingId)] : [dateISO, timeHHMM];
-
-  const cnt = await db.get(
-    `SELECT COUNT(*)::int AS c
-     FROM bookings
-     WHERE date=$1 AND time=$2
-       AND COALESCE(LOWER(status),'') <> 'cancelado'${whereExclude}`,
-    params
-  );
-
-  if ((cnt?.c || 0) >= cap) {
-    const err = new Error('Este horário já atingiu o limite de agendamentos. Escolha outro horário.');
-    err.statusCode = 409;
-    throw err;
-  }
-
-  return { open, close, cap };
-}
-
-
-
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+/* =========================
+   OPENING HOURS / SLOT VALIDATION
+========================= */
+function parseDowFromDate(dateStr) {
+  // dateStr: YYYY-MM-DD
+  // Use noon UTC to avoid TZ edge cases
+  const d = new Date(dateStr + 'T12:00:00.000Z');
+  return d.getUTCDay(); // 0=Sun..6=Sat
+}
+
+function isValidHalfHour(timeStr) {
+  // HH:MM
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(timeStr || '');
+  if (!m) return false;
+  return (m[2] === '00' || m[2] === '30');
+}
+
+async function getOpeningRule(dow) {
+  const row = await db.get(`SELECT * FROM opening_hours WHERE day_of_week=$1`, [dow]);
+  // Default rule if not configured
+  if (!row) return { day_of_week: dow, is_closed: false, open_time: '07:30:00', close_time: '17:30:00', capacity_per_slot: 1 };
+  return row;
+}
+
+function timeToHHMM(t) {
+  if (!t) return null;
+  return String(t).slice(0, 5);
+}
+
+async function ensureSlotAvailable({ date, time, excludeBookingId = null }) {
+  if (!date || !time) throw new Error('Data e horário são obrigatórios.');
+  if (!isValidHalfHour(time)) throw new Error('Horário inválido. Use slots de 30 min (ex.: 09:00 ou 09:30).');
+
+  const dow = parseDowFromDate(date);
+  const rule = await getOpeningRule(dow);
+
+  if (rule.is_closed) throw new Error('Dia indisponível (fechado).');
+
+  const openHHMM = timeToHHMM(rule.open_time);
+  const closeHHMM = timeToHHMM(rule.close_time);
+
+  if (!openHHMM || !closeHHMM) throw new Error('Horário de funcionamento não configurado para este dia.');
+  if (time < openHHMM || time >= closeHHMM) throw new Error(`Horário fora do funcionamento (${openHHMM}–${closeHHMM}).`);
+
+  const cap = Math.max(0, parseInt(rule.capacity_per_slot || 0, 10));
+  if (cap === 0) throw new Error('Capacidade por slot está zerada para este dia/horário.');
+
+  const params = excludeBookingId ? [date, time, excludeBookingId] : [date, time];
+  const whereExclude = excludeBookingId ? 'AND id <> $3' : '';
+  const row = await db.get(
+    `SELECT COUNT(*)::int AS n
+     FROM bookings
+     WHERE date=$1 AND time=$2
+       AND (status IS NULL OR status NOT IN ('cancelado','cancelled'))
+       ${whereExclude}`,
+    params
+  );
+
+  if ((row?.n || 0) >= cap) {
+    throw new Error(`Limite atingido para ${date} ${time}. Capacidade: ${cap} agendamento(s) por slot.`);
+  }
+}
+
 
 /* =========================
    STATIC FILES
@@ -98,73 +78,6 @@ app.use(express.json());
 
 // Admin (admin.html, logos etc) + index.html
 app.use(express.static(__dirname));
-
-
-/* =========================
-   HORÁRIO DE FUNCIONAMENTO (CRUD simples)
-========================= */
-
-// Listar configurações (Dom..Sáb)
-app.get('/api/opening-hours', async (req, res) => {
-  try {
-    const rows = await db.all(`SELECT * FROM opening_hours ORDER BY day_of_week ASC`);
-    res.json({ opening_hours: rows });
-  } catch (err) {
-    console.error('Erro ao listar opening_hours:', err);
-    res.status(500).json({ error: 'Erro interno ao buscar horário de funcionamento.' });
-  }
-});
-
-// Salvar configurações (upsert em lote)
-// body: { opening_hours: [{day_of_week,is_closed,open_time,close_time,capacity_per_slot}, ...] }
-app.put('/api/opening-hours', async (req, res) => {
-  try {
-    const list = Array.isArray(req.body.opening_hours) ? req.body.opening_hours : null;
-    if (!list || !list.length) {
-      return res.status(400).json({ error: 'Envie opening_hours como uma lista.' });
-    }
-
-    for (const r of list) {
-      const day_of_week = Number(r.day_of_week);
-      const is_closed = !!r.is_closed;
-      const open_time = r.open_time ? String(r.open_time).slice(0,5) : null;
-      const close_time = r.close_time ? String(r.close_time).slice(0,5) : null;
-      const capacity_per_slot = Number(r.capacity_per_slot || 1);
-
-      if (!(day_of_week >= 0 && day_of_week <= 6)) {
-        return res.status(400).json({ error: 'day_of_week inválido (0..6).' });
-      }
-      if (capacity_per_slot < 1 || !Number.isFinite(capacity_per_slot)) {
-        return res.status(400).json({ error: 'capacity_per_slot deve ser >= 1.' });
-      }
-
-      // se não está fechado, open/close são obrigatórios
-      if (!is_closed) {
-        if (!open_time || !close_time || open_time >= close_time) {
-          return res.status(400).json({ error: 'open_time/close_time inválidos para dia aberto.' });
-        }
-        if (!isHalfHourSlot(open_time) || !isHalfHourSlot(close_time)) {
-          return res.status(400).json({ error: 'open_time e close_time devem ser múltiplos de 30 minutos.' });
-        }
-      }
-
-      await db.run(
-        `INSERT INTO opening_hours (day_of_week, is_closed, open_time, close_time, capacity_per_slot, updated_at)
-         VALUES ($1,$2,$3,$4,$5,NOW())
-         ON CONFLICT (day_of_week)
-         DO UPDATE SET is_closed=EXCLUDED.is_closed, open_time=EXCLUDED.open_time, close_time=EXCLUDED.close_time,
-                       capacity_per_slot=EXCLUDED.capacity_per_slot, updated_at=NOW()`,
-        [day_of_week, is_closed, open_time, close_time, capacity_per_slot]
-      );
-    }
-
-    const rows = await db.all(`SELECT * FROM opening_hours ORDER BY day_of_week ASC`);
-    res.json({ opening_hours: rows });
-  } catch (err) {
-    console.error('Erro ao salvar opening_hours:', err);
-    res.status(500).json({ error: 'Erro interno ao salvar horário de funcionamento.' });
-  }
-});
 
 /* =========================
    CLIENTES
@@ -314,7 +227,9 @@ app.delete('/api/pets/:id', async (req, res) => {
 app.post('/api/bookings', async (req, res) => {
   const { customer_id, pet_id, date, time, service, prize, notes, status } = req.body;
 
-  if (!customer_id || !date || !time || !service || !prize) {
+          await ensureSlotAvailable({ date, time, excludeBookingId: parseInt(req.params.id,10) });
+await ensureSlotAvailable({ date, time });
+if (!customer_id || !date || !time || !service || !prize) {
     return res.status(400).json({
       error: 'Cliente, data, horário, serviço e mimo são obrigatórios.'
     });
@@ -599,6 +514,140 @@ app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html'))
    START SERVER (aguarda initDb)
 ========================= */
 const PORT = process.env.PORT || 4000;
+
+
+
+/* =========================
+   RAÇAS DE CÃES
+========================= */
+
+// Listar raças (com busca)
+app.get('/api/breeds', async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const params = [];
+    let where = '';
+    if (search) {
+      params.push('%' + search + '%');
+      where = 'WHERE name ILIKE $1';
+    }
+    const rows = await db.all(`SELECT * FROM dog_breeds ${where} ORDER BY name`, params);
+    res.json({ breeds: rows });
+  } catch (err) {
+    console.error('Erro ao listar raças:', err);
+    res.status(500).json({ error: 'Erro interno ao listar raças.' });
+  }
+});
+
+// Criar raça
+app.post('/api/breeds', async (req, res) => {
+  try {
+    const { name, size, coat, history } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'Nome é obrigatório.' });
+    const row = await db.get(
+      `INSERT INTO dog_breeds (name, size, coat, history)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (name) DO UPDATE SET
+         size=EXCLUDED.size,
+         coat=EXCLUDED.coat,
+         history=EXCLUDED.history,
+         updated_at=NOW()
+       RETURNING *`,
+      [(name || '').trim(), size || 'medio', coat || 'media', history || null]
+    );
+    res.json({ breed: row });
+  } catch (err) {
+    console.error('Erro ao criar raça:', err);
+    res.status(500).json({ error: 'Erro interno ao criar raça.' });
+  }
+});
+
+// Atualizar raça
+app.put('/api/breeds/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { name, size, coat, history } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    if (!name) return res.status(400).json({ error: 'Nome é obrigatório.' });
+
+    const row = await db.get(
+      `UPDATE dog_breeds
+       SET name=$1, size=$2, coat=$3, history=$4, updated_at=NOW()
+       WHERE id=$5
+       RETURNING *`,
+      [(name || '').trim(), size || 'medio', coat || 'media', history || null, id]
+    );
+    if (!row) return res.status(404).json({ error: 'Raça não encontrada.' });
+    res.json({ breed: row });
+  } catch (err) {
+    console.error('Erro ao atualizar raça:', err);
+    res.status(500).json({ error: 'Erro interno ao atualizar raça.' });
+  }
+});
+
+// Excluir raça
+app.delete('/api/breeds/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    await db.run(`DELETE FROM dog_breeds WHERE id=$1`, [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao excluir raça:', err);
+    res.status(500).json({ error: 'Erro interno ao excluir raça.' });
+  }
+});
+
+/* =========================
+   HORÁRIO DE FUNCIONAMENTO
+========================= */
+
+// Listar horários
+app.get('/api/opening-hours', async (req, res) => {
+  try {
+    const rows = await db.all(`SELECT * FROM opening_hours ORDER BY day_of_week`);
+    res.json({ opening_hours: rows });
+  } catch (err) {
+    console.error('Erro ao listar horários:', err);
+    res.status(500).json({ error: 'Erro interno ao listar horários.' });
+  }
+});
+
+// Atualizar horários (upsert em lote)
+app.put('/api/opening-hours', async (req, res) => {
+  try {
+    const items = (req.body && req.body.items) || [];
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Lista de horários vazia.' });
+    }
+
+    for (const it of items) {
+      const dow = Number(it.day_of_week);
+      const is_closed = !!it.is_closed;
+      const open_time = is_closed ? null : it.open_time;
+      const close_time = is_closed ? null : it.close_time;
+      const cap = Math.max(0, parseInt(it.capacity_per_slot || 0, 10));
+
+      await db.run(
+        `INSERT INTO opening_hours (day_of_week, is_closed, open_time, close_time, capacity_per_slot)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (day_of_week) DO UPDATE SET
+           is_closed=EXCLUDED.is_closed,
+           open_time=EXCLUDED.open_time,
+           close_time=EXCLUDED.close_time,
+           capacity_per_slot=EXCLUDED.capacity_per_slot,
+           updated_at=NOW()`,
+        [dow, is_closed, open_time, close_time, cap]
+      );
+    }
+
+    const rows = await db.all(`SELECT * FROM opening_hours ORDER BY day_of_week`);
+    res.json({ opening_hours: rows });
+  } catch (err) {
+    console.error('Erro ao salvar horários:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar horários.' });
+  }
+});
 
 (async () => {
   try {
