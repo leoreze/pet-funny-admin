@@ -2738,6 +2738,7 @@
           }
           await loadClientes();
           await loadDashboard();
+          await renderTabela();
         } catch (e) { alert(e.message); }
       });
 
@@ -2789,6 +2790,8 @@
       await loadClientes();
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadDashboard();
+      await renderTabela();
+
     } catch (e) {
       cliError.textContent = e.message;
       cliError.style.display = 'block';
@@ -2836,6 +2839,7 @@
           await loadPetsForClienteTab(clienteSelecionadoId);
           await loadClientes();
           await loadDashboard();
+          await renderTabela();
         } catch (e) { alert(e.message); }
       });
 
@@ -2890,6 +2894,7 @@
       await loadClientes();
       await loadBreeds();
       await loadDashboard();
+      await renderTabela();
     } catch (e) {
       petError.textContent = e.message;
       petError.style.display = 'block';
