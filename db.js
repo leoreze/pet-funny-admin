@@ -169,52 +169,116 @@ async function initDb() {
      DOG BREEDS
      - compat: server.js usa tabela dog_breeds
   ========================= */
-  await query(`
-    CREATE TABLE IF NOT EXISTS dog_breeds (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
-      history JSONB NOT NULL DEFAULT '[]'::jsonb,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  await query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS dog_breeds_name_unique
-    ON dog_breeds (LOWER(name));
-  `);
-
-  // Se você tinha tabela antiga "breeds", tenta migrar (best-effort)
+// Migração best-effort: breeds (legado) -> dog_breeds (atual)
+// Importante: dog_breeds pode ter colunas NOT NULL como size/coat etc.
+// Então inserimos preenchendo apenas as colunas que EXISTEM e garantindo defaults.
 await query(`
   DO $$
   DECLARE
     r RECORD;
     j JSONB;
+
+    has_size BOOLEAN := FALSE;
+    has_coat BOOLEAN := FALSE;
+    has_is_active BOOLEAN := FALSE;
+    has_updated_at BOOLEAN := FALSE;
+
+    cols TEXT := '';
+    vals TEXT := '';
+    sql TEXT := '';
   BEGIN
-    IF EXISTS (
+    -- Se não existir tabela legado, sai
+    IF NOT EXISTS (
       SELECT 1 FROM information_schema.tables
       WHERE table_schema='public' AND table_name='breeds'
     ) THEN
-
-      FOR r IN
-        SELECT name, history
-        FROM breeds
-      LOOP
-        BEGIN
-          -- tenta converter history para jsonb; se for texto comum ("Raça ..."), cai no EXCEPTION
-          j := COALESCE(r.history::jsonb, '[]'::jsonb);
-        EXCEPTION WHEN others THEN
-          j := '[]'::jsonb;
-        END;
-
-        INSERT INTO dog_breeds (name, history)
-        VALUES (r.name, j)
-        ON CONFLICT (LOWER(name)) DO NOTHING;
-      END LOOP;
-
+      RETURN;
     END IF;
+
+    -- Detecta colunas existentes em dog_breeds
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='size'
+    ) INTO has_size;
+
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='coat'
+    ) INTO has_coat;
+
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='is_active'
+    ) INTO has_is_active;
+
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='updated_at'
+    ) INTO has_updated_at;
+
+    -- Monta lista de colunas/valores base
+    cols := 'name, history';
+    vals := '$1, $2';
+
+    -- Adiciona defaults para colunas NOT NULL prováveis, se existirem
+    IF has_size THEN
+      cols := cols || ', size';
+      vals := vals || ', $3';
+    END IF;
+
+    IF has_coat THEN
+      cols := cols || ', coat';
+      vals := vals || ', $4';
+    END IF;
+
+    IF has_is_active THEN
+      cols := cols || ', is_active';
+      vals := vals || ', $5';
+    END IF;
+
+    IF has_updated_at THEN
+      cols := cols || ', updated_at';
+      vals := vals || ', NOW()';
+    END IF;
+
+    sql := 'INSERT INTO dog_breeds (' || cols || ') VALUES (' || vals || ')
+            ON CONFLICT (LOWER(name)) DO NOTHING';
+
+    FOR r IN
+      SELECT name, history
+      FROM breeds
+    LOOP
+      BEGIN
+        j := COALESCE(r.history::jsonb, '[]'::jsonb);
+      EXCEPTION WHEN others THEN
+        j := '[]'::jsonb;
+      END;
+
+      -- Valores default seguros:
+      -- size: 'N/A' (ou 'indefinido') | coat: '' | is_active: true
+      IF has_size AND has_coat AND has_is_active THEN
+        EXECUTE sql USING r.name, j, 'N/A', '', TRUE;
+      ELSIF has_size AND has_coat THEN
+        EXECUTE sql USING r.name, j, 'N/A', '';
+      ELSIF has_size AND has_is_active THEN
+        EXECUTE sql USING r.name, j, 'N/A', TRUE;
+      ELSIF has_size THEN
+        EXECUTE sql USING r.name, j, 'N/A';
+      ELSIF has_coat AND has_is_active THEN
+        EXECUTE sql USING r.name, j, '', TRUE;
+      ELSIF has_coat THEN
+        EXECUTE sql USING r.name, j, '';
+      ELSIF has_is_active THEN
+        EXECUTE sql USING r.name, j, TRUE;
+      ELSE
+        EXECUTE sql USING r.name, j;
+      END IF;
+
+    END LOOP;
+
   END $$;
 `);
+
 
 
   /* =========================
