@@ -185,21 +185,37 @@ async function initDb() {
   `);
 
   // Se você tinha tabela antiga "breeds", tenta migrar (best-effort)
-  await query(`
-    DO $$
-    BEGIN
-      IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema='public' AND table_name='breeds'
-      ) THEN
+await query(`
+  DO $$
+  DECLARE
+    r RECORD;
+    j JSONB;
+  BEGIN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema='public' AND table_name='breeds'
+    ) THEN
+
+      FOR r IN
+        SELECT name, history
+        FROM breeds
+      LOOP
+        BEGIN
+          -- tenta converter history para jsonb; se for texto comum ("Raça ..."), cai no EXCEPTION
+          j := COALESCE(r.history::jsonb, '[]'::jsonb);
+        EXCEPTION WHEN others THEN
+          j := '[]'::jsonb;
+        END;
+
         INSERT INTO dog_breeds (name, history)
-        SELECT b.name,
-               COALESCE(b.history::jsonb, '[]'::jsonb)
-        FROM breeds b
+        VALUES (r.name, j)
         ON CONFLICT (LOWER(name)) DO NOTHING;
-      END IF;
-    END $$;
-  `);
+      END LOOP;
+
+    END IF;
+  END $$;
+`);
+
 
   /* =========================
      OPENING HOURS (horário de funcionamento)
