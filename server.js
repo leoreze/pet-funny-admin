@@ -23,6 +23,71 @@ function sanitizePhone(phone) {
   return String(phone || '').replace(/\D/g, '');
 }
 
+function timeToMinutes(hhmm) {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(hhmm || '').trim());
+  if (!m) return NaN;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function getDowFromISODate(dateStr) {
+  // dateStr: YYYY-MM-DD (interpreta como meia-noite local)
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.getDay(); // 0=Dom..6=Sáb
+}
+
+async function validateBookingSlot({ date, time, excludeBookingId = null }) {
+  const dow = getDowFromISODate(date);
+  if (dow == null) return { ok: false, error: 'Data inválida.' };
+
+  const oh = await db.get(
+    `SELECT dow, is_closed, open_time, close_time, max_per_half_hour
+     FROM opening_hours WHERE dow = $1`,
+    [dow]
+  );
+
+  // Se não existir linha (banco antigo), assume aberto padrão.
+  if (!oh) return { ok: true };
+  if (oh.is_closed) return { ok: false, error: 'Dia fechado para agendamentos.' };
+
+  const t = timeToMinutes(time);
+  const open = timeToMinutes(oh.open_time);
+  const close = timeToMinutes(oh.close_time);
+  if (!Number.isFinite(t) || !Number.isFinite(open) || !Number.isFinite(close)) {
+    return { ok: false, error: 'Horário inválido.' };
+  }
+  if (t < open || t >= close) {
+    return { ok: false, error: 'Horário fora do funcionamento.' };
+  }
+  if ((t - open) % 30 !== 0) {
+    return { ok: false, error: 'Horário deve ser em intervalos de 30 minutos.' };
+  }
+
+  const cap = Number(oh.max_per_half_hour);
+  if (!Number.isFinite(cap) || cap <= 0) {
+    return { ok: false, error: 'Capacidade do horário está zerada.' };
+  }
+
+  const params = [date, String(time).slice(0, 5)];
+  let sql = `
+    SELECT COUNT(*)::int AS n
+    FROM bookings
+    WHERE date = $1
+      AND time = $2
+      AND COALESCE(status,'') NOT IN ('cancelado','cancelada')
+  `;
+  if (excludeBookingId) {
+    params.push(Number(excludeBookingId));
+    sql += ` AND id <> $${params.length}`;
+  }
+  const cnt = await db.get(sql, params);
+  const n = cnt?.n || 0;
+  if (n >= cap) {
+    return { ok: false, error: 'Este horário já atingiu o limite de agendamentos.' };
+  }
+  return { ok: true };
+}
+
 /* =========================
    CUSTOMERS
 ========================= */
@@ -324,6 +389,10 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
     }
 
+    // Horário de funcionamento + capacidade por meia hora (evita overbooking)
+    const v = await validateBookingSlot({ date, time });
+    if (!v.ok) return res.status(409).json({ error: v.error });
+
     const row = await db.get(
       `
       INSERT INTO bookings (customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at)
@@ -357,6 +426,10 @@ app.put('/api/bookings/:id', async (req, res) => {
     if (!id || !customer_id || !date || !time || !prize) {
       return res.status(400).json({ error: 'id, customer_id, date, time e prize são obrigatórios.' });
     }
+
+    // Horário de funcionamento + capacidade por meia hora (exclui o próprio agendamento)
+    const v = await validateBookingSlot({ date, time, excludeBookingId: id });
+    if (!v.ok) return res.status(409).json({ error: v.error });
 
     const row = await db.get(
       `
