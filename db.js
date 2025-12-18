@@ -2,21 +2,24 @@
 const { Pool } = require('pg');
 
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL não definida nas variáveis de ambiente');
+  console.error('❌ DATABASE_URL não definido (Postgres). Configure no Render/Host.');
 }
-
-const isProduction = process.env.NODE_ENV === 'production';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  ssl: process.env.DATABASE_URL?.includes('localhost')
+    ? false
+    : { rejectUnauthorized: false },
 });
 
-/* =========================
-   DB helpers
-========================= */
 async function query(sql, params = []) {
-  return pool.query(sql, params);
+  const client = await pool.connect();
+  try {
+    const res = await client.query(sql, params);
+    return res;
+  } finally {
+    client.release();
+  }
 }
 
 async function all(sql, params = []) {
@@ -26,128 +29,60 @@ async function all(sql, params = []) {
 
 async function get(sql, params = []) {
   const res = await query(sql, params);
-  return res.rows?.[0] || null;
+  return (res.rows && res.rows[0]) ? res.rows[0] : null;
 }
 
 async function run(sql, params = []) {
   const res = await query(sql, params);
-  return {
-    lastID: res.rows?.[0]?.id ? Number(res.rows[0].id) : undefined,
-    changes: res.rowCount,
-  };
+  return { rowCount: res.rowCount };
 }
 
 /* =========================
-   Schema utilities
+   Helpers
 ========================= */
-async function columnExists(table, column) {
-  const row = await get(
-    `
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2
-    LIMIT 1
-    `,
-    [table, column]
-  );
-  return !!row;
+function normalizePhone(phone) {
+  if (!phone) return null;
+  return String(phone).replace(/\D/g, '');
 }
 
-async function addColumnIfMissing(table, column, definitionSql) {
-  const exists = await columnExists(table, column);
-  if (exists) return;
-  await query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definitionSql};`);
+function normalizePlate(plate) {
+  if (!plate) return null;
+  return String(plate).trim().toUpperCase();
 }
 
-async function tableExists(table) {
-  const row = await get(
-    `
-    SELECT 1
-    FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = $1
-    LIMIT 1
-    `,
-    [table]
-  );
-  return !!row;
+function normalizeCPF(cpf) {
+  if (!cpf) return null;
+  return String(cpf).replace(/\D/g, '');
 }
 
-/* =========================
-   Breeds seed (extenso; pode expandir)
-   Campos:
-   - name (raça)
-   - history (breve)
-   - size: pequeno|médio|grande
-   - coat: curta|média|longa
-========================= */
-const BREEDS_SEED = [
-  // Pequeno
-  { name:'Affenpinscher', size:'pequeno', coat:'média', history:'Raça alemã antiga, criada como caçador de roedores em casas e estábulos; hoje é cão de companhia vivaz.' },
-  { name:'Bichon Frisé', size:'pequeno', coat:'longa', history:'Cão de companhia do Mediterrâneo, popular em cortes europeias; pelagem encaracolada e temperamento alegre.' },
-  { name:'Biewer Terrier', size:'pequeno', coat:'longa', history:'Variante moderna do Yorkshire Terrier desenvolvida na Alemanha; conhecido pelo padrão tricolor e sociabilidade.' },
-  { name:'Boston Terrier', size:'pequeno', coat:'curta', history:'Desenvolvido nos EUA como cão de companhia; apelidado de “American Gentleman” pelo temperamento equilibrado.' },
-  { name:'Cavalier King Charles Spaniel', size:'pequeno', coat:'longa', history:'Spaniel de companhia ligado à nobreza britânica; criado para convivência e afeto.' },
-  { name:'Chihuahua', size:'pequeno', coat:'curta', history:'Originário do México; uma das menores raças do mundo, muito alerta e ligado ao tutor.' },
-  { name:'Dachshund', size:'pequeno', coat:'curta', history:'Criado na Alemanha para caça em tocas (texugo); corpo alongado e coragem marcante.' },
-  { name:'Fox Terrier (Smooth)', size:'pequeno', coat:'curta', history:'Terrier britânico usado na caça à raposa; enérgico, inteligente e esportivo.' },
-  { name:'Fox Terrier (Wire)', size:'pequeno', coat:'média', history:'Versão de pelagem dura do Fox Terrier; historicamente usado para caça e controle de pragas.' },
-  { name:'French Bulldog (Bulldog Francês)', size:'pequeno', coat:'curta', history:'Popularizado na França a partir de cães do tipo bulldog; excelente companhia, dócil e adaptável.' },
-  { name:'Havanese (Bichon Havanês)', size:'pequeno', coat:'longa', history:'Cão de companhia associado a Cuba; conhecido por alegria, inteligência e pelagem sedosa.' },
-  { name:'Italian Greyhound (Galgo Italiano)', size:'pequeno', coat:'curta', history:'Pequeno lebrel de companhia presente desde a antiguidade; elegante, sensível e rápido.' },
-  { name:'Jack Russell Terrier', size:'pequeno', coat:'curta', history:'Terrier britânico para trabalho e caça; muita energia e grande drive.' },
-  { name:'Lhasa Apso', size:'pequeno', coat:'longa', history:'Originário do Tibete, usado como cão sentinela em monastérios; independente e leal.' },
-  { name:'Maltês', size:'pequeno', coat:'longa', history:'Raça antiga do Mediterrâneo, criada para companhia; pelagem branca longa e temperamento dócil.' },
-  { name:'Miniature Pinscher (Pinscher Miniatura)', size:'pequeno', coat:'curta', history:'Desenvolvido na Alemanha; cão compacto, alerta e confiante, associado ao controle de pragas.' },
-  { name:'Papillon', size:'pequeno', coat:'longa', history:'Spaniel miniatura europeu; famoso pelas orelhas “em borboleta” e facilidade de treino.' },
-  { name:'Pekingese (Pequinês)', size:'pequeno', coat:'longa', history:'Cão de companhia imperial chinês; postura altiva e forte vínculo com a família.' },
-  { name:'Pomeranian (Spitz Alemão Anão)', size:'pequeno', coat:'longa', history:'Derivado do Spitz alemão; popular como companhia, muito alerta e expressivo.' },
-  { name:'Poodle (Toy)', size:'pequeno', coat:'média', history:'Variedade de companhia do Poodle; altamente inteligente e treinável.' },
-  { name:'Poodle (Miniatura)', size:'pequeno', coat:'média', history:'Variedade menor do Poodle, historicamente ligada a trabalho na água; hoje também companhia.' },
-  { name:'Pug', size:'pequeno', coat:'curta', history:'Raça antiga da China, criada para companhia; famosa pelo focinho curto e personalidade afetiva.' },
-  { name:'Shih Tzu', size:'pequeno', coat:'longa', history:'Raça de companhia do Tibete/China; desenvolvida para vida em palácios, sociável e carinhosa.' },
-  { name:'Yorkshire Terrier', size:'pequeno', coat:'longa', history:'Criado na Inglaterra para caça de roedores; hoje é popular como cão de colo, cheio de atitude.' },
-  { name:'West Highland White Terrier', size:'pequeno', coat:'média', history:'Terrier escocês para caça de pequenos animais; ativo, corajoso e comunicativo.' },
-  { name:'Schnauzer (Miniatura)', size:'pequeno', coat:'média', history:'Versão pequena do Schnauzer alemão, usado em fazendas; inteligente, alerta e protetor.' },
+function safeJsonParse(str, fallback = null) {
+  if (str == null) return fallback;
+  if (typeof str === 'object') return str;
+  try {
+    return JSON.parse(str);
+  } catch {
+    return fallback;
+  }
+}
 
-  // Médio
-  { name:'Australian Shepherd', size:'médio', coat:'média', history:'Cão de pastoreio popularizado nos EUA; muito inteligente e ativo, exige estímulos.' },
-  { name:'Basenji', size:'médio', coat:'curta', history:'Raça africana antiga; conhecida por vocalização incomum e comportamento independente.' },
-  { name:'Beagle', size:'médio', coat:'curta', history:'Farejador britânico criado para caça; sociável e com forte instinto de olfato.' },
-  { name:'Border Collie', size:'médio', coat:'média', history:'Considerado um dos melhores cães de pastoreio; extremamente inteligente e focado.' },
-  { name:'Boxer', size:'médio', coat:'curta', history:'Desenvolvido na Alemanha; cão versátil, leal e brincalhão, historicamente usado em trabalho e guarda.' },
-  { name:'Bulldog Inglês', size:'médio', coat:'curta', history:'Antigo cão de trabalho associado a esportes históricos; hoje é companhia calma e apegada.' },
-  { name:'Cocker Spaniel (Inglês)', size:'médio', coat:'longa', history:'Spaniel britânico de caça; hoje é muito popular como cão de família, sensível e ativo.' },
-  { name:'Dalmatian (Dálmata)', size:'médio', coat:'curta', history:'Historicamente ligado a carruagens e companhia de cavalos; atlético e resistente.' },
-  { name:'English Springer Spaniel', size:'médio', coat:'longa', history:'Spaniel de caça britânico; energético, sociável e muito treinável.' },
-  { name:'German Spitz (Spitz Alemão)', size:'médio', coat:'longa', history:'Família Spitz europeia antiga; alerta, vocal e bom cão de alarme.' },
-  { name:'Shetland Sheepdog (Sheltie)', size:'médio', coat:'longa', history:'Pastoreio das ilhas Shetland; lembra um Collie em miniatura, inteligente e sensível.' },
-  { name:'Siberian Husky', size:'médio', coat:'média', history:'Cão de trenó do nordeste asiático; resistente, sociável e com alta energia.' },
-  { name:'Staffordshire Bull Terrier', size:'médio', coat:'curta', history:'Terrier britânico; conhecido por coragem e afeto com pessoas quando bem socializado.' },
-  { name:'Whippet', size:'médio', coat:'curta', history:'Lebrel britânico para corrida; dócil em casa e muito veloz ao ar livre.' },
-  { name:'Shiba Inu', size:'médio', coat:'média', history:'Raça japonesa antiga; alerta e independente, historicamente usada na caça.' },
-  { name:'Akita (Americano/Japonês)', size:'grande', coat:'média', history:'Raça japonesa de caça e guarda; leal e reservada, exige socialização.' },
+function normalizeBreedHistory(b) {
+  // garante estrutura mínima p/ evitar erros na UI
+  const history = safeJsonParse(b.history, []);
+  return { ...b, history };
+}
 
-  // Grande
-  { name:'German Shepherd (Pastor Alemão)', size:'grande', coat:'média', history:'Desenvolvido na Alemanha para trabalho; amplamente usado em polícia/serviço pela inteligência.' },
-  { name:'Golden Retriever', size:'grande', coat:'longa', history:'Criado na Escócia para resgate na água; dócil, confiável e excelente cão de família.' },
-  { name:'Labrador Retriever', size:'grande', coat:'curta', history:'Originário do Canadá; versátil para trabalho e companhia, muito amigável.' },
-  { name:'Rottweiler', size:'grande', coat:'curta', history:'Raça alemã de trabalho e guarda; forte, estável e leal quando bem treinado.' },
-  { name:'Doberman Pinscher', size:'grande', coat:'curta', history:'Criado na Alemanha para proteção; inteligente, atlético e altamente treinável.' },
-  { name:'Bernese Mountain Dog (Boiadeiro Bernês)', size:'grande', coat:'longa', history:'Cão de trabalho suíço para fazenda e tração; calmo, afetuoso e robusto.' },
-  { name:'Great Dane (Dogue Alemão)', size:'grande', coat:'curta', history:'Conhecido pelo porte gigante; historicamente usado como cão de caça e guarda, hoje também companhia.' },
-  { name:'Boxer (Grande)', size:'médio', coat:'curta', history:'Entrada duplicada intencional? Não. (mantém como Boxer médio; remova se necessário).' },
-];
-
-function uniqueBreeds(seed) {
+function uniqueBreedsByName(rows) {
   const map = new Map();
-  for (const b of seed) {
-    const key = String(b.name || '').trim().toLowerCase();
+  for (const b of rows) {
+    const key = (b.name || '').trim().toLowerCase();
     if (!key) continue;
     if (map.has(key)) continue;
     map.set(key, b);
   }
   // remove registros “placeholder”
-  return Array.from(map.values()).filter(b => !String(b.history || '').includes('Entrada duplicada'));
+  return Array.from(map.values()).filter(
+    b => !String(b.history || '').includes('Entrada duplicada')
+  );
 }
 
 /* =========================
@@ -158,10 +93,20 @@ async function initDb() {
   await query(`
     CREATE TABLE IF NOT EXISTS customers (
       id SERIAL PRIMARY KEY,
-      phone TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      phone TEXT NOT NULL,
+      email TEXT,
+      cpf TEXT,
+      address TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS customers_phone_idx
+    ON customers (phone);
   `);
 
   // pets
@@ -170,18 +115,28 @@ async function initDb() {
       id SERIAL PRIMARY KEY,
       customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
+      species TEXT NOT NULL DEFAULT 'dog',
       breed TEXT,
-      info TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      size TEXT,
+      coat TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
 
-  // services (value_cents + active)
+  await query(`
+    CREATE INDEX IF NOT EXISTS pets_customer_idx
+    ON pets (customer_id);
+  `);
+
+  // services
   await query(`
     CREATE TABLE IF NOT EXISTS services (
       id SERIAL PRIMARY KEY,
-      date DATE NOT NULL,
-      title TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      duration_minutes INTEGER NOT NULL DEFAULT 60,
       value_cents INTEGER NOT NULL DEFAULT 0,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -189,73 +144,62 @@ async function initDb() {
     );
   `);
 
-  await query(`CREATE INDEX IF NOT EXISTS idx_services_date ON services(date);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_services_title_lower ON services ((lower(title)));`);
-
-  // bookings (compat: mantém service TEXT, mas adiciona service_id)
+  // orders / appointments
   await query(`
-    CREATE TABLE IF NOT EXISTS bookings (
+    CREATE TABLE IF NOT EXISTS appointments (
       id SERIAL PRIMARY KEY,
       customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-      pet_id INTEGER REFERENCES pets(id) ON DELETE SET NULL,
-      service_id INTEGER REFERENCES services(id) ON DELETE SET NULL,
-      date TEXT NOT NULL,
-      time TEXT NOT NULL,
-      service TEXT,
-      prize TEXT NOT NULL,
+      pet_id INTEGER NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+      service_id INTEGER NOT NULL REFERENCES services(id),
+      starts_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ NOT NULL,
+      status TEXT NOT NULL DEFAULT 'scheduled',
       notes TEXT,
-      status TEXT NOT NULL DEFAULT 'agendado',
-      last_notification_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  // garante colunas em bases antigas
-  await addColumnIfMissing('bookings', 'service_id', 'INTEGER REFERENCES services(id) ON DELETE SET NULL');
-  await addColumnIfMissing('bookings', 'service', 'TEXT');
-  await addColumnIfMissing('services', 'value_cents', 'INTEGER NOT NULL DEFAULT 0');
-  await addColumnIfMissing('services', 'is_active', 'BOOLEAN NOT NULL DEFAULT TRUE');
-  await addColumnIfMissing('services', 'updated_at', 'TIMESTAMPTZ NOT NULL DEFAULT NOW()');
-
-  // indices
-  await query(`CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_pets_customer_id ON pets(customer_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(date);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_service_id ON bookings(service_id);`);
-
-  // breeds table
-  await query(`
-    CREATE TABLE IF NOT EXISTS breeds (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      history TEXT,
-      size TEXT NOT NULL CHECK (size IN ('pequeno','médio','grande')),
-      coat TEXT NOT NULL CHECK (coat IN ('curta','média','longa')),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
-  await query(`CREATE INDEX IF NOT EXISTS idx_breeds_size ON breeds(size);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_breeds_coat ON breeds(coat);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_breeds_name_lower ON breeds ((lower(name)));`);
 
-  // seed breeds (somente se vazio)
-  const c = await get(`SELECT COUNT(*)::int AS n FROM breeds;`);
-  if ((c?.n || 0) === 0) {
-    const seed = uniqueBreeds(BREEDS_SEED);
-    for (const b of seed) {
-      await query(
-        `INSERT INTO breeds (name, history, size, coat) VALUES ($1,$2,$3,$4) ON CONFLICT (name) DO NOTHING;`,
-        [b.name, b.history || null, b.size, b.coat]
-      );
-    }
-    console.log(`✔ breeds seeded: ${seed.length}`);
-  } else {
-    console.log('✔ breeds table ready (seed skipped)');
-  }
+  await query(`
+    CREATE INDEX IF NOT EXISTS appointments_starts_idx
+    ON appointments (starts_at);
+  `);
 
+  /* =========================
+     DOG BREEDS
+     - compat: server.js usa tabela dog_breeds
+  ========================= */
+  await query(`
+    CREATE TABLE IF NOT EXISTS dog_breeds (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      history JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS dog_breeds_name_unique
+    ON dog_breeds (LOWER(name));
+  `);
+
+  // Se você tinha tabela antiga "breeds", tenta migrar (best-effort)
+  await query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema='public' AND table_name='breeds'
+      ) THEN
+        INSERT INTO dog_breeds (name, history)
+        SELECT b.name,
+               COALESCE(b.history::jsonb, '[]'::jsonb)
+        FROM breeds b
+        ON CONFLICT (LOWER(name)) DO NOTHING;
+      END IF;
+    END $$;
+  `);
 
   /* =========================
      OPENING HOURS (horário de funcionamento)
@@ -263,10 +207,12 @@ async function initDb() {
      - is_closed: dia fechado
      - open_time / close_time: HH:MM
      - max_per_half_hour: capacidade por slot de 30min
-  ========================= */
+     ========================= */
+
+  // 1) Cria tabela se não existir (para instalações novas)
   await query(`
     CREATE TABLE IF NOT EXISTS opening_hours (
-      dow INTEGER PRIMARY KEY,
+      dow INTEGER,
       is_closed BOOLEAN NOT NULL DEFAULT FALSE,
       open_time TEXT,
       close_time TEXT,
@@ -275,7 +221,79 @@ async function initDb() {
     );
   `);
 
-  // seed padrão se vazio
+  // 2) Migra schema legado (se a tabela já existia com nomes diferentes)
+  //    - day_of_week -> dow
+  //    - max_per_slot -> max_per_half_hour
+  //    - garante colunas essenciais
+  //    - garante UNIQUE em dow (para ON CONFLICT funcionar)
+  {
+    const cols = await all(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='opening_hours'
+    `);
+    const colset = new Set((cols || []).map(c => c.column_name));
+
+    // renomes seguros (apenas se destino não existir)
+    if (colset.has('day_of_week') && !colset.has('dow')) {
+      await query(`ALTER TABLE opening_hours RENAME COLUMN day_of_week TO dow;`);
+      colset.add('dow'); colset.delete('day_of_week');
+    }
+    if (colset.has('max_per_slot') && !colset.has('max_per_half_hour')) {
+      await query(`ALTER TABLE opening_hours RENAME COLUMN max_per_slot TO max_per_half_hour;`);
+      colset.add('max_per_half_hour'); colset.delete('max_per_slot');
+    }
+
+    if (!colset.has('dow')) {
+      await query(`ALTER TABLE opening_hours ADD COLUMN dow INTEGER;`);
+      colset.add('dow');
+    }
+    if (!colset.has('is_closed')) {
+      await query(`ALTER TABLE opening_hours ADD COLUMN is_closed BOOLEAN NOT NULL DEFAULT FALSE;`);
+      colset.add('is_closed');
+    }
+    if (!colset.has('open_time')) {
+      await query(`ALTER TABLE opening_hours ADD COLUMN open_time TEXT;`);
+      colset.add('open_time');
+    }
+    if (!colset.has('close_time')) {
+      await query(`ALTER TABLE opening_hours ADD COLUMN close_time TEXT;`);
+      colset.add('close_time');
+    }
+    if (!colset.has('max_per_half_hour')) {
+      await query(`ALTER TABLE opening_hours ADD COLUMN max_per_half_hour INTEGER NOT NULL DEFAULT 1;`);
+      colset.add('max_per_half_hour');
+    }
+    if (!colset.has('updated_at')) {
+      await query(`ALTER TABLE opening_hours ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+      colset.add('updated_at');
+    }
+
+    // normaliza dados (evita NULLs e valores inválidos)
+    await query(`UPDATE opening_hours SET max_per_half_hour = 0 WHERE max_per_half_hour IS NULL;`);
+    await query(`UPDATE opening_hours SET is_closed = FALSE WHERE is_closed IS NULL;`);
+
+    // dow precisa estar entre 0..6 para a UI
+    await query(`DELETE FROM opening_hours WHERE dow IS NULL OR dow < 0 OR dow > 6;`);
+
+    // garante unicidade em dow
+    // (ON CONFLICT precisa de constraint UNIQUE/PK na coluna alvo)
+    await query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_indexes
+          WHERE schemaname='public'
+            AND tablename='opening_hours'
+            AND indexname='opening_hours_dow_unique'
+        ) THEN
+          CREATE UNIQUE INDEX opening_hours_dow_unique ON opening_hours(dow);
+        END IF;
+      END $$;
+    `);
+  }
+
+  // 3) Seed padrão se vazio
   const ohCount = await get(`SELECT COUNT(*)::int AS n FROM opening_hours;`);
   if ((ohCount?.n || 0) === 0) {
     const seed = [
@@ -289,10 +307,15 @@ async function initDb() {
     ];
 
     for (const r of seed) {
-      await query(
+      await run(
         `INSERT INTO opening_hours (dow, is_closed, open_time, close_time, max_per_half_hour)
          VALUES ($1,$2,$3,$4,$5)
-         ON CONFLICT (dow) DO NOTHING;`,
+         ON CONFLICT (dow) DO UPDATE
+           SET is_closed=EXCLUDED.is_closed,
+               open_time=EXCLUDED.open_time,
+               close_time=EXCLUDED.close_time,
+               max_per_half_hour=EXCLUDED.max_per_half_hour,
+               updated_at=NOW()`,
         [r.dow, r.is_closed, r.open_time, r.close_time, r.max_per_half_hour]
       );
     }
@@ -309,4 +332,10 @@ module.exports = {
   get,
   run,
   query,
+  normalizePhone,
+  normalizePlate,
+  normalizeCPF,
+  safeJsonParse,
+  normalizeBreedHistory,
+  uniqueBreedsByName,
 };
