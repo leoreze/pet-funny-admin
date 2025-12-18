@@ -488,6 +488,96 @@ app.delete('/api/breeds/:id', async (req, res) => {
   }
 });
 
+
+/* =========================
+   OPENING HOURS (horário de funcionamento)
+========================= */
+
+app.get('/api/opening-hours', async (req, res) => {
+  try {
+    const rows = await db.all(
+      `SELECT dow, is_closed, open_time, close_time, max_per_half_hour, updated_at
+       FROM opening_hours
+       ORDER BY dow`
+    );
+    res.json({ opening_hours: rows });
+  } catch (err) {
+    console.error('Erro ao listar opening_hours:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar horários de funcionamento.' });
+  }
+});
+
+// Atualização em lote (envia 7 linhas)
+app.put('/api/opening-hours', async (req, res) => {
+  try {
+    const items = Array.isArray(req.body.opening_hours) ? req.body.opening_hours : [];
+    if (!items.length) return res.status(400).json({ error: 'Envie opening_hours como array.' });
+
+    // validação leve
+    const byDow = new Map();
+    for (const it of items) {
+      const dow = Number(it.dow);
+      if (![0,1,2,3,4,5,6].includes(dow)) continue;
+
+      const is_closed = !!it.is_closed;
+      let open_time = it.open_time != null ? String(it.open_time).trim() : null;
+      let close_time = it.close_time != null ? String(it.close_time).trim() : null;
+      let max_per_half_hour = it.max_per_half_hour != null ? Number(it.max_per_half_hour) : 1;
+
+      if (!Number.isFinite(max_per_half_hour) || max_per_half_hour < 0) max_per_half_hour = 0;
+
+      if (is_closed) {
+        open_time = null;
+        close_time = null;
+        if (max_per_half_hour !== 0) max_per_half_hour = 0;
+      } else {
+        // formato HH:MM básico
+        const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
+        if (!hhmm.test(open_time || '')) open_time = '07:30';
+        if (!hhmm.test(close_time || '')) close_time = '17:30';
+        if (max_per_half_hour === 0) max_per_half_hour = 1;
+      }
+
+      byDow.set(dow, { dow, is_closed, open_time, close_time, max_per_half_hour });
+    }
+
+    // garante todos os dias (se vier incompleto, mantém os atuais)
+    const existing = await db.all(`SELECT dow, is_closed, open_time, close_time, max_per_half_hour FROM opening_hours;`);
+    const existingMap = new Map(existing.map(r => [Number(r.dow), r]));
+
+    const finalRows = [];
+    for (const dow of [0,1,2,3,4,5,6]) {
+      const v = byDow.get(dow) || existingMap.get(dow) || { dow, is_closed: true, open_time: null, close_time: null, max_per_half_hour: 0 };
+      finalRows.push(v);
+    }
+
+    for (const r of finalRows) {
+      await db.query(
+        `INSERT INTO opening_hours (dow, is_closed, open_time, close_time, max_per_half_hour, updated_at)
+         VALUES ($1,$2,$3,$4,$5,NOW())
+         ON CONFLICT (dow)
+         DO UPDATE SET
+           is_closed = EXCLUDED.is_closed,
+           open_time = EXCLUDED.open_time,
+           close_time = EXCLUDED.close_time,
+           max_per_half_hour = EXCLUDED.max_per_half_hour,
+           updated_at = NOW();`,
+        [r.dow, r.is_closed, r.open_time, r.close_time, r.max_per_half_hour]
+      );
+    }
+
+    const rows = await db.all(
+      `SELECT dow, is_closed, open_time, close_time, max_per_half_hour, updated_at
+       FROM opening_hours
+       ORDER BY dow`
+    );
+    res.json({ opening_hours: rows });
+  } catch (err) {
+    console.error('Erro ao atualizar opening_hours:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar horários de funcionamento.' });
+  }
+});
+
 /* =========================
    START
 ========================= */

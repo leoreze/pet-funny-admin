@@ -255,6 +255,51 @@ async function initDb() {
   } else {
     console.log('✔ breeds table ready (seed skipped)');
   }
+
+
+  /* =========================
+     OPENING HOURS (horário de funcionamento)
+     - dow: 0=Dom ... 6=Sáb
+     - is_closed: dia fechado
+     - open_time / close_time: HH:MM
+     - max_per_half_hour: capacidade por slot de 30min
+  ========================= */
+  await query(`
+    CREATE TABLE IF NOT EXISTS opening_hours (
+      dow INTEGER PRIMARY KEY,
+      is_closed BOOLEAN NOT NULL DEFAULT FALSE,
+      open_time TEXT,
+      close_time TEXT,
+      max_per_half_hour INTEGER NOT NULL DEFAULT 1,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  // seed padrão se vazio
+  const ohCount = await get(`SELECT COUNT(*)::int AS n FROM opening_hours;`);
+  if ((ohCount?.n || 0) === 0) {
+    const seed = [
+      { dow: 1, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 }, // Seg
+      { dow: 2, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 }, // Ter
+      { dow: 3, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 }, // Qua
+      { dow: 4, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 }, // Qui
+      { dow: 5, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 }, // Sex
+      { dow: 6, is_closed: false, open_time: '07:30', close_time: '13:00', max_per_half_hour: 1 }, // Sáb
+      { dow: 0, is_closed: true,  open_time: null,   close_time: null,   max_per_half_hour: 0 }, // Dom fechado
+    ];
+
+    for (const r of seed) {
+      await query(
+        `INSERT INTO opening_hours (dow, is_closed, open_time, close_time, max_per_half_hour)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (dow) DO NOTHING;`,
+        [r.dow, r.is_closed, r.open_time, r.close_time, r.max_per_half_hour]
+      );
+    }
+    console.log('✔ opening_hours seeded');
+  } else {
+    console.log('✔ opening_hours table ready (seed skipped)');
+  }
 }
 
 module.exports = {
