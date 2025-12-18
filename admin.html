@@ -1297,6 +1297,114 @@
     return { start, end };
   }
 
+  
+  /* ===== Validação de Data/Horário (mesmas regras do index.html) ===== */
+  const todayISO = new Date().toISOString().split('T')[0];
+
+  function validarDiaHora(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+
+    const date = new Date(dateStr + 'T' + timeStr + ':00');
+    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
+
+    const diaSemana = date.getDay();
+    const parts = String(timeStr).split(':');
+    const hh = parseInt(parts[0], 10);
+    const mm = parseInt(parts[1] || '0', 10);
+
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
+
+    // Admin também deve seguir a regra do cliente: somente 00 ou 30
+    if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
+
+    const minutos = hh * 60 + mm;
+    const inicio = 7 * 60 + 30;
+
+    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+    if (diaSemana >= 1 && diaSemana <= 5) {
+      const fim = 17 * 60 + 30;
+      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+    }
+    if (diaSemana === 6) {
+      const fim = 13 * 60;
+      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+    }
+
+    // Não permite agendar no passado (comparando data/hora local)
+    const now = new Date();
+    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+
+    return null;
+  }
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function buildRangeForDate(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return null;
+    const day = d.getDay();
+    if (day === 0) return { closed: true };
+    const startMin = 7 * 60 + 30;
+    const endMin = (day === 6) ? (13 * 60) : (17 * 60 + 30);
+    return { closed: false, startMin, endMin };
+  }
+
+  function normalizeHHMM(t) {
+    const s = String(t || '').trim();
+    const m = s.match(/^(\d{1,2}):(\d{1,2})/);
+    if (!m) return null;
+    const hh = pad2(parseInt(m[1], 10));
+    const mm = pad2(parseInt(m[2], 10));
+    return `${hh}:${mm}`;
+  }
+
+  function isActiveBookingStatus(status) {
+    const s = normStr(status);
+    // status "cancelado" não ocupa slot
+    return s !== 'cancelado';
+  }
+
+  async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
+    const data = await apiGet('/api/bookings', { date: dateStr });
+    const list = data.bookings || [];
+    const set = new Set();
+
+    list.forEach(b => {
+      if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
+      if (!isActiveBookingStatus(b.status)) return;
+      const t = normalizeHHMM(b.time);
+      if (t) set.add(t);
+    });
+
+    return set;
+  }
+
+  function minutesToHHMM(totalMin) {
+    const hh = Math.floor(totalMin / 60);
+    const mm = totalMin % 60;
+    return `${pad2(hh)}:${pad2(mm)}`;
+  }
+
+  function clampToRange(timeStr, range) {
+    const t = normalizeHHMM(timeStr);
+    if (!t || !range || range.closed) return null;
+    const [hh, mm] = t.split(':').map(n => parseInt(n, 10));
+    let total = hh * 60 + mm;
+
+    // arredonda para o slot mais próximo (00/30)
+    total = Math.round(total / 30) * 30;
+
+    if (total < range.startMin) total = range.startMin;
+    if (total > range.endMin) total = range.endMin;
+
+    // garante que não sai do padrão 00/30 depois do clamp
+    total = Math.round(total / 30) * 30;
+
+    return minutesToHHMM(total);
+  }
+
+
   function classStatus(status) {
     const s = normStr(status);
     if (s === 'agendado') return 'status-agendado';
@@ -1462,6 +1570,28 @@
   const formService = document.getElementById('formService');
   const formDate = document.getElementById('formDate');
   const formTime = document.getElementById('formTime');
+
+  // Regras padrão (mesmas do cliente)
+  if (formDate) formDate.min = todayISO;
+  if (formTime) formTime.step = 1800; // 30 minutos
+
+
+  // Revalida e aplica limites quando a data/horário mudam
+  if (formDate) {
+    formDate.addEventListener('change', async () => {
+      const excludeId = bookingId && bookingId.value ? Number(bookingId.value) : null;
+      await refreshBookingDateTimeState(excludeId);
+    });
+  }
+
+  if (formTime) {
+    // arredonda para 00/30 e aplica faixa do dia
+    formTime.addEventListener('blur', () => {
+      const range = buildRangeForDate(formDate ? formDate.value : '');
+      const clamped = clampToRange(formTime.value, range);
+      if (clamped) formTime.value = clamped;
+    });
+  }
   const formStatus = document.getElementById('formStatus');
   const formNotes = document.getElementById('formNotes');
   const formError = document.getElementById('formError');
@@ -1509,6 +1639,49 @@
     formNome.disabled = isEdit;
     formPetSelect.disabled = false;
     formPrize.disabled = false;
+  }
+
+  /* ===== Estado de disponibilidade (Admin) ===== */
+  let occupiedTimesSet = new Set();
+
+  async function refreshBookingDateTimeState(excludeBookingId) {
+    if (!formDate || !formTime) return;
+
+    const dateStr = formDate.value;
+    if (!dateStr) return;
+
+    const range = buildRangeForDate(dateStr);
+    if (!range || range.closed) {
+      formTime.disabled = true;
+      formTime.value = '';
+      occupiedTimesSet = new Set();
+      return;
+    }
+
+    formTime.disabled = false;
+    formTime.step = 1800; // 30 min
+
+    formTime.min = minutesToHHMM(range.startMin);
+    formTime.max = minutesToHHMM(range.endMin);
+
+    // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
+    try {
+      occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+    } catch (e) {
+      console.warn('Falha ao carregar horários ocupados:', e);
+      occupiedTimesSet = new Set();
+    }
+
+    // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
+    if (formTime.value) {
+      const clamped = clampToRange(formTime.value, range);
+      if (clamped) formTime.value = clamped;
+    }
+  }
+
+  function isTimeOccupied(timeStr) {
+    const t = normalizeHHMM(timeStr);
+    return !!t && occupiedTimesSet.has(t);
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
@@ -1644,7 +1817,10 @@
       const txt = booking.service || booking.service_title || '';
       const match = servicesCache.find(s => normStr(s.title) === normStr(txt));
       formService.value = match ? String(match.id) : '';
-    }
+      
+    // Atualiza limites e disponibilidade para a data (exclui o próprio agendamento)
+    refreshBookingDateTimeState(booking.id);
+  }
 
     formDate.value = booking.date || '';
     formTime.value = booking.time || '';
@@ -1673,6 +1849,7 @@
     }
 
     mostrarFormAgenda();
+    refreshBookingDateTimeState(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -2399,6 +2576,23 @@
 
     const date = formDate.value;
     const time = formTime.value;
+
+    // Validação de data/horário (mesmas regras do cliente)
+    const dtMsg = validarDiaHora(date, time);
+    if (dtMsg) {
+      formError.textContent = dtMsg;
+      formError.style.display = 'block';
+      return;
+    }
+
+    // Carrega horários ocupados do dia e bloqueia conflito
+    await refreshBookingDateTimeState(id);
+    if (isTimeOccupied(time)) {
+      formError.textContent = 'Horário indisponível para esta data. Selecione outro horário.';
+      formError.style.display = 'block';
+      return;
+    }
+
     const status = formStatus.value;
     const notes = formNotes.value.trim();
 
@@ -2571,6 +2765,7 @@
     formPetSelect.disabled = true;
     formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
     mostrarFormAgenda();
+    refreshBookingDateTimeState(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
