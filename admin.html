@@ -515,289 +515,124 @@
     }
     .footer-info strong { font-size: 13px; color: #263238; }
     .footer-bottom { font-size: 11px; color: #78909c; text-align: center; margin-top: 4px; }
+  
+    /* ===== MENU (hambúrguer) ===== */
+    .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .menu-toggle {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 10px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: #eaf6ff;
+      cursor: pointer;
+      user-select: none;
+    }
+    .menu-toggle:hover { background: rgba(255,255,255,0.10); }
+    .menu-icon { font-size: 18px; line-height: 1; }
+    .menu-label { font-weight: 800; letter-spacing: 0.2px; }
+    .logo-block { min-width: 0; }
+    .logo-sub { text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* Inputs datetime no mesmo padrão visual */
-  .dt-input {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,.12);
-    background: rgba(0,0,0,.20);
-    color: inherit;
-    outline: none;
-  }
-  .dt-input:focus {
-    border-color: rgba(255,255,255,.25);
-  }
+    .tabs { display: none; } /* mantém para JS, mas a navegação é pelo menu */
 
-  /* =========================
-   MENU HAMBURGUER + SIDEBAR
-========================= */
+    .menu-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.48);
+      z-index: 999;
+    }
+    .side-menu {
+      position: fixed; top: 0; left: 0; height: 100vh; width: 290px;
+      background: #0c1b22;
+      border-right: 1px solid rgba(255,255,255,0.10);
+      padding: 14px;
+      z-index: 1000;
+      transform: translateX(-110%);
+      transition: transform 160ms ease;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .side-menu.open { transform: translateX(0); }
+    .side-menu-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 8px; margin-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .side-menu-title { font-weight: 900; color: #eaf6ff; }
+    .side-menu-close {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: #eaf6ff;
+      border-radius: 10px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .side-menu-item {
+      width: 100%;
+      text-align: left;
+      padding: 10px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      color: #eaf6ff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .side-menu-item:hover { background: rgba(255,255,255,0.08); }
+    .side-menu-item.active { background: rgba(1,173,183,0.18); border-color: rgba(1,173,183,0.45); }
 
-.hamburger{
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  border: 1px solid #d0dde0;
-  background: #f3f7f8;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
-  margin-right: 10px;
-}
-.hamburger:hover{
-  border-color: rgba(1, 173, 183, 0.6);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
-  transform: translateY(-1px);
-}
-.hamburger-lines{
-  width: 18px;
-  height: 12px;
-  position: relative;
-  display: block;
-}
-.hamburger-lines::before,
-.hamburger-lines::after,
-.hamburger-lines{
-  background: transparent;
-}
-.hamburger-lines::before,
-.hamburger-lines::after{
-  content: "";
-  position: absolute;
-  left: 0;
-  width: 18px;
-  height: 2px;
-  background: #37474f;
-  border-radius: 99px;
-}
-.hamburger-lines::before{ top: 1px; }
-.hamburger-lines::after{ bottom: 1px; }
-.hamburger-lines{
-  border-top: 2px solid #37474f;
-  border-bottom: 2px solid transparent;
-  height: 2px;
-}
+    /* ===== AGENDA: ordenação ===== */
+    #agendaListWrapper thead th.sortable { cursor: pointer; user-select: none; }
+    #agendaListWrapper thead th.sortable::after {
+      content: " ⇅";
+      opacity: 0.55;
+      font-weight: 700;
+    }
+    #agendaListWrapper thead th.sortable.sort-asc::after { content: " ↑"; opacity: 0.9; }
+    #agendaListWrapper thead th.sortable.sort-desc::after { content: " ↓"; opacity: 0.9; }
 
-/* Backdrop por cima do conteúdo */
-.sidebar-backdrop{
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  z-index: 9998;
-}
+    /* ===== AGENDA: menu de ações (⋯) ===== */
+    .kebab { position: relative; display: inline-flex; }
+    .kebab-btn {
+      width: 38px; height: 30px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: #eaf6ff;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+    }
+    .kebab-btn:hover { background: rgba(255,255,255,0.10); }
+    .kebab-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      min-width: 160px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: #0b161c;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+      padding: 6px;
+      display: none;
+      z-index: 20;
+    }
+    .kebab-menu.open { display: block; }
+    .kebab-menu button {
+      width: 100%;
+      text-align: left;
+      padding: 10px 10px;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      color: #eaf6ff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .kebab-menu button:hover { background: rgba(255,255,255,0.08); }
+    .kebab-menu .danger { color: #ff9d9d; }
 
-/* Sidebar overlay */
-.sidebar{
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  width: 320px;
-  max-width: 86vw;
-  background: #ffffff;
-  border-right: 1px solid #dde5e8;
-  box-shadow: 18px 0 40px rgba(0,0,0,0.18);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  transform: translateX(-105%);
-  transition: transform 0.18s ease;
-}
-
-.sidebar.open{
-  transform: translateX(0);
-}
-
-.sidebar-header{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 14px 10px;
-  border-bottom: 1px solid #dde5e8;
-}
-
-.sidebar-title{
-  font-weight: 800;
-  color: #263238;
-  letter-spacing: -0.02em;
-}
-
-.sidebar-close{
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  border: 1px solid #d0dde0;
-  background: #f3f7f8;
-  cursor: pointer;
-}
-
-.sidebar-links{
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow: auto;
-}
-
-/* Reaproveita .tab-btn, mas em formato vertical */
-.sidebar .tab-btn{
-  width: 100%;
-  justify-content: flex-start;
-  border-radius: 14px;
-  padding: 12px 12px;
-}
-
-/* Oculta o layout antigo de abas (se ainda existir em algum lugar) */
-.tabs{ display: none !important; }
-
-/* utilitário */
-.hidden{ display: none !important; }
-
-
-/* =========================
-   HEADER ADMIN – MENU
-========================= */
-
-.header-admin{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.header-left{
-  display: flex;
-  align-items: center;
-  gap: 10px; /* espaçamento pequeno e elegante */
-}
-
-/* Botão Menu */
-.menu-trigger{
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(1,173,183,.45);
-  background: linear-gradient(
-    135deg,
-    rgba(1,173,183,.15),
-    rgba(1,173,183,.05)
-  );
-  color: #014c52;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all .15s ease;
-}
-
-.menu-trigger:hover{
-  background: linear-gradient(
-    135deg,
-    rgba(1,173,183,.25),
-    rgba(1,173,183,.10)
-  );
-  box-shadow: 0 6px 18px rgba(0,0,0,.12);
-  transform: translateY(-1px);
-}
-
-/* Ícone chamativo */
-.menu-icon{
-  font-size: 20px;
-  line-height: 1;
-  color: #01adb7;
-}
-
-/* Texto MENU */
-.menu-text{
-  font-size: 14px;
-  letter-spacing: .03em;
-  text-transform: uppercase;
-}
-
-/* Logo-sub inline */
-.logo-inline{
-  font-size: 13px;
-  opacity: .75;
-  white-space: nowrap;
-}
-
-/* Lado direito */
-.header-right{
-  display: flex;
-  align-items: center;
-}
-
-/* Mobile */
-@media (max-width: 720px){
-  .logo-inline{
-    display: none;
-  }
-}
-
-/* ===== Agendamentos (Lista): Sort + Kebab menu ===== */
-.sortable-th {
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-.sort-ind {
-  margin-left: 6px;
-  font-size: 11px;
-  opacity: .65;
-}
-
-.kebab-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.kebab-btn {
-  width: 34px;
-  height: 30px;
-  border-radius: 10px;
-  border: 1px solid rgba(0,0,0,.15);
-  background: #fff;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.kebab-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 150px;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,.12);
-  border-radius: 12px;
-  box-shadow: 0 10px 26px rgba(0,0,0,.14);
-  z-index: 999;
-  padding: 6px;
-}
-
-.kebab-item {
-  width: 100%;
-  text-align: left;
-  padding: 9px 10px;
-  border: none;
-  background: transparent;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.kebab-item:hover {
-  background: rgba(0,0,0,.06);
-}
-
+    /* ===== Ajuste select horário ===== */
+    #formTime:disabled { opacity: 0.65; cursor: not-allowed; }
 
   </style>
 </head>
@@ -840,61 +675,51 @@
 
 <div id="adminApp">
   <div class="container">
-<div class="header header-admin">
-  <!-- Menu + texto + logo-sub (lado esquerdo) -->
-  <div class="header-left">
-    <button
-      id="btnMenu"
-      class="menu-trigger"
-      type="button"
-      aria-label="Abrir menu"
-      aria-expanded="false"
-    >
-      <span class="menu-icon" aria-hidden="true">☰</span>
-      <span class="menu-text">Menu</span>
-    </button>
+    <div class="header">
+      <div class="header-left">
+        <button id="btnMenu" class="menu-toggle" type="button" aria-label="Abrir menu" aria-expanded="false">
+          <span class="menu-icon" aria-hidden="true">☰</span>
+          <span class="menu-label">Menu</span>
+        </button>
 
-    <div class="logo-sub logo-inline">
-      Área Administrativa – Pet Funny
+        <div class="logo-block">
+          <div class="logo-sub">Área Administrativa - Pet Funny</div>
+        </div>
+      </div>
+
+      <div class="filters">
+        <button class="btn btn-danger btn-small" id="btnLogout" type="button">Sair</button>
+      </div>
     </div>
-  </div>
 
-  <!-- Ações (lado direito) -->
-  <div class="filters header-right">
-    <button class="btn btn-danger btn-small" id="btnLogout" type="button">
-      Sair
-    </button>
-  </div>
-</div>
+    <!-- MENU LATERAL (substitui as abas) -->
+    <div id="menuOverlay" class="menu-overlay hidden" aria-hidden="true"></div>
+    <aside id="sideMenu" class="side-menu hidden" aria-label="Menu principal">
+      <div class="side-menu-header">
+        <div class="side-menu-title">Pet Funny</div>
+        <button id="btnMenuClose" class="side-menu-close" type="button" aria-label="Fechar menu">✕</button>
+      </div>
+      <button class="side-menu-item active" data-tab="tab-agenda" type="button">📅 Agendamentos</button>
+      <button class="side-menu-item" data-tab="tab-clientes" type="button">👤 Clientes &amp; Pets</button>
+      <button class="side-menu-item" data-tab="tab-servicos" type="button">🧼 Serviços</button>
+      <button class="side-menu-item" data-tab="tab-racas" type="button">🐶 Raças de Cães</button>
+      <button class="side-menu-item" data-tab="tab-horarios" type="button">⏱️ Horário de Funcionamento</button>
+      <button class="side-menu-item" data-tab="tab-dashboard" type="button">📊 Dashboard</button>
+    </aside>
 
-
-
-<!-- MENU LATERAL (HAMBURGUER) -->
-<div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
-
-<nav id="sidebar" class="sidebar hidden" aria-label="Menu do painel">
-  <div class="sidebar-header">
-    <div class="sidebar-title">Menu</div>
-    <button id="btnMenuClose" class="sidebar-close" type="button" aria-label="Fechar menu">✕</button>
-  </div>
-
-  <div class="sidebar-links">
-    <!-- Reaproveita os MESMOS botões/tab-btn e data-tab -->
-    <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agendamentos</button>
-    <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
-    <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
-    <button class="tab-btn" data-tab="tab-racas" type="button"><span>🐶</span> Raças de Cães</button>
-    <button class="tab-btn" data-tab="tab-mimos" type="button"><span>🎁</span> Mimos</button>
-    <button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
-    <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
-  </div>
-</nav>
-
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agenda &amp; Mimos</button>
+      <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
+      <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
+      <button class="tab-btn" data-tab="tab-racas" type="button"><span>🐶</span> Raças de Cães</button>
+      <button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
+      <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
+    </div>
 
     <!-- TAB: AGENDA -->
     <section id="tab-agenda" class="tab-view active">
       <div class="section-title-row">
-         <div class="section-title">Agendamentos</div>
+         <div class="section-title">Agendamentos & Mimos</div>
 
            <div class="agenda-actions-right">
           <!-- NOVO: Toggle Lista/Cards -->
@@ -979,10 +804,9 @@
           </div>
           <div class="form-group">
             <label for="formTime">Horário</label>
-            <select id="formTime" required>
-  <option value="">Selecione um horário</option>
-</select>
-
+            <select id="formTime" disabled>
+              <option value="">Selecione um horário</option>
+            </select>
           </div>
         </div>
 
@@ -1027,16 +851,16 @@
         <table>
           <thead>
           <tr>
-            <th>Data</th>
-            <th>Hora</th>
-            <th>Tutor(a)</th>
-            <th>Pet</th>
-            <th>Telefone</th>
-            <th>Serviço</th>
-            <th>Mimo</th>
-            <th>Status</th>
-            <th>Última notificação</th>
-            <th>Obs.</th>
+            <th class="sortable" data-sort-key="date" title="Ordenar">Data</th>
+            <th class="sortable" data-sort-key="time" title="Ordenar">Hora</th>
+            <th class="sortable" data-sort-key="customer_name" title="Ordenar">Tutor(a)</th>
+            <th class="sortable" data-sort-key="pet_name" title="Ordenar">Pet</th>
+            <th class="sortable" data-sort-key="phone" title="Ordenar">Telefone</th>
+            <th class="sortable" data-sort-key="service_label" title="Ordenar">Serviço</th>
+            <th class="sortable" data-sort-key="prize" title="Ordenar">Mimo</th>
+            <th class="sortable" data-sort-key="status" title="Ordenar">Status</th>
+            <th class="sortable" data-sort-key="last_notification_at" title="Ordenar">Última notificação</th>
+            <th class="sortable" data-sort-key="notes" title="Ordenar">Obs.</th>
             <th>Ações</th>
           </tr>
           </thead>
@@ -1272,107 +1096,6 @@
       </div>
     </section>
 
-<!-- TAB: MIMOS -->
-<section id="tab-mimos" class="tab-view">
-  <div class="section-title-row">
-    <div class="section-title">Mimos</div>
-
-    <div class="section-actions" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <div style="display:flex; gap:8px; align-items:center;">
-        <input id="mimosSearch" type="text" placeholder="Buscar mimos..." class="input" style="min-width:260px;" />
-      </div>
-
-      <button class="btn" id="btnNovoMimo" type="button">Novo Mimo</button>
-      <button class="btn btn-secondary btn-small" id="btnMimosReload" type="button">Recarregar</button>
-    </div>
-  </div>
-
-  <div class="card">
-
-    <!-- Form colapsável (fechado por padrão) -->
-    <div id="mimoFormWrap" class="card" style="margin:0 0 16px 0; display:none;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <h3 style="margin:0;">Cadastrar / Editar Mimo</h3>
-        <button class="btn btn-secondary btn-small" id="btnFecharMimoForm" type="button">Fechar</button>
-      </div>
-
-      <div class="grid-2" style="margin-top:12px;">
-        <div>
-          <div class="form-row">
-            <label for="mimoTitle">Título</label>
-            <input id="mimoTitle" type="text" placeholder="Ex.: 🎁 Banho Grátis" maxlength="80" />
-          </div>
-
-          <div class="form-row">
-            <label for="mimoDesc">Descrição (com emojis)</label>
-            <textarea id="mimoDesc" rows="3" placeholder="Ex.: 🎉 Você ganhou 1 banho grátis!"></textarea>
-
-            <div id="emojiPanel" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; user-select:none;"></div>
-            <small style="opacity:.75">Dica rápida: no Windows, use <b>Win + .</b> para abrir o seletor de emojis.</small>
-          </div>
-        </div>
-
-        <div>
-          <div class="grid-2">
-            <div class="form-row">
-              <label for="mimoValue">Valor (R$)</label>
-              <input id="mimoValue" type="text" inputmode="numeric" placeholder="0,00" />
-            </div>
-
-            <div class="form-row" style="display:flex; align-items:flex-end;">
-              <label style="display:flex; gap:8px; align-items:center; margin:0;">
-                <input id="mimoActive" type="checkbox" checked />
-                Ativo
-              </label>
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div class="form-row">
-              <label for="mimoStart">Início</label>
-              <input id="mimoStart" type="datetime-local" class="dt-input" />
-            </div>
-
-            <div class="form-row">
-              <label for="mimoEnd">Término</label>
-              <input id="mimoEnd" type="datetime-local" class="dt-input" />
-            </div>
-          </div>
-
-          <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
-            <button class="btn" id="btnMimoSave" type="button">Salvar</button>
-            <button class="btn btn-secondary" id="btnMimoClear" type="button">Limpar</button>
-            <div id="mimoMsg" style="margin-left:auto; opacity:.85;"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Lista -->
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin:18px 0 14px 0;">
-      <h3 style="margin:0;">Lista de Mimos</h3>
-    </div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Título</th>
-            <th>Valor</th>
-            <th>Período</th>
-            <th>Ativo</th>
-            <th style="width:160px;">Ações</th>
-          </tr>
-        </thead>
-        <tbody id="tbodyMimos"></tbody>
-      </table>
-      <div id="mimosEmpty" class="empty" style="display:none;">Nenhum mimo cadastrado.</div>
-    </div>
-
-  </div>
-</section>
-
-
 
     <!-- TAB: HORÁRIO DE FUNCIONAMENTO -->
     <section id="tab-horarios" class="tab-view">
@@ -1536,390 +1259,6 @@
       .trim();
   }
 
-  /* =========================================================
-   MIMOS (Admin) - CRUD + Emojis + Valor (cents) + Período
-   Requisitos:
-   - HTML ids: tab-mimos, tbodyMimos, mimosEmpty,
-              mimoTitle, mimoDesc, emojiPanel,
-              mimoValue, mimoStart, mimoEnd, mimoActive,
-              btnMimoSave, btnMimoClear, btnMimosReload, mimoMsg
-   - API no server:
-     GET    /api/mimos
-     POST   /api/mimos
-     PUT    /api/mimos/:id
-     DELETE /api/mimos/:id
-   - Opcional: select existente #formPrize (para roleta/prêmio no agendamento)
-========================================================= */
-(function () {
-  'use strict';
-
-  const $ = (id) => document.getElementById(id);
-  const elTab = $('tab-mimos');
-  if (!elTab) return;
-
-  const els = {
-    title: $('mimoTitle'),
-    desc: $('mimoDesc'),
-    emojiPanel: $('emojiPanel'),
-    value: $('mimoValue'),
-    start: $('mimoStart'),
-    end: $('mimoEnd'),
-    active: $('mimoActive'),
-    save: $('btnMimoSave'),
-    clear: $('btnMimoClear'),
-    reload: $('btnMimosReload'),
-    msg: $('mimoMsg'),
-    tbody: $('tbodyMimos'),
-    empty: $('mimosEmpty'),
-    prizeSelect: document.getElementById('formPrize') || null,
-
-    // novos do layout
-    search: $('mimosSearch'),
-    btnNovo: $('btnNovoMimo'),
-    formWrap: $('mimoFormWrap'),
-    btnCloseForm: $('btnFecharMimoForm'),
-  };
-
-  let currentEditId = null;
-  let cacheMimos = [];
-
-  function setMsg(text, isError) {
-    if (!els.msg) return;
-    els.msg.textContent = text || '';
-    els.msg.style.color = isError ? '#c0392b' : '';
-  }
-
-  function pad2(n) { return String(n).padStart(2, '0'); }
-
-  function toDatetimeLocalValue(isoOrTs) {
-    if (!isoOrTs) return '';
-    const d = new Date(isoOrTs);
-    if (isNaN(d.getTime())) return '';
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  }
-
-  function fromDatetimeLocalValue(v) {
-    if (!v) return null;
-    const d = new Date(v);
-    if (isNaN(d.getTime())) return null;
-    return d.toISOString();
-  }
-
-  function parseBRLToCents(input) {
-    if (input == null) return 0;
-    const s = String(input).replace(/[^\d,.-]/g, '').trim();
-    if (!s) return 0;
-    const normalized = s.replace(/\./g, '').replace(',', '.');
-    const n = Number(normalized);
-    if (!Number.isFinite(n)) return 0;
-    return Math.max(0, Math.round(n * 100));
-  }
-
-  function formatCentsToBRL(cents) {
-    const v = Number(cents || 0) / 100;
-    return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  function moneyMaskAttach(inputEl) {
-    if (!inputEl) return;
-    inputEl.addEventListener('blur', () => {
-      const cents = parseBRLToCents(inputEl.value);
-      inputEl.value = formatCentsToBRL(cents);
-    });
-  }
-
-  const EMOJI_LIST = [
-    '🎁','🎉','✨','⭐','💎','🏆','🥇','🎯','🔥','✅','🧡','💛','💚','💙','💜',
-    '🐶','🐾','🛁','✂️','🧴','🧼','🫧','🦴','🍖','💸','🎟️','📣','📅','🔔','🎡','🎲'
-  ];
-
-  function insertAtCursor(textarea, text) {
-    if (!textarea) return;
-    const start = textarea.selectionStart ?? textarea.value.length;
-    const end = textarea.selectionEnd ?? textarea.value.length;
-    const before = textarea.value.slice(0, start);
-    const after = textarea.value.slice(end);
-    textarea.value = before + text + after;
-    const newPos = start + text.length;
-    textarea.selectionStart = textarea.selectionEnd = newPos;
-  }
-
-  function buildEmojiPanel() {
-    if (!els.emojiPanel || !els.desc) return;
-    els.emojiPanel.innerHTML = '';
-    EMOJI_LIST.forEach((e) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = e;
-      b.className = 'btn btn-small';
-      b.style.padding = '6px 8px';
-      b.style.lineHeight = '1';
-      b.addEventListener('click', () => {
-        insertAtCursor(els.desc, e);
-        els.desc.focus();
-      });
-      els.emojiPanel.appendChild(b);
-    });
-  }
-
-  function openForm() {
-    if (els.formWrap) els.formWrap.style.display = '';
-  }
-  function closeForm() {
-    if (els.formWrap) els.formWrap.style.display = 'none';
-  }
-
-  function clearForm() {
-    currentEditId = null;
-    if (els.title) els.title.value = '';
-    if (els.desc) els.desc.value = '';
-    if (els.value) els.value.value = formatCentsToBRL(0);
-    if (els.start) els.start.value = '';
-    if (els.end) els.end.value = '';
-    if (els.active) els.active.checked = true;
-    setMsg('', false);
-  }
-
-  /* ---------- API ---------- */
-  async function apiGetMimos() {
-    const r = await fetch('/api/mimos', { method: 'GET' });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || 'Erro ao buscar mimos.');
-    return data.mimos || [];
-  }
-
-  async function apiCreateMimo(payload) {
-    const r = await fetch('/api/mimos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || 'Erro ao criar mimo.');
-    return data.mimo;
-  }
-
-  async function apiUpdateMimo(id, payload) {
-    const r = await fetch(`/api/mimos/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || 'Erro ao atualizar mimo.');
-    return data.mimo;
-  }
-
-  async function apiDeleteMimo(id) {
-    const r = await fetch(`/api/mimos/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || 'Erro ao excluir mimo.');
-    return true;
-  }
-
-  /* ---------- Render ---------- */
-  function syncPrizeSelect(mimos) {
-    if (!els.prizeSelect) return;
-
-    const now = new Date();
-    const isInPeriod = (m) => {
-      if (!m.is_active) return false;
-      const s = m.starts_at ? new Date(m.starts_at) : null;
-      const e = m.ends_at ? new Date(m.ends_at) : null;
-      if (s && !isNaN(s.getTime()) && now < s) return false;
-      if (e && !isNaN(e.getTime()) && now > e) return false;
-      return true;
-    };
-
-    const active = (mimos || []).filter(isInPeriod);
-    const current = els.prizeSelect.value;
-
-    els.prizeSelect.innerHTML = '';
-    const opt0 = document.createElement('option');
-    opt0.value = '';
-    opt0.textContent = '— Sem mimo —';
-    els.prizeSelect.appendChild(opt0);
-
-    active.forEach((m) => {
-      const opt = document.createElement('option');
-      opt.value = m.title; // compat: booking.prize é texto
-      opt.textContent = `${m.title} (R$ ${formatCentsToBRL(m.value_cents)})`;
-      opt.setAttribute('data-mimo-id', String(m.id));
-      els.prizeSelect.appendChild(opt);
-    });
-
-    if (current) els.prizeSelect.value = current;
-  }
-
-  function renderMimosTable(mimos) {
-    if (!els.tbody) return;
-    els.tbody.innerHTML = '';
-
-    const q = (els.search?.value || '').trim().toLowerCase();
-    const filtered = !q ? (mimos || []) : (mimos || []).filter(m =>
-      String(m.title || '').toLowerCase().includes(q) ||
-      String(m.description || '').toLowerCase().includes(q)
-    );
-
-    if (!filtered || filtered.length === 0) {
-      if (els.empty) els.empty.style.display = '';
-      return;
-    }
-    if (els.empty) els.empty.style.display = 'none';
-
-    const fmt = (d) => {
-      if (!d || isNaN(d.getTime())) return '—';
-      return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    };
-
-    filtered.forEach((m) => {
-      const tr = document.createElement('tr');
-
-      const tdTitle = document.createElement('td');
-      tdTitle.textContent = m.title || '';
-      tr.appendChild(tdTitle);
-
-      const tdValue = document.createElement('td');
-      tdValue.textContent = `R$ ${formatCentsToBRL(m.value_cents)}`;
-      tr.appendChild(tdValue);
-
-      const tdPeriod = document.createElement('td');
-      const s = m.starts_at ? new Date(m.starts_at) : null;
-      const e = m.ends_at ? new Date(m.ends_at) : null;
-      tdPeriod.textContent = `${fmt(s)} → ${fmt(e)}`;
-      tr.appendChild(tdPeriod);
-
-      const tdActive = document.createElement('td');
-      tdActive.textContent = m.is_active ? 'Sim' : 'Não';
-      tr.appendChild(tdActive);
-
-      const tdActions = document.createElement('td');
-      tdActions.style.whiteSpace = 'nowrap';
-
-      const btnEdit = document.createElement('button');
-      btnEdit.type = 'button';
-      btnEdit.className = 'btn btn-small';
-      btnEdit.textContent = 'Editar';
-      btnEdit.addEventListener('click', () => {
-        currentEditId = m.id;
-        if (els.title) els.title.value = m.title || '';
-        if (els.desc) els.desc.value = m.description || '';
-        if (els.value) els.value.value = formatCentsToBRL(m.value_cents);
-        if (els.start) els.start.value = toDatetimeLocalValue(m.starts_at);
-        if (els.end) els.end.value = toDatetimeLocalValue(m.ends_at);
-        if (els.active) els.active.checked = !!m.is_active;
-        setMsg(`Editando ID ${m.id}`, false);
-        openForm();
-      });
-
-      const btnDel = document.createElement('button');
-      btnDel.type = 'button';
-      btnDel.className = 'btn btn-small btn-danger';
-      btnDel.textContent = 'Excluir';
-      btnDel.style.marginLeft = '6px';
-      btnDel.addEventListener('click', async () => {
-        const ok = confirm(`Excluir o mimo "${m.title}"?`);
-        if (!ok) return;
-        try {
-          setMsg('Excluindo...', false);
-          await apiDeleteMimo(m.id);
-          await reloadMimos();
-          setMsg('Mimo excluído.', false);
-        } catch (err) {
-          setMsg(err.message || 'Erro ao excluir.', true);
-        }
-      });
-
-      tdActions.appendChild(btnEdit);
-      tdActions.appendChild(btnDel);
-      tr.appendChild(tdActions);
-
-      els.tbody.appendChild(tr);
-    });
-  }
-
-  async function reloadMimos() {
-    setMsg('Carregando...', false);
-    const mimos = await apiGetMimos();
-    cacheMimos = mimos;
-    renderMimosTable(mimos);
-    syncPrizeSelect(mimos);
-    setMsg('', false);
-  }
-
-  async function handleSave() {
-    try {
-      setMsg('Salvando...', false);
-
-      const title = (els.title?.value || '').trim();
-      const description = (els.desc?.value || '').trim();
-      const value_cents = parseBRLToCents(els.value?.value || '0');
-      const starts_at = fromDatetimeLocalValue(els.start?.value || '');
-      const ends_at = fromDatetimeLocalValue(els.end?.value || '');
-      const is_active = !!els.active?.checked;
-
-      if (!title) {
-        setMsg('Informe o título.', true);
-        els.title?.focus();
-        return;
-      }
-
-      if (ends_at && starts_at && new Date(ends_at) < new Date(starts_at)) {
-        setMsg('A data de término não pode ser menor que a data de início.', true);
-        return;
-      }
-
-      const payload = { title, description, value_cents, starts_at, ends_at, is_active };
-
-      if (currentEditId) {
-        await apiUpdateMimo(currentEditId, payload);
-        setMsg('Mimo atualizado.', false);
-      } else {
-        await apiCreateMimo(payload);
-        setMsg('Mimo criado.', false);
-      }
-
-      await reloadMimos();
-      clearForm();
-      closeForm();
-    } catch (err) {
-      setMsg(err.message || 'Erro ao salvar.', true);
-    }
-  }
-
-  function attachEvents() {
-    moneyMaskAttach(els.value);
-
-    if (els.save) els.save.addEventListener('click', handleSave);
-    if (els.clear) els.clear.addEventListener('click', clearForm);
-    if (els.reload) els.reload.addEventListener('click', () => reloadMimos().catch(e => setMsg(e.message || 'Erro.', true)));
-
-    if (els.btnNovo) els.btnNovo.addEventListener('click', () => {
-      clearForm();
-      openForm();
-      els.title?.focus();
-    });
-
-    if (els.btnCloseForm) els.btnCloseForm.addEventListener('click', () => {
-      closeForm();
-      setMsg('', false);
-    });
-
-    if (els.search) els.search.addEventListener('input', () => {
-      renderMimosTable(cacheMimos);
-    });
-
-    document.addEventListener('click', (e) => {
-      const btn = e.target?.closest?.('.tab-btn[data-tab="tab-mimos"]');
-      if (!btn) return;
-      reloadMimos().catch(err => setMsg(err.message || 'Erro ao carregar mimos.', true));
-    });
-  }
-
-  buildEmojiPanel();
-  attachEvents();
-})();
-
   /* ========= CONTROLE DE SESSÃO (30 MIN) ========= */
   const SESSION_KEY = 'pf_admin_session';
   const SESSION_DURATION_MS = 30 * 60 * 1000;
@@ -1970,8 +1309,15 @@
       await loadClientes();
       await loadBreeds();
       await loadOpeningHours();
+      await loadMimosToPrizeSelect();
       await loadDashboard();
-      initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
+      initAgendaViewToggle();
+      initAgendaSortingUI();
+  // Fecha menus de ações (⋯) ao clicar fora
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.kebab-menu.open').forEach(el => el.classList.remove('open'));
+  });
+    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
   }
 
@@ -2148,33 +1494,28 @@
   function validarDiaHora(dateStr, timeStr) {
     if (!dateStr || !timeStr) return 'Informe a data e o horário.';
 
-    const date = new Date(dateStr + 'T' + timeStr + ':00');
-    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
-
-    const diaSemana = date.getDay();
-    const parts = String(timeStr).split(':');
-    const hh = parseInt(parts[0], 10);
-    const mm = parseInt(parts[1] || '0', 10);
-
+    // valida HH:MM
+    const m = String(timeStr).match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return 'Horário inválido.';
+    const hh = parseInt(m[1], 10);
+    const mm = parseInt(m[2], 10);
     if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
 
-    // Admin também deve seguir a regra do cliente: somente 00 ou 30
+    // somente 00/30
     if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
 
+    const range = buildRangeForDate(dateStr);
+    if (!range || range.closed) return 'A loja está fechada nesta data.';
+
     const minutos = hh * 60 + mm;
-    const inicio = 7 * 60 + 30;
-
-    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
-    if (diaSemana >= 1 && diaSemana <= 5) {
-      const fim = 17 * 60 + 30;
-      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
-    }
-    if (diaSemana === 6) {
-      const fim = 13 * 60;
-      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+    if (minutos < range.startMin || minutos >= range.endMinExclusive) {
+      return 'Horário fora do funcionamento configurado.';
     }
 
-    // Não permite agendar no passado (comparando data/hora local)
+    const date = new Date(dateStr + 'T' + pad2(hh) + ':' + pad2(mm) + ':00');
+    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
+
+    // não permite no passado
     const now = new Date();
     if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
 
@@ -2187,11 +1528,32 @@
     if (!dateStr) return null;
     const d = new Date(dateStr + 'T00:00:00');
     if (Number.isNaN(d.getTime())) return null;
-    const day = d.getDay();
-    if (day === 0) return { closed: true };
-    const startMin = 7 * 60 + 30;
-    const endMin = (day === 6) ? (13 * 60) : (17 * 60 + 30);
-    return { closed: false, startMin, endMin };
+
+    const dow = d.getDay(); // 0=Dom .. 6=Sáb
+    const rows = (openingHoursCache && openingHoursCache.length) ? openingHoursCache : getDefaultOpeningHours();
+    const r = rows.find(x => Number(x.dow) === Number(dow));
+
+    if (!r || r.is_closed) return { closed: true, maxPerHalfHour: 0 };
+
+    const open = (r.open_time != null) ? String(r.open_time).trim() : '';
+    const close = (r.close_time != null) ? String(r.close_time).trim() : '';
+    const om = open.match(/^(\d{1,2}):(\d{2})$/);
+    const cm = close.match(/^(\d{1,2}):(\d{2})$/);
+    if (!om || !cm) return { closed: true, maxPerHalfHour: 0 };
+
+    const startMin = parseInt(om[1], 10) * 60 + parseInt(om[2], 10);
+    const closeMin = parseInt(cm[1], 10) * 60 + parseInt(cm[2], 10);
+
+    if (!Number.isFinite(startMin) || !Number.isFinite(closeMin) || closeMin <= startMin) {
+      return { closed: true, maxPerHalfHour: 0 };
+    }
+
+    let cap = Number(r.max_per_half_hour);
+    if (!Number.isFinite(cap)) cap = 1;
+    if (cap < 0) cap = 0;
+
+    // endMinExclusive: NÃO pode iniciar no horário de fechamento
+    return { closed: false, startMin, endMinExclusive: closeMin, maxPerHalfHour: cap };
   }
 
   function normalizeHHMM(t) {
@@ -2212,16 +1574,17 @@
   async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
     const data = await apiGet('/api/bookings', { date: dateStr });
     const list = data.bookings || [];
-    const set = new Set();
+    const map = new Map();
 
     list.forEach(b => {
       if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
       if (!isActiveBookingStatus(b.status)) return;
       const t = normalizeHHMM(b.time);
-      if (t) set.add(t);
+      if (!t) return;
+      map.set(t, (map.get(t) || 0) + 1);
     });
 
-    return set;
+    return map;
   }
 
   function minutesToHHMM(totalMin) {
@@ -2239,10 +1602,12 @@
     // arredonda para o slot mais próximo (00/30)
     total = Math.round(total / 30) * 30;
 
-    if (total < range.startMin) total = range.startMin;
-    if (total > range.endMin) total = range.endMin;
+    const maxStart = Math.max(range.startMin, (range.endMinExclusive || 0) - 30);
 
-    // garante que não sai do padrão 00/30 depois do clamp
+    if (total < range.startMin) total = range.startMin;
+    if (total > maxStart) total = maxStart;
+
+    // garante padrão 00/30
     total = Math.round(total / 30) * 30;
 
     return minutesToHHMM(total);
@@ -2377,7 +1742,57 @@
       if (tabId === 'tab-agenda') {
         try { renderAgendaByView(ultimaLista || []); } catch (_) {}
       }
+    
+
+  // ===== MENU LATERAL (hambúrguer) =====
+  const btnMenu = document.getElementById('btnMenu');
+  const btnMenuClose = document.getElementById('btnMenuClose');
+  const sideMenu = document.getElementById('sideMenu');
+  const menuOverlay = document.getElementById('menuOverlay');
+  const sideItems = document.querySelectorAll('.side-menu-item');
+
+  function openMenu() {
+    if (!sideMenu || !menuOverlay || !btnMenu) return;
+    sideMenu.classList.add('open');
+    sideMenu.classList.remove('hidden');
+    menuOverlay.classList.remove('hidden');
+    btnMenu.setAttribute('aria-expanded','true');
+  }
+  function closeMenu() {
+    if (!sideMenu || !menuOverlay || !btnMenu) return;
+    sideMenu.classList.remove('open');
+    menuOverlay.classList.add('hidden');
+    btnMenu.setAttribute('aria-expanded','false');
+    // mantém animação e depois esconde
+    setTimeout(() => { sideMenu.classList.add('hidden'); }, 160);
+  }
+
+  if (btnMenu) btnMenu.addEventListener('click', () => {
+    if (!sideMenu) return;
+    if (sideMenu.classList.contains('open')) closeMenu();
+    else openMenu();
+  });
+  if (btnMenuClose) btnMenuClose.addEventListener('click', closeMenu);
+  if (menuOverlay) menuOverlay.addEventListener('click', closeMenu);
+
+  // Menu item -> aciona aba equivalente (sem mexer na lógica existente)
+  sideItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const tabId = item.getAttribute('data-tab');
+      if (!tabId) return;
+
+      // ativa visual do menu
+      sideItems.forEach(i => i.classList.toggle('active', i === item));
+
+      // dispara click no botão de aba correspondente (JS existente)
+      const btn = document.querySelector('.tab-btn[data-tab="' + tabId + '"]');
+      if (btn) btn.click();
+
+      closeMenu();
     });
+  });
+
+});
   });
 
   // ===== CAMPOS AGENDA =====
@@ -2419,8 +1834,7 @@
 
   // Regras padrão (mesmas do cliente)
   if (formDate) formDate.min = todayISO;
-  if (formTime) formTime.step = 1800; // 30 minutos
-
+  
 
   // Revalida e aplica limites quando a data/horário mudam
   if (formDate) {
@@ -2429,16 +1843,7 @@
       await refreshBookingDateTimeState(excludeId);
     });
   }
-
-  if (formTime) {
-    // arredonda para 00/30 e aplica faixa do dia
-    formTime.addEventListener('blur', () => {
-      const range = buildRangeForDate(formDate ? formDate.value : '');
-      const clamped = clampToRange(formTime.value, range);
-      if (clamped) formTime.value = clamped;
-    });
-  }
-  const formStatus = document.getElementById('formStatus');
+const formStatus = document.getElementById('formStatus');
   const formNotes = document.getElementById('formNotes');
   const formError = document.getElementById('formError');
   const btnSalvar = document.getElementById('btnSalvar');
@@ -2474,6 +1879,10 @@
   const dashAvgTicket = document.getElementById('dashAvgTicket');
 
   let ultimaLista = [];
+
+  // ===== Ordenação da lista de agendamentos =====
+  let agendaSortKey = 'date';
+  let agendaSortDir = 'asc';
   let clientesCache = [];
   let clienteSelecionadoId = null;
   let petsCache = [];
@@ -2488,46 +1897,90 @@
   }
 
   /* ===== Estado de disponibilidade (Admin) ===== */
-  let occupiedTimesSet = new Set();
+  let occupiedCounts = new Map();
 
   async function refreshBookingDateTimeState(excludeBookingId) {
     if (!formDate || !formTime) return;
 
     const dateStr = formDate.value;
-    if (!dateStr) return;
+    if (!dateStr) {
+      formTime.disabled = true;
+      formTime.innerHTML = '<option value="">Selecione um horário</option>';
+      occupiedCounts = new Map();
+      return;
+    }
 
     const range = buildRangeForDate(dateStr);
     if (!range || range.closed) {
       formTime.disabled = true;
-      formTime.value = '';
-      occupiedTimesSet = new Set();
+      formTime.innerHTML = '<option value="">(Fechado neste dia)</option>';
+      occupiedCounts = new Map();
       return;
     }
 
-    formTime.disabled = false;
-    formTime.step = 1800; // 30 min
-
-    formTime.min = minutesToHHMM(range.startMin);
-    formTime.max = minutesToHHMM(range.endMin);
-
-    // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
+    // carrega ocupação do dia (exclui o próprio agendamento em edição)
     try {
-      occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+      occupiedCounts = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
     } catch (e) {
       console.warn('Falha ao carregar horários ocupados:', e);
-      occupiedTimesSet = new Set();
+      occupiedCounts = new Map();
     }
 
-    // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
-    if (formTime.value) {
-      const clamped = clampToRange(formTime.value, range);
-      if (clamped) formTime.value = clamped;
+    // monta opções 30/30 respeitando horário e capacidade
+    const now = new Date();
+    const isToday = (dateStr === now.toISOString().slice(0, 10));
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+
+    const selected = String(formTime.value || '').trim();
+    const options = [];
+
+    for (let m = range.startMin; m < range.endMinExclusive; m += 30) {
+      const label = minutesToHHMM(m);
+
+      // não mostra horários já passados (hoje)
+      if (isToday && m < (nowMin - 1)) continue;
+
+      // capacidade
+      if (isTimeOccupied(label, range)) continue;
+
+      options.push(label);
+    }
+
+    // monta HTML
+    let htmlOpt = '<option value="">Selecione um horário</option>';
+    if (options.length === 0) {
+      htmlOpt = '<option value="">(Sem horários disponíveis)</option>';
+      formTime.disabled = true;
+    } else {
+      formTime.disabled = false;
+      htmlOpt += options.map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+
+    // mantém seleção se existir
+    formTime.innerHTML = htmlOpt;
+
+    if (selected) {
+      const exists = Array.from(formTime.options).some(o => o.value === selected);
+      if (exists) {
+        formTime.value = selected;
+      } else {
+        // se estava selecionado algo e não existe mais, tenta "clamp" para o mais próximo
+        const clamped = clampToRange(selected, range);
+        if (clamped && Array.from(formTime.options).some(o => o.value === clamped)) {
+          formTime.value = clamped;
+        } else {
+          formTime.value = '';
+        }
+      }
     }
   }
 
-  function isTimeOccupied(timeStr) {
+  function isTimeOccupied(timeStr, range) {
     const t = normalizeHHMM(timeStr);
-    return !!t && occupiedTimesSet.has(t);
+    if (!t) return false;
+    const cap = (range && Number.isFinite(range.maxPerHalfHour)) ? Number(range.maxPerHalfHour) : 1;
+    if (cap <= 0) return true;
+    return (occupiedCounts.get(t) || 0) >= cap;
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
@@ -2695,6 +2148,7 @@
     }
 
     mostrarFormAgenda();
+    loadMimosToPrizeSelect().catch(console.error);
     refreshBookingDateTimeState(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -2834,6 +2288,62 @@
       servicesEmpty.textContent = 'Erro ao carregar serviços: ' + e.message;
     }
   }
+
+  /* ===== MIMOS (para o select do agendamento) ===== */
+  let mimosCache = [];
+
+  function formatMoneyFromCents(cents) {
+    const v = Number(cents || 0) / 100;
+    return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  }
+
+  async function loadMimosToPrizeSelect() {
+    if (!formPrize) return;
+
+    try {
+      const data = await apiGet('/api/mimos');
+      const rows = data.mimos || data.prizes || [];
+
+      // aceita tanto {title} quanto {name}
+      mimosCache = (rows || []).filter(x => x && (x.title || x.name)).map(x => ({
+        id: x.id,
+        title: x.title || x.name,
+        description: x.description || '',
+        value_cents: Number(x.value_cents || 0),
+        is_active: (x.is_active !== false),
+        starts_at: x.starts_at || null,
+        ends_at: x.ends_at || null,
+      }));
+
+      // por padrão, mostra ativos; se vier vazio, cai para o que existir
+      const list = mimosCache.length
+        ? mimosCache.filter(m => m.is_active)
+        : [];
+
+      const useList = list.length ? list : mimosCache;
+
+      formPrize.innerHTML = '<option value="">(Sem mimo)</option>' +
+        useList.map(m => {
+          const label = m.value_cents ? `${m.title} • ${formatMoneyFromCents(m.value_cents)}` : m.title;
+          return `<option value="${esc(m.title)}">${esc(label)}</option>`;
+        }).join('');
+
+    } catch (e) {
+      // não quebra a tela: mantém o que já estiver no HTML
+      console.warn('Falha ao carregar mimos:', e);
+    }
+  }
+
 
   async function saveService() {
     serviceError.style.display = 'none';
@@ -3144,268 +2654,194 @@
     return serviceLabel;
   }
 
-  /* ===== Agendamentos (Lista): Sort + Kebab menu ===== */
-let agendaSortState = { idx: null, dir: 1 }; // dir: 1 asc, -1 desc
-let agendaSortInited = false;
-
-const AGENDA_COLS = [
-  { name: 'Data', getter: (a) => `${a.date || ''} ${a.time || ''}`.trim() },
-  { name: 'Hora', getter: (a) => `${a.time || ''} ${a.date || ''}`.trim() },
-  { name: 'Tutor(a)', getter: (a) => (a.customer_name || '').toString().toLowerCase() },
-  { name: 'Pet', getter: (a) => (a.pet_name || '').toString().toLowerCase() },
-  { name: 'Telefone', getter: (a) => (String(a.phone || '').replace(/\D/g, '')) },
-  { name: 'Serviço', getter: (a) => (getServiceLabelFromBooking(a) || '').toString().toLowerCase() },
-  { name: 'Mimo', getter: (a) => (a.prize || '').toString().toLowerCase() },
-  { name: 'Status', getter: (a) => (a.status || 'agendado').toString().toLowerCase() },
-  { name: 'Última notificação', getter: (a) => (a.last_notification_at || '') },
-  { name: 'Obs.', getter: (a) => (a.notes || '').toString().toLowerCase() },
-];
-
-function closeAllKebabMenus() {
-  document.querySelectorAll('.kebab-menu').forEach(m => m.classList.add('hidden'));
-  document.querySelectorAll('.kebab-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
-}
-
-function sortAgendaIfNeeded(lista) {
-  if (!agendaSortState || agendaSortState.idx == null) return lista;
-
-  const col = AGENDA_COLS[agendaSortState.idx];
-  if (!col) return lista;
-
-  const dir = agendaSortState.dir || 1;
-
-  // cópia para não quebrar referências
-  const arr = [...lista];
-
-  arr.sort((a, b) => {
-    const va = col.getter(a);
-    const vb = col.getter(b);
-
-    // tenta comparar como data quando parece ISO
-    const da = Date.parse(va);
-    const db = Date.parse(vb);
-    if (!Number.isNaN(da) && !Number.isNaN(db)) {
-      if (da === db) return 0;
-      return (da < db ? -1 : 1) * dir;
-    }
-
-    // numérico (telefone)
-    const na = typeof va === 'string' && va !== '' && /^\d+$/.test(va) ? Number(va) : null;
-    const nb = typeof vb === 'string' && vb !== '' && /^\d+$/.test(vb) ? Number(vb) : null;
-    if (na != null && nb != null) {
-      if (na === nb) return 0;
-      return (na < nb ? -1 : 1) * dir;
-    }
-
-    // string
-    const sa = (va ?? '').toString();
-    const sb = (vb ?? '').toString();
-    const cmp = sa.localeCompare(sb, 'pt-BR', { sensitivity: 'base' });
-    return cmp * dir;
-  });
-
-  return arr;
-}
-
-function initAgendaListSortingOnce() {
-  if (agendaSortInited) return;
-  agendaSortInited = true;
-
-  const theadThs = document.querySelectorAll('#agendaListWrapper table thead th');
-  if (!theadThs || !theadThs.length) return;
-
-  // último TH é Ações (não ordena)
-  theadThs.forEach((th, idx) => {
-    const isActions = (idx === theadThs.length - 1);
-    th.dataset.originalText = th.textContent.trim();
-
-    if (isActions) return;
-
-    th.classList.add('sortable-th');
-    th.title = 'Clique para ordenar';
-    th.addEventListener('click', () => {
-      // toggle direção se clicar na mesma coluna
-      if (agendaSortState.idx === idx) {
-        agendaSortState.dir = agendaSortState.dir * -1;
-      } else {
-        agendaSortState.idx = idx;
-        agendaSortState.dir = 1;
-      }
-
-      // atualiza indicadores
-      theadThs.forEach((th2, j) => {
-        const orig = th2.dataset.originalText || th2.textContent.trim();
-        if (j === theadThs.length - 1) {
-          th2.textContent = orig;
-          return;
-        }
-
-        if (j === agendaSortState.idx) {
-          const arrow = agendaSortState.dir === 1 ? '▲' : '▼';
-          th2.innerHTML = `${orig} <span class="sort-ind">${arrow}</span>`;
-        } else {
-          th2.textContent = orig;
-        }
-      });
-
-      // re-render com ordenação (somente lista)
-      if (Array.isArray(ultimaLista)) renderAgendaByView(ultimaLista);
-    });
-  });
-
-  // fecha menus ao clicar fora
-  document.addEventListener('click', () => closeAllKebabMenus());
-  // evita menu “preso” quando rola
-  document.addEventListener('scroll', () => closeAllKebabMenus(), true);
-}
-
-
   function renderAgendaByView(lista) {
-  // vazio: atualiza ambos estados para evitar inconsistências
-  const isEmpty = !lista || !lista.length;
+    // vazio: atualiza ambos estados para evitar inconsistências
+    const isEmpty = !lista || !lista.length;
 
-  if (agendaView === 'cards') {
-    renderAgendaCards(lista || []);
-    if (estadoVazio) estadoVazio.style.display = 'none';
-    if (estadoVazioCards) estadoVazioCards.classList.toggle('hidden', !isEmpty);
-  } else {
-    // init do sort só quando a tabela existe
-    initAgendaListSortingOnce();
+    if (agendaView === 'cards') {
+      renderAgendaCards(lista || []);
+      if (estadoVazio) estadoVazio.style.display = 'none';
+      if (estadoVazioCards) estadoVazioCards.classList.toggle('hidden', !isEmpty);
+    } else {
+      renderAgendaList(lista || []);
+      if (estadoVazioCards) estadoVazioCards.class
+  function applyAgendaSort(lista) {
+    if (!Array.isArray(lista)) return [];
+    const key = agendaSortKey;
+    const dir = agendaSortDir === 'desc' ? -1 : 1;
 
-    // ordena apenas na visualização "lista"
-    const sorted = sortAgendaIfNeeded(lista || []);
-    renderAgendaList(sorted);
+    const getVal = (a) => {
+      if (!a) return '';
+      if (key === 'service_label') return getServiceLabelFromBooking(a) || '';
+      if (key === 'date') return String(a.date || '');
+      if (key === 'time') return String(a.time || '');
+      if (key === 'phone') return String(a.phone || '').replace(/\D/g,'');
+      if (key === 'last_notification_at') return String(a.last_notification_at || '');
+      if (key === 'notes') return String(a.notes || '');
+      return String(a[key] || '');
+    };
 
-    if (estadoVazioCards) estadoVazioCards.classList.add('hidden');
-    if (estadoVazio) estadoVazio.style.display = isEmpty ? 'block' : 'none';
-  }
-}
-
-
-  function renderAgendaList(lista) {
-  tbodyAgenda.innerHTML = '';
-  estadoVazio.style.display = lista.length ? 'none' : 'block';
-
-  // sempre que re-renderiza, fecha menus abertos
-  closeAllKebabMenus();
-
-  lista.forEach(a => {
-    const tr = document.createElement('tr');
-
-    const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
-    const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
-    const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
-    const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-    const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
-
-    const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
-
-    const tdMimo = document.createElement('td');
-    tdMimo.textContent = a.prize || '-';
-    tdMimo.className = 'td-mimo';
-
-    const tdStatus = document.createElement('td');
-    const spanStatus = document.createElement('span');
-    const labelStatus = (a.status || 'agendado');
-    spanStatus.textContent = labelStatus;
-    spanStatus.className = 'td-status ' + classStatus(labelStatus);
-    tdStatus.appendChild(spanStatus);
-
-    const tdNotif = document.createElement('td');
-    tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
-
-    const tdObs = document.createElement('td');
-    tdObs.textContent = a.notes || '';
-    tdObs.className = 'td-obs';
-
-    /* ===== AÇÕES: Kebab menu (⋯) ===== */
-    const tdAcoes = document.createElement('td');
-
-    const wrap = document.createElement('div');
-    wrap.className = 'kebab-wrap';
-
-    const btnKebab = document.createElement('button');
-    btnKebab.type = 'button';
-    btnKebab.className = 'kebab-btn';
-    btnKebab.setAttribute('aria-label', 'Ações');
-    btnKebab.setAttribute('aria-haspopup', 'menu');
-    btnKebab.setAttribute('aria-expanded', 'false');
-    btnKebab.textContent = '⋯';
-
-    const menu = document.createElement('div');
-    menu.className = 'kebab-menu hidden';
-    menu.setAttribute('role', 'menu');
-
-    const itemEditar = document.createElement('button');
-    itemEditar.type = 'button';
-    itemEditar.className = 'kebab-item';
-    itemEditar.textContent = 'Editar';
-    itemEditar.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      closeAllKebabMenus();
-      preencherFormEdicao(a);
-    });
-
-    const itemExcluir = document.createElement('button');
-    itemExcluir.type = 'button';
-    itemExcluir.className = 'kebab-item';
-    itemExcluir.textContent = 'Excluir';
-    itemExcluir.addEventListener('click', async (ev) => {
-      ev.stopPropagation();
-      closeAllKebabMenus();
-
-      if (!confirm('Deseja realmente excluir este agendamento?')) return;
-      try {
-        await apiDelete('/api/bookings/' + a.id);
-        await renderTabela();
-        await loadDashboard();
-      } catch (e) { alert(e.message); }
-    });
-
-    menu.appendChild(itemEditar);
-    menu.appendChild(itemExcluir);
-
-    btnKebab.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-
-      // fecha outros
-      document.querySelectorAll('.kebab-menu').forEach(m => {
-        if (m !== menu) m.classList.add('hidden');
-      });
-      document.querySelectorAll('.kebab-btn').forEach(b => {
-        if (b !== btnKebab) b.setAttribute('aria-expanded', 'false');
-      });
-
-      const isOpen = !menu.classList.contains('hidden');
-      if (isOpen) {
-        menu.classList.add('hidden');
-        btnKebab.setAttribute('aria-expanded', 'false');
-      } else {
-        menu.classList.remove('hidden');
-        btnKebab.setAttribute('aria-expanded', 'true');
+    const arr = lista.slice();
+    arr.sort((a,b) => {
+      // data/hora como composto
+      if (key === 'date') {
+        const ad = String(a.date || ''), bd = String(b.date || '');
+        if (ad !== bd) return ad > bd ? dir : -dir;
+        const at = String(a.time || ''), bt = String(b.time || '');
+        if (at !== bt) return at > bt ? dir : -dir;
+        return 0;
       }
+      if (key === 'time') {
+        const at = String(a.time || ''), bt = String(b.time || '');
+        if (at !== bt) return at > bt ? dir : -dir;
+        const ad = String(a.date || ''), bd = String(b.date || '');
+        if (ad !== bd) return ad > bd ? dir : -dir;
+        return 0;
+      }
+
+      const av = getVal(a).toLowerCase();
+      const bv = getVal(b).toLowerCase();
+      if (av === bv) return 0;
+      return av > bv ? dir : -dir;
     });
 
-    wrap.appendChild(btnKebab);
-    wrap.appendChild(menu);
-    tdAcoes.appendChild(wrap);
+    return arr;
+  }
 
-    tr.appendChild(tdData);
-    tr.appendChild(tdHora);
-    tr.appendChild(tdTutor);
-    tr.appendChild(tdPet);
-    tr.appendChild(tdTel);
-    tr.appendChild(tdServ);
-    tr.appendChild(tdMimo);
-    tr.appendChild(tdStatus);
-    tr.appendChild(tdNotif);
-    tr.appendChild(tdObs);
-    tr.appendChild(tdAcoes);
+  function initAgendaSortingUI() {
+    const ths = document.querySelectorAll('#agendaListWrapper thead th.sortable');
+    if (!ths || !ths.length) return;
 
-    tbodyAgenda.appendChild(tr);
-  });
-}
+    const updateIndicators = () => {
+      ths.forEach(th => {
+        th.classList.remove('sort-asc','sort-desc');
+        if (th.dataset.sortKey === agendaSortKey) th.classList.add(agendaSortDir === 'desc' ? 'sort-desc' : 'sort-asc');
+      });
+    };
 
+    ths.forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sortKey;
+        if (!key) return;
+        if (agendaSortKey === key) {
+          agendaSortDir = (agendaSortDir === 'asc') ? 'desc' : 'asc';
+        } else {
+          agendaSortKey = key;
+          agendaSortDir = 'asc';
+        }
+        updateIndicators();
+       function renderAgendaList(lista) {
+    const sorted = applyAgendaSort(lista || []);
+
+    tbodyAgenda.innerHTML = '';
+    estadoVazio.style.display = lista.length ? 'none' : 'block';
+
+    sorted.forEach(a => {
+      const tr = document.createElement('tr');
+
+      const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
+      const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
+      const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
+      const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
+
+      const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
+
+      const tdMimo = document.createElement('td');
+      tdMimo.textContent = a.prize || '-';
+      tdMimo.className = 'td-mimo';
+
+      const tdStatus = document.createElement('td');
+      const spanStatus = document.createElement('span');
+      const labelStatus = (a.status || 'agendado');
+      spanStatus.textContent = labelStatus;
+      spanStatus.className = 'td-status ' + classStatus(labelStatus);
+      tdStatus.appendChild(spanStatus);
+
+      const tdNotif = document.createElement('td');
+      tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
+
+      const tdObs = document.createElement('td');
+      tdObs.textContent = a.notes || '';
+      tdObs.className = 'td-obs';
+
+      const tdAcoes = document.createElement('td');
+
+      const kebab = document.createElement('div');
+      kebab.className = 'kebab';
+
+      const btnKebab = document.createElement('button');
+      btnKebab.type = 'button';
+      btnKebab.className = 'kebab-btn';
+      btnKebab.setAttribute('aria-label', 'Ações');
+      btnKebab.textContent = '⋯';
+
+      const menu = document.createElement('div');
+      menu.className = 'kebab-menu';
+
+      const itemEditar = document.createElement('button');
+      itemEditar.type = 'button';
+      itemEditar.textContent = 'Editar';
+      itemEditar.addEventListener('click', async () => {
+        menu.classList.remove('open');
+        await abrirEditarAgendamento(a.id);
+      });
+
+      const itemExcluir = document.createElement('button');
+      itemExcluir.type = 'button';
+      itemExcluir.className = 'danger';
+      itemExcluir.textContent = 'Excluir';
+      itemExcluir.addEventListener('click', async () => {
+        menu.classList.remove('open');
+        if (!confirm('Deseja realmente excluir este agendamento?')) return;
+        try {
+          await apiDelete('/api/bookings/' + a.id);
+          await renderTabela();
+          await loadDashboard();
+        } catch (e) { alert(e.message); }
+      });
+
+      menu.appendChild(itemEditar);
+      menu.appendChild(itemExcluir);
+
+      btnKebab.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        // fecha outros menus
+        document.querySelectorAll('.kebab-menu.open').forEach(el => el.classList.remove('open'));
+        menu.classList.toggle('open');
+      });
+
+      kebab.appendChild(btnKebab);
+      kebab.appendChild(menu);
+      tdAcoes.appendChild(kebab);
+
+
+      tr.appendChild(tdData);
+      tr.appendChild(tdHora);
+      tr.appendChild(tdTutor);
+      tr.appendChild(tdPet);
+      tr.appendChild(tdTel);
+      tr.appendChild(tdServ);
+      tr.appendChild(tdMimo);
+      tr.appendChild(tdStatus);
+      tr.appendChild(tdNotif);
+      tr.appendChild(tdObs);
+      tr.appendChild(tdAcoes);
+
+      tbodyAgenda.appendChild(tr);
+    });
+  }
+
+  dChild(tdServ);
+      tr.appendChild(tdMimo);
+      tr.appendChild(tdStatus);
+      tr.appendChild(tdNotif);
+      tr.appendChild(tdObs);
+      tr.appendChild(tdAcoes);
+
+      tbodyAgenda.appendChild(tr);
+    });
+  }
 
   function renderAgendaCards(lista) {
     if (!agendaCards) return;
@@ -3605,7 +3041,8 @@ function initAgendaListSortingOnce() {
 
     // Carrega horários ocupados do dia e bloqueia conflito
     await refreshBookingDateTimeState(id);
-    if (isTimeOccupied(time)) {
+    const _rangeNow = buildRangeForDate(date);
+    if (isTimeOccupied(time, _rangeNow)) {
       formError.textContent = 'Horário indisponível para esta data. Selecione outro horário.';
       formError.style.display = 'block';
       return;
@@ -4463,55 +3900,6 @@ function initAgendaListSortingOnce() {
 
 // ===== Início =====
   tryAutoLogin();
-
-  /* =========================
-   SIDEBAR (MENU HAMBURGUER)
-========================= */
-(function initSidebarMenu(){
-  const btnMenu = document.getElementById('btnMenu');
-  const btnMenuClose = document.getElementById('btnMenuClose');
-  const sidebar = document.getElementById('sidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-
-  if (!btnMenu || !sidebar || !backdrop) return;
-
-  function openMenu(){
-    backdrop.classList.remove('hidden');
-    sidebar.classList.remove('hidden');
-    requestAnimationFrame(() => sidebar.classList.add('open'));
-    btnMenu.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeMenu(){
-    sidebar.classList.remove('open');
-    btnMenu.setAttribute('aria-expanded', 'false');
-    setTimeout(() => {
-      sidebar.classList.add('hidden');
-      backdrop.classList.add('hidden');
-    }, 180);
-  }
-
-  btnMenu.addEventListener('click', () => {
-    const isOpen = sidebar.classList.contains('open');
-    if (isOpen) closeMenu();
-    else openMenu();
-  });
-
-  if (btnMenuClose) btnMenuClose.addEventListener('click', closeMenu);
-  backdrop.addEventListener('click', closeMenu);
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && sidebar.classList.contains('open')) closeMenu();
-  });
-
-  // Fecha o menu ao clicar em qualquer item do menu (tab-btn)
-  sidebar.addEventListener('click', (e) => {
-    const btn = e.target.closest('.tab-btn');
-    if (btn) closeMenu();
-  });
-})();
-
-
 </script>
 </body>
 </html>
