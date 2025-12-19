@@ -958,8 +958,11 @@
           <div class="form-group">
             <label for="formPrize">Mimo (Roleta)</label>
             <select id="formPrize">
-  <option value="">Carregando mimos...</option>
-</select>
+              <option value="Tosa Higiênica">Tosa Higiênica</option>
+              <option value="Hidratação">Hidratação</option>
+              <option value="Foto e Vídeo Profissional">Foto e Vídeo Profissional</option>
+              <option value="Patinhas impecáveis">Patinhas impecáveis</option>
+            </select>
           </div>
         </div>
 
@@ -976,11 +979,7 @@
           </div>
           <div class="form-group">
             <label for="formTime">Horário</label>
-       <select id="formTime" disabled>
-  <option value="">Selecione um horário</option>
-</select>
-
-
+            <input type="time" id="formTime" />
           </div>
         </div>
 
@@ -1589,197 +1588,6 @@
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
-  /* =========================
-   MIMOS -> Select do Agendamento
-========================= */
-async function loadMimosIntoPrizeSelect() {
-  const sel = document.getElementById('formPrize');
-  if (!sel) return;
-
-  // placeholder
-  sel.innerHTML = `<option value="">Carregando mimos...</option>`;
-
-  try {
-    // Ajuste aqui se seu backend usar outro endpoint/querystring
-    const res = await fetch('/api/mimos', { credentials: 'include' });
-    const data = await res.json();
-
-    const rows = (data && (data.mimos || data.items || data.data)) || [];
-    const now = new Date();
-
-    // filtro: ativos e dentro do período (se starts_at/ends_at existirem)
-    const active = rows.filter(m => {
-      if (m == null) return false;
-      if (m.is_active === false) return false;
-
-      const s = m.starts_at ? new Date(m.starts_at) : null;
-      const e = m.ends_at ? new Date(m.ends_at) : null;
-
-      if (s && now < s) return false;
-      if (e && now > e) return false;
-
-      return true;
-    });
-
-    if (!active.length) {
-      sel.innerHTML = `<option value="">(Nenhum mimo ativo no período)</option>`;
-      return;
-    }
-
-    // monta options
-    sel.innerHTML = `<option value="">(Sem mimo)</option>`;
-    for (const m of active) {
-      const title = (m.title || '').trim();
-      if (!title) continue;
-      const opt = document.createElement('option');
-      opt.value = title;
-      opt.textContent = title;
-      sel.appendChild(opt);
-    }
-  } catch (err) {
-    console.error('Erro ao carregar mimos:', err);
-    sel.innerHTML = `<option value="">Erro ao carregar mimos</option>`;
-  }
-}
-
-/* =========================
-   HORÁRIOS (30 em 30) -> Select
-   - habilita/desabilita corretamente
-   - remove horários já passados no dia atual
-========================= */
-
-function pad2(n) { return String(n).padStart(2, '0'); }
-
-function timeToMinutes(hhmm) {
-  const [h, m] = String(hhmm || '').split(':').map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return NaN;
-  return h * 60 + m;
-}
-
-function minutesToTime(min) {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${pad2(h)}:${pad2(m)}`;
-}
-
-function isSameYMD(a, b) {
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
-}
-
-/**
- * Gera slots de 30 em 30 com base em:
- * - openingHoursCache[dow] = { is_closed, open_time, close_time }
- *
- * IMPORTANTE:
- * - este código assume que você já tem um cache de horários do "Horário de Funcionamento".
- * - Se no seu admin já existe algo como `openingHoursCache`, ele usa.
- * - Se não existir, ele cai num padrão 07:30–17:30 (seg–sex) e 07:30–13:00 (sab).
- */
-function getOpeningForDate(dateObj) {
-  const dow = dateObj.getDay(); // 0 dom ... 6 sáb
-
-  // Tenta usar o cache existente no seu admin (caso já tenha)
-  if (window.openingHoursCache && window.openingHoursCache[dow]) {
-    return window.openingHoursCache[dow];
-  }
-
-  // fallback seguro
-  if (dow === 0) return { is_closed: true };
-  if (dow === 6) return { is_closed: false, open_time: '07:30', close_time: '13:00' };
-  return { is_closed: false, open_time: '07:30', close_time: '17:30' };
-}
-
-function populateTimeSelectForDate(dateStr) {
-  const sel = document.getElementById('formTime');
-  if (!sel) return;
-
-  // estado base
-  sel.innerHTML = `<option value="">Selecione um horário</option>`;
-  sel.disabled = true;
-
-  if (!dateStr) return;
-
-  const d = new Date(dateStr + 'T00:00:00');
-  if (Number.isNaN(d.getTime())) return;
-
-  const oh = getOpeningForDate(d);
-  if (!oh || oh.is_closed) {
-    sel.innerHTML = `<option value="">(Fechado neste dia)</option>`;
-    sel.disabled = true;
-    return;
-  }
-
-  const openMin = timeToMinutes(oh.open_time);
-  const closeMin = timeToMinutes(oh.close_time);
-
-  if (!Number.isFinite(openMin) || !Number.isFinite(closeMin) || closeMin <= openMin) {
-    sel.innerHTML = `<option value="">(Horário inválido/configuração)</option>`;
-    sel.disabled = true;
-    return;
-  }
-
-  // remove horários já passados se for hoje
-  const now = new Date();
-  let minAllowed = openMin;
-  if (isSameYMD(d, now)) {
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    // próximo múltiplo de 30
-    const nextSlot = Math.ceil(nowMin / 30) * 30;
-    minAllowed = Math.max(openMin, nextSlot);
-  }
-
-  for (let t = minAllowed; t < closeMin; t += 30) {
-    const hhmm = minutesToTime(t);
-    const opt = document.createElement('option');
-    opt.value = hhmm;
-    opt.textContent = hhmm;
-    sel.appendChild(opt);
-  }
-
-  // se não sobrou slot
-  if (sel.options.length <= 1) {
-    sel.innerHTML = `<option value="">(Sem horários disponíveis)</option>`;
-    sel.disabled = true;
-    return;
-  }
-
-  sel.disabled = false;
-}
-
-/**
- * Bind para manter o select de horário habilitando/desabilitando corretamente
- * e garantir que ele sempre repopule ao mudar a data.
- */
-function bindBookingDateTime() {
-  const dateEl = document.getElementById('formDate');
-  const timeEl = document.getElementById('formTime');
-  if (!dateEl || !timeEl) return;
-
-  // sempre que mudar a data, repopula o select
-  dateEl.addEventListener('change', () => {
-    populateTimeSelectForDate(dateEl.value);
-  });
-
-  // se já tiver data preenchida, repopula ao abrir
-  if (dateEl.value) {
-    populateTimeSelectForDate(dateEl.value);
-  }
-}
-
-/* =========================
-   CHAME ISTO NO SEU INIT
-========================= */
-function initMimosAndTimeSelectFixes() {
-  // 1) garante que o select de mimos seja preenchido sempre que o painel carregar
-  loadMimosIntoPrizeSelect();
-
-  // 2) garante que o horário não fique travado
-  bindBookingDateTime();
-}
-
-
   function toDatetimeLocalValue(isoOrTs) {
     if (!isoOrTs) return '';
     const d = new Date(isoOrTs);
@@ -2335,84 +2143,53 @@ function initMimosAndTimeSelectFixes() {
   const todayISO = new Date().toISOString().split('T')[0];
 
   function validarDiaHora(dateStr, timeStr) {
-  const date = new Date(dateStr + 'T00:00:00');
-  if (Number.isNaN(date.getTime())) return 'Data inválida.';
+    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
 
-  const tNorm = normalizeHHMM(timeStr);
-  if (!tNorm) return 'Hora inválida.';
+    const date = new Date(dateStr + 'T' + timeStr + ':00');
+    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
 
-  const [hh, mm] = tNorm.split(':').map(n => parseInt(n, 10));
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Hora inválida.';
+    const diaSemana = date.getDay();
+    const parts = String(timeStr).split(':');
+    const hh = parseInt(parts[0], 10);
+    const mm = parseInt(parts[1] || '0', 10);
 
-  // mantém regra de 30 em 30
-  if (mm !== 0 && mm !== 30) return 'Selecione um horário de 30 em 30 minutos.';
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
 
-  const range = buildRangeForDate(dateStr);
-  if (!range) return 'Horário inválido.';
-  if (range.closed) return 'Este dia está configurado como fechado no Horário de Funcionamento.';
+    // Admin também deve seguir a regra do cliente: somente 00 ou 30
+    if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
 
-  const minutos = hh * 60 + mm;
+    const minutos = hh * 60 + mm;
+    const inicio = 7 * 60 + 30;
 
-  // respeita abertura/fechamento configurados
-  if (minutos < range.startMin || minutos > range.endMin) {
-    const openLabel = range.openHHMM || minutesToHHMM(range.startMin);
-    const closeLabel = range.closeHHMM || minutesToHHMM(range.endMin);
-    return `Horários permitidos: ${openLabel} até ${closeLabel}.`;
+    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+    if (diaSemana >= 1 && diaSemana <= 5) {
+      const fim = 17 * 60 + 30;
+      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+    }
+    if (diaSemana === 6) {
+      const fim = 13 * 60;
+      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+    }
+
+    // Não permite agendar no passado (comparando data/hora local)
+    const now = new Date();
+    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+
+    return null;
   }
-
-  // Não permite agendar no passado (comparando data/hora local)
-  const now = new Date();
-  const dt = new Date(`${dateStr}T${tNorm}:00`);
-  if (dt.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
-
-  return null;
-}
-
-
-
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
-function buildRangeForDate(dateStr) {
-  if (!dateStr) return null;
-
-  const d = new Date(dateStr + 'T00:00:00');
-  if (Number.isNaN(d.getTime())) return null;
-
-  const dow = d.getDay(); // 0=Dom .. 6=Sáb
-
-  // Usa cache do horário de funcionamento se existir, senão fallback
-  const defaults = [
-    { dow: 1, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
-    { dow: 2, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
-    { dow: 3, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
-    { dow: 4, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
-    { dow: 5, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
-    { dow: 6, is_closed: false, open_time: '07:30', close_time: '13:00', max_per_half_hour: 1 },
-    { dow: 0, is_closed: true,  open_time: null,   close_time: null,   max_per_half_hour: 0 },
-  ];
-
-  const rows = Array.isArray(openingHoursCache) && openingHoursCache.length ? openingHoursCache : defaults;
-  const row = rows.find(r => Number(r.dow) === Number(dow)) || defaults.find(r => Number(r.dow) === Number(dow));
-
-  if (!row || row.is_closed) return { closed: true };
-
-  const openHHMM = normalizeHHMM(row.open_time) || '07:30';
-  const closeHHMM = normalizeHHMM(row.close_time) || '17:30';
-
-  const [oh, om] = openHHMM.split(':').map(n => parseInt(n, 10));
-  const [ch, cm] = closeHHMM.split(':').map(n => parseInt(n, 10));
-
-  const startMin = oh * 60 + om;
-  const endMin = ch * 60 + cm;
-
-  if (!Number.isFinite(startMin) || !Number.isFinite(endMin) || endMin < startMin) {
-    return { closed: false, startMin: 7 * 60 + 30, endMin: 17 * 60 + 30 };
+  function buildRangeForDate(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return null;
+    const day = d.getDay();
+    if (day === 0) return { closed: true };
+    const startMin = 7 * 60 + 30;
+    const endMin = (day === 6) ? (13 * 60) : (17 * 60 + 30);
+    return { closed: false, startMin, endMin };
   }
-
-  return { closed: false, startMin, endMin, openHHMM, closeHHMM };
-}
-
 
   function normalizeHHMM(t) {
     const s = String(t || '').trim();
@@ -2710,82 +2487,41 @@ function buildRangeForDate(dateStr) {
   /* ===== Estado de disponibilidade (Admin) ===== */
   let occupiedTimesSet = new Set();
 
-  function populateTimeSelectOptions(dateStr, range, occupiedSet) {
-  if (!formTime) return;
+  async function refreshBookingDateTimeState(excludeBookingId) {
+    if (!formDate || !formTime) return;
 
-  // limpa e adiciona placeholder
-  formTime.innerHTML = '';
-  const opt0 = document.createElement('option');
-  opt0.value = '';
-  opt0.textContent = 'Selecione um horário';
-  formTime.appendChild(opt0);
+    const dateStr = formDate.value;
+    if (!dateStr) return;
 
-  if (!dateStr || !range || range.closed) {
-    formTime.disabled = true;
-    return;
+    const range = buildRangeForDate(dateStr);
+    if (!range || range.closed) {
+      formTime.disabled = true;
+      formTime.value = '';
+      occupiedTimesSet = new Set();
+      return;
+    }
+
+    formTime.disabled = false;
+    formTime.step = 1800; // 30 min
+
+    formTime.min = minutesToHHMM(range.startMin);
+    formTime.max = minutesToHHMM(range.endMin);
+
+    // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
+    try {
+      occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+    } catch (e) {
+      console.warn('Falha ao carregar horários ocupados:', e);
+      occupiedTimesSet = new Set();
+    }
+
+    // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
+    if (formTime.value) {
+      const clamped = clampToRange(formTime.value, range);
+      if (clamped) formTime.value = clamped;
+    }
   }
 
-  formTime.disabled = false;
-
-  // remove horários no passado (apenas se a data for hoje)
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-
-  // gera slots de 30 em 30, incluindo o endMin se ele cai exatamente no slot (como seu comportamento antigo)
-  for (let m = range.startMin; m <= range.endMin; m += 30) {
-    const hhmm = minutesToHHMM(m);
-
-    // se for hoje, não mostra horários já passados
-    if (dateStr === todayStr && m <= nowMin) continue;
-
-    // não mostra horários ocupados (status ativos)
-    if (occupiedSet && occupiedSet.has(hhmm)) continue;
-
-    const opt = document.createElement('option');
-    opt.value = hhmm;
-    opt.textContent = hhmm;
-    formTime.appendChild(opt);
-  }
-
-  // se nada sobrou, desabilita
-  if (formTime.options.length <= 1) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'Sem horários disponíveis';
-    formTime.appendChild(opt);
-    formTime.disabled = true;
-  }
-}
-
-
-  async function refreshBookingDateTimeState(dateStr, excludeBookingId) {
-  const range = buildRangeForDate(dateStr);
-
-  if (!dateStr || !range || range.closed) {
-    formTime.disabled = true;
-    formTime.value = '';
-    occupiedTimesSet = new Set();
-    populateTimeSelectOptions(dateStr, range, occupiedTimesSet);
-    return;
-  }
-
-  // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
-  try {
-    occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
-  } catch (e) {
-    console.warn('Falha ao carregar horários ocupados:', e);
-    occupiedTimesSet = new Set();
-  }
-
-  // popula opções 30/30 respeitando horário de funcionamento e removendo passados
-  populateTimeSelectOptions(dateStr, range, occupiedTimesSet);
-
-  // se o valor atual não existir mais no select, limpa
-  if (formTime.value && !Array.from(formTime.options).some(o => o.value === formTime.value)) {
-    formTime.value = '';
-  }
-}
   function isTimeOccupied(timeStr) {
     const t = normalizeHHMM(timeStr);
     return !!t && occupiedTimesSet.has(t);
@@ -3544,129 +3280,80 @@ function initAgendaListSortingOnce() {
 
 
   function renderAgendaList(lista) {
-  tbodyAgenda.innerHTML = '';
-  estadoVazio.style.display = lista.length ? 'none' : 'block';
+    tbodyAgenda.innerHTML = '';
+    estadoVazio.style.display = lista.length ? 'none' : 'block';
 
-  // sempre que re-renderiza, fecha menus abertos
-  closeAllKebabMenus();
+    lista.forEach(a => {
+      const tr = document.createElement('tr');
 
-  lista.forEach(a => {
-    const tr = document.createElement('tr');
+      const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
+      const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
+      const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
+      const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
 
-    const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
-    const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
-    const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
-    const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-    const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
+      const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
 
-    const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
+      const tdMimo = document.createElement('td');
+      tdMimo.textContent = a.prize || '-';
+      tdMimo.className = 'td-mimo';
 
-    const tdMimo = document.createElement('td');
-    tdMimo.textContent = a.prize || '-';
-    tdMimo.className = 'td-mimo';
+      const tdStatus = document.createElement('td');
+      const spanStatus = document.createElement('span');
+      const labelStatus = (a.status || 'agendado');
+      spanStatus.textContent = labelStatus;
+      spanStatus.className = 'td-status ' + classStatus(labelStatus);
+      tdStatus.appendChild(spanStatus);
 
-    const tdStatus = document.createElement('td');
-    const spanStatus = document.createElement('span');
-    const labelStatus = (a.status || 'agendado');
-    spanStatus.textContent = labelStatus;
-    spanStatus.className = 'td-status ' + classStatus(labelStatus);
-    tdStatus.appendChild(spanStatus);
+      const tdNotif = document.createElement('td');
+      tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
 
-    const tdNotif = document.createElement('td');
-    tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
+      const tdObs = document.createElement('td');
+      tdObs.textContent = a.notes || '';
+      tdObs.className = 'td-obs';
 
-    const tdObs = document.createElement('td');
-    tdObs.textContent = a.notes || '';
-    tdObs.className = 'td-obs';
+      const tdAcoes = document.createElement('td');
+      const divActions = document.createElement('div');
+      divActions.className = 'actions';
 
-    /* ===== AÇÕES: Kebab menu (⋯) ===== */
-    const tdAcoes = document.createElement('td');
+      const btnEditar = document.createElement('button');
+      btnEditar.textContent = 'Editar';
+      btnEditar.className = 'btn btn-small btn-secondary';
+      btnEditar.type = 'button';
+      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
 
-    const wrap = document.createElement('div');
-    wrap.className = 'kebab-wrap';
-
-    const btnKebab = document.createElement('button');
-    btnKebab.type = 'button';
-    btnKebab.className = 'kebab-btn';
-    btnKebab.setAttribute('aria-label', 'Ações');
-    btnKebab.setAttribute('aria-haspopup', 'menu');
-    btnKebab.setAttribute('aria-expanded', 'false');
-    btnKebab.textContent = '⋯';
-
-    const menu = document.createElement('div');
-    menu.className = 'kebab-menu hidden';
-    menu.setAttribute('role', 'menu');
-
-    const itemEditar = document.createElement('button');
-    itemEditar.type = 'button';
-    itemEditar.className = 'kebab-item';
-    itemEditar.textContent = 'Editar';
-    itemEditar.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      closeAllKebabMenus();
-      preencherFormEdicao(a);
-    });
-
-    const itemExcluir = document.createElement('button');
-    itemExcluir.type = 'button';
-    itemExcluir.className = 'kebab-item';
-    itemExcluir.textContent = 'Excluir';
-    itemExcluir.addEventListener('click', async (ev) => {
-      ev.stopPropagation();
-      closeAllKebabMenus();
-
-      if (!confirm('Deseja realmente excluir este agendamento?')) return;
-      try {
-        await apiDelete('/api/bookings/' + a.id);
-        await renderTabela();
-        await loadDashboard();
-      } catch (e) { alert(e.message); }
-    });
-
-    menu.appendChild(itemEditar);
-    menu.appendChild(itemExcluir);
-
-    btnKebab.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-
-      // fecha outros
-      document.querySelectorAll('.kebab-menu').forEach(m => {
-        if (m !== menu) m.classList.add('hidden');
-      });
-      document.querySelectorAll('.kebab-btn').forEach(b => {
-        if (b !== btnKebab) b.setAttribute('aria-expanded', 'false');
+      const btnExcluir = document.createElement('button');
+      btnExcluir.textContent = 'Excluir';
+      btnExcluir.className = 'btn btn-small btn-danger';
+      btnExcluir.type = 'button';
+      btnExcluir.addEventListener('click', async () => {
+        if (!confirm('Deseja realmente excluir este agendamento?')) return;
+        try {
+          await apiDelete('/api/bookings/' + a.id);
+          await renderTabela();
+          await loadDashboard();
+        } catch (e) { alert(e.message); }
       });
 
-      const isOpen = !menu.classList.contains('hidden');
-      if (isOpen) {
-        menu.classList.add('hidden');
-        btnKebab.setAttribute('aria-expanded', 'false');
-      } else {
-        menu.classList.remove('hidden');
-        btnKebab.setAttribute('aria-expanded', 'true');
-      }
+      divActions.appendChild(btnEditar);
+      divActions.appendChild(btnExcluir);
+      tdAcoes.appendChild(divActions);
+
+      tr.appendChild(tdData);
+      tr.appendChild(tdHora);
+      tr.appendChild(tdTutor);
+      tr.appendChild(tdPet);
+      tr.appendChild(tdTel);
+      tr.appendChild(tdServ);
+      tr.appendChild(tdMimo);
+      tr.appendChild(tdStatus);
+      tr.appendChild(tdNotif);
+      tr.appendChild(tdObs);
+      tr.appendChild(tdAcoes);
+
+      tbodyAgenda.appendChild(tr);
     });
-
-    wrap.appendChild(btnKebab);
-    wrap.appendChild(menu);
-    tdAcoes.appendChild(wrap);
-
-    tr.appendChild(tdData);
-    tr.appendChild(tdHora);
-    tr.appendChild(tdTutor);
-    tr.appendChild(tdPet);
-    tr.appendChild(tdTel);
-    tr.appendChild(tdServ);
-    tr.appendChild(tdMimo);
-    tr.appendChild(tdStatus);
-    tr.appendChild(tdNotif);
-    tr.appendChild(tdObs);
-    tr.appendChild(tdAcoes);
-
-    tbodyAgenda.appendChild(tr);
-  });
-}
-
+  }
 
   function renderAgendaCards(lista) {
     if (!agendaCards) return;
