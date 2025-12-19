@@ -529,6 +529,134 @@
   .dt-input:focus {
     border-color: rgba(255,255,255,.25);
   }
+
+  /* =========================
+   MENU HAMBURGUER + SIDEBAR
+========================= */
+
+.hamburger{
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid #d0dde0;
+  background: #f3f7f8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  margin-right: 10px;
+}
+.hamburger:hover{
+  border-color: rgba(1, 173, 183, 0.6);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.10);
+  transform: translateY(-1px);
+}
+.hamburger-lines{
+  width: 18px;
+  height: 12px;
+  position: relative;
+  display: block;
+}
+.hamburger-lines::before,
+.hamburger-lines::after,
+.hamburger-lines{
+  background: transparent;
+}
+.hamburger-lines::before,
+.hamburger-lines::after{
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 18px;
+  height: 2px;
+  background: #37474f;
+  border-radius: 99px;
+}
+.hamburger-lines::before{ top: 1px; }
+.hamburger-lines::after{ bottom: 1px; }
+.hamburger-lines{
+  border-top: 2px solid #37474f;
+  border-bottom: 2px solid transparent;
+  height: 2px;
+}
+
+/* Backdrop por cima do conteúdo */
+.sidebar-backdrop{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 9998;
+}
+
+/* Sidebar overlay */
+.sidebar{
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 320px;
+  max-width: 86vw;
+  background: #ffffff;
+  border-right: 1px solid #dde5e8;
+  box-shadow: 18px 0 40px rgba(0,0,0,0.18);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-105%);
+  transition: transform 0.18s ease;
+}
+
+.sidebar.open{
+  transform: translateX(0);
+}
+
+.sidebar-header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid #dde5e8;
+}
+
+.sidebar-title{
+  font-weight: 800;
+  color: #263238;
+  letter-spacing: -0.02em;
+}
+
+.sidebar-close{
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #d0dde0;
+  background: #f3f7f8;
+  cursor: pointer;
+}
+
+.sidebar-links{
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+}
+
+/* Reaproveita .tab-btn, mas em formato vertical */
+.sidebar .tab-btn{
+  width: 100%;
+  justify-content: flex-start;
+  border-radius: 14px;
+  padding: 12px 12px;
+}
+
+/* Oculta o layout antigo de abas (se ainda existir em algum lugar) */
+.tabs{ display: none !important; }
+
+/* utilitário */
+.hidden{ display: none !important; }
+
+
   </style>
 </head>
 <body>
@@ -570,27 +698,43 @@
 
 <div id="adminApp">
   <div class="container">
-    <div class="header">
-      <div class="logo-block">
-        <div class="logo-title">Pet Funny</div>
-        <div class="logo-sub">Painel de Agendamentos, Clientes &amp; Pets</div>
-      </div>
+<div class="header">
+  <button id="btnMenu" class="hamburger" type="button" aria-label="Abrir menu" aria-expanded="false">
+    <span class="hamburger-lines" aria-hidden="true"></span>
+  </button>
 
-      <div class="filters">
-        <button class="btn btn-danger btn-small" id="btnLogout" type="button">Sair</button>
-      </div>
-    </div>
+  <div class="logo-block">
+    <div class="logo-title">Pet Funny</div>
+    <div class="logo-sub">Painel de Agendamentos, Clientes &amp; Pets</div>
+  </div>
 
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agenda &amp; Mimos</button>
-      <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
-      <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
-      <button class="tab-btn" data-tab="tab-racas" type="button"><span>🐶</span> Raças de Cães</button>
-      <button class="tab-btn" data-tab="tab-mimos" type="button"><span>🎁</span> Mimos</button>
-<button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
+  <div class="filters">
+    <button class="btn btn-danger btn-small" id="btnLogout" type="button">Sair</button>
+  </div>
+</div>
 
-      <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
-    </div>
+
+<!-- MENU LATERAL (HAMBURGUER) -->
+<div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+
+<nav id="sidebar" class="sidebar hidden" aria-label="Menu do painel">
+  <div class="sidebar-header">
+    <div class="sidebar-title">Menu</div>
+    <button id="btnMenuClose" class="sidebar-close" type="button" aria-label="Fechar menu">✕</button>
+  </div>
+
+  <div class="sidebar-links">
+    <!-- Reaproveita os MESMOS botões/tab-btn e data-tab -->
+    <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agenda &amp; Mimos</button>
+    <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
+    <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
+    <button class="tab-btn" data-tab="tab-racas" type="button"><span>🐶</span> Raças de Cães</button>
+    <button class="tab-btn" data-tab="tab-mimos" type="button"><span>🎁</span> Mimos</button>
+    <button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
+    <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
+  </div>
+</nav>
+
 
     <!-- TAB: AGENDA -->
     <section id="tab-agenda" class="tab-view active">
@@ -3989,6 +4133,55 @@
 
 // ===== Início =====
   tryAutoLogin();
+
+  /* =========================
+   SIDEBAR (MENU HAMBURGUER)
+========================= */
+(function initSidebarMenu(){
+  const btnMenu = document.getElementById('btnMenu');
+  const btnMenuClose = document.getElementById('btnMenuClose');
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  if (!btnMenu || !sidebar || !backdrop) return;
+
+  function openMenu(){
+    backdrop.classList.remove('hidden');
+    sidebar.classList.remove('hidden');
+    requestAnimationFrame(() => sidebar.classList.add('open'));
+    btnMenu.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeMenu(){
+    sidebar.classList.remove('open');
+    btnMenu.setAttribute('aria-expanded', 'false');
+    setTimeout(() => {
+      sidebar.classList.add('hidden');
+      backdrop.classList.add('hidden');
+    }, 180);
+  }
+
+  btnMenu.addEventListener('click', () => {
+    const isOpen = sidebar.classList.contains('open');
+    if (isOpen) closeMenu();
+    else openMenu();
+  });
+
+  if (btnMenuClose) btnMenuClose.addEventListener('click', closeMenu);
+  backdrop.addEventListener('click', closeMenu);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar.classList.contains('open')) closeMenu();
+  });
+
+  // Fecha o menu ao clicar em qualquer item do menu (tab-btn)
+  sidebar.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab-btn');
+    if (btn) closeMenu();
+  });
+})();
+
+
 </script>
 </body>
 </html>
