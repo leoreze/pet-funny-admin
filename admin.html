@@ -958,11 +958,8 @@
           <div class="form-group">
             <label for="formPrize">Mimo (Roleta)</label>
             <select id="formPrize">
-              <option value="Tosa Higiênica">Tosa Higiênica</option>
-              <option value="Hidratação">Hidratação</option>
-              <option value="Foto e Vídeo Profissional">Foto e Vídeo Profissional</option>
-              <option value="Patinhas impecáveis">Patinhas impecáveis</option>
-            </select>
+  <option value="">Carregando mimos...</option>
+</select>
           </div>
         </div>
 
@@ -979,9 +976,10 @@
           </div>
           <div class="form-group">
             <label for="formTime">Horário</label>
-            <select id="formTime" required>
+       <select id="formTime" disabled>
   <option value="">Selecione um horário</option>
 </select>
+
 
           </div>
         </div>
@@ -1591,6 +1589,197 @@
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
+  /* =========================
+   MIMOS -> Select do Agendamento
+========================= */
+async function loadMimosIntoPrizeSelect() {
+  const sel = document.getElementById('formPrize');
+  if (!sel) return;
+
+  // placeholder
+  sel.innerHTML = `<option value="">Carregando mimos...</option>`;
+
+  try {
+    // Ajuste aqui se seu backend usar outro endpoint/querystring
+    const res = await fetch('/api/mimos', { credentials: 'include' });
+    const data = await res.json();
+
+    const rows = (data && (data.mimos || data.items || data.data)) || [];
+    const now = new Date();
+
+    // filtro: ativos e dentro do período (se starts_at/ends_at existirem)
+    const active = rows.filter(m => {
+      if (m == null) return false;
+      if (m.is_active === false) return false;
+
+      const s = m.starts_at ? new Date(m.starts_at) : null;
+      const e = m.ends_at ? new Date(m.ends_at) : null;
+
+      if (s && now < s) return false;
+      if (e && now > e) return false;
+
+      return true;
+    });
+
+    if (!active.length) {
+      sel.innerHTML = `<option value="">(Nenhum mimo ativo no período)</option>`;
+      return;
+    }
+
+    // monta options
+    sel.innerHTML = `<option value="">(Sem mimo)</option>`;
+    for (const m of active) {
+      const title = (m.title || '').trim();
+      if (!title) continue;
+      const opt = document.createElement('option');
+      opt.value = title;
+      opt.textContent = title;
+      sel.appendChild(opt);
+    }
+  } catch (err) {
+    console.error('Erro ao carregar mimos:', err);
+    sel.innerHTML = `<option value="">Erro ao carregar mimos</option>`;
+  }
+}
+
+/* =========================
+   HORÁRIOS (30 em 30) -> Select
+   - habilita/desabilita corretamente
+   - remove horários já passados no dia atual
+========================= */
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function timeToMinutes(hhmm) {
+  const [h, m] = String(hhmm || '').split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return NaN;
+  return h * 60 + m;
+}
+
+function minutesToTime(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${pad2(h)}:${pad2(m)}`;
+}
+
+function isSameYMD(a, b) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+/**
+ * Gera slots de 30 em 30 com base em:
+ * - openingHoursCache[dow] = { is_closed, open_time, close_time }
+ *
+ * IMPORTANTE:
+ * - este código assume que você já tem um cache de horários do "Horário de Funcionamento".
+ * - Se no seu admin já existe algo como `openingHoursCache`, ele usa.
+ * - Se não existir, ele cai num padrão 07:30–17:30 (seg–sex) e 07:30–13:00 (sab).
+ */
+function getOpeningForDate(dateObj) {
+  const dow = dateObj.getDay(); // 0 dom ... 6 sáb
+
+  // Tenta usar o cache existente no seu admin (caso já tenha)
+  if (window.openingHoursCache && window.openingHoursCache[dow]) {
+    return window.openingHoursCache[dow];
+  }
+
+  // fallback seguro
+  if (dow === 0) return { is_closed: true };
+  if (dow === 6) return { is_closed: false, open_time: '07:30', close_time: '13:00' };
+  return { is_closed: false, open_time: '07:30', close_time: '17:30' };
+}
+
+function populateTimeSelectForDate(dateStr) {
+  const sel = document.getElementById('formTime');
+  if (!sel) return;
+
+  // estado base
+  sel.innerHTML = `<option value="">Selecione um horário</option>`;
+  sel.disabled = true;
+
+  if (!dateStr) return;
+
+  const d = new Date(dateStr + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return;
+
+  const oh = getOpeningForDate(d);
+  if (!oh || oh.is_closed) {
+    sel.innerHTML = `<option value="">(Fechado neste dia)</option>`;
+    sel.disabled = true;
+    return;
+  }
+
+  const openMin = timeToMinutes(oh.open_time);
+  const closeMin = timeToMinutes(oh.close_time);
+
+  if (!Number.isFinite(openMin) || !Number.isFinite(closeMin) || closeMin <= openMin) {
+    sel.innerHTML = `<option value="">(Horário inválido/configuração)</option>`;
+    sel.disabled = true;
+    return;
+  }
+
+  // remove horários já passados se for hoje
+  const now = new Date();
+  let minAllowed = openMin;
+  if (isSameYMD(d, now)) {
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    // próximo múltiplo de 30
+    const nextSlot = Math.ceil(nowMin / 30) * 30;
+    minAllowed = Math.max(openMin, nextSlot);
+  }
+
+  for (let t = minAllowed; t < closeMin; t += 30) {
+    const hhmm = minutesToTime(t);
+    const opt = document.createElement('option');
+    opt.value = hhmm;
+    opt.textContent = hhmm;
+    sel.appendChild(opt);
+  }
+
+  // se não sobrou slot
+  if (sel.options.length <= 1) {
+    sel.innerHTML = `<option value="">(Sem horários disponíveis)</option>`;
+    sel.disabled = true;
+    return;
+  }
+
+  sel.disabled = false;
+}
+
+/**
+ * Bind para manter o select de horário habilitando/desabilitando corretamente
+ * e garantir que ele sempre repopule ao mudar a data.
+ */
+function bindBookingDateTime() {
+  const dateEl = document.getElementById('formDate');
+  const timeEl = document.getElementById('formTime');
+  if (!dateEl || !timeEl) return;
+
+  // sempre que mudar a data, repopula o select
+  dateEl.addEventListener('change', () => {
+    populateTimeSelectForDate(dateEl.value);
+  });
+
+  // se já tiver data preenchida, repopula ao abrir
+  if (dateEl.value) {
+    populateTimeSelectForDate(dateEl.value);
+  }
+}
+
+/* =========================
+   CHAME ISTO NO SEU INIT
+========================= */
+function initMimosAndTimeSelectFixes() {
+  // 1) garante que o select de mimos seja preenchido sempre que o painel carregar
+  loadMimosIntoPrizeSelect();
+
+  // 2) garante que o horário não fique travado
+  bindBookingDateTime();
+}
+
+
   function toDatetimeLocalValue(isoOrTs) {
     if (!isoOrTs) return '';
     const d = new Date(isoOrTs);
@@ -2178,6 +2367,8 @@
 
   return null;
 }
+
+
 
 
   function pad2(n) { return String(n).padStart(2, '0'); }
