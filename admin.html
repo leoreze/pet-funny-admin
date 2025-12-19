@@ -3280,129 +3280,80 @@ function initAgendaListSortingOnce() {
 
 
   function renderAgendaList(lista) {
-  tbodyAgenda.innerHTML = '';
-  estadoVazio.style.display = lista.length ? 'none' : 'block';
+    tbodyAgenda.innerHTML = '';
+    estadoVazio.style.display = lista.length ? 'none' : 'block';
 
-  // sempre que re-renderiza, fecha menus abertos
-  closeAllKebabMenus();
+    lista.forEach(a => {
+      const tr = document.createElement('tr');
 
-  lista.forEach(a => {
-    const tr = document.createElement('tr');
+      const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
+      const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
+      const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
+      const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
 
-    const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
-    const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
-    const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
-    const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-    const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
+      const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
 
-    const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
+      const tdMimo = document.createElement('td');
+      tdMimo.textContent = a.prize || '-';
+      tdMimo.className = 'td-mimo';
 
-    const tdMimo = document.createElement('td');
-    tdMimo.textContent = a.prize || '-';
-    tdMimo.className = 'td-mimo';
+      const tdStatus = document.createElement('td');
+      const spanStatus = document.createElement('span');
+      const labelStatus = (a.status || 'agendado');
+      spanStatus.textContent = labelStatus;
+      spanStatus.className = 'td-status ' + classStatus(labelStatus);
+      tdStatus.appendChild(spanStatus);
 
-    const tdStatus = document.createElement('td');
-    const spanStatus = document.createElement('span');
-    const labelStatus = (a.status || 'agendado');
-    spanStatus.textContent = labelStatus;
-    spanStatus.className = 'td-status ' + classStatus(labelStatus);
-    tdStatus.appendChild(spanStatus);
+      const tdNotif = document.createElement('td');
+      tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
 
-    const tdNotif = document.createElement('td');
-    tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
+      const tdObs = document.createElement('td');
+      tdObs.textContent = a.notes || '';
+      tdObs.className = 'td-obs';
 
-    const tdObs = document.createElement('td');
-    tdObs.textContent = a.notes || '';
-    tdObs.className = 'td-obs';
+      const tdAcoes = document.createElement('td');
+      const divActions = document.createElement('div');
+      divActions.className = 'actions';
 
-    /* ===== AÇÕES: Kebab menu (⋯) ===== */
-    const tdAcoes = document.createElement('td');
+      const btnEditar = document.createElement('button');
+      btnEditar.textContent = 'Editar';
+      btnEditar.className = 'btn btn-small btn-secondary';
+      btnEditar.type = 'button';
+      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
 
-    const wrap = document.createElement('div');
-    wrap.className = 'kebab-wrap';
-
-    const btnKebab = document.createElement('button');
-    btnKebab.type = 'button';
-    btnKebab.className = 'kebab-btn';
-    btnKebab.setAttribute('aria-label', 'Ações');
-    btnKebab.setAttribute('aria-haspopup', 'menu');
-    btnKebab.setAttribute('aria-expanded', 'false');
-    btnKebab.textContent = '⋯';
-
-    const menu = document.createElement('div');
-    menu.className = 'kebab-menu hidden';
-    menu.setAttribute('role', 'menu');
-
-    const itemEditar = document.createElement('button');
-    itemEditar.type = 'button';
-    itemEditar.className = 'kebab-item';
-    itemEditar.textContent = 'Editar';
-    itemEditar.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      closeAllKebabMenus();
-      preencherFormEdicao(a);
-    });
-
-    const itemExcluir = document.createElement('button');
-    itemExcluir.type = 'button';
-    itemExcluir.className = 'kebab-item';
-    itemExcluir.textContent = 'Excluir';
-    itemExcluir.addEventListener('click', async (ev) => {
-      ev.stopPropagation();
-      closeAllKebabMenus();
-
-      if (!confirm('Deseja realmente excluir este agendamento?')) return;
-      try {
-        await apiDelete('/api/bookings/' + a.id);
-        await renderTabela();
-        await loadDashboard();
-      } catch (e) { alert(e.message); }
-    });
-
-    menu.appendChild(itemEditar);
-    menu.appendChild(itemExcluir);
-
-    btnKebab.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-
-      // fecha outros
-      document.querySelectorAll('.kebab-menu').forEach(m => {
-        if (m !== menu) m.classList.add('hidden');
-      });
-      document.querySelectorAll('.kebab-btn').forEach(b => {
-        if (b !== btnKebab) b.setAttribute('aria-expanded', 'false');
+      const btnExcluir = document.createElement('button');
+      btnExcluir.textContent = 'Excluir';
+      btnExcluir.className = 'btn btn-small btn-danger';
+      btnExcluir.type = 'button';
+      btnExcluir.addEventListener('click', async () => {
+        if (!confirm('Deseja realmente excluir este agendamento?')) return;
+        try {
+          await apiDelete('/api/bookings/' + a.id);
+          await renderTabela();
+          await loadDashboard();
+        } catch (e) { alert(e.message); }
       });
 
-      const isOpen = !menu.classList.contains('hidden');
-      if (isOpen) {
-        menu.classList.add('hidden');
-        btnKebab.setAttribute('aria-expanded', 'false');
-      } else {
-        menu.classList.remove('hidden');
-        btnKebab.setAttribute('aria-expanded', 'true');
-      }
+      divActions.appendChild(btnEditar);
+      divActions.appendChild(btnExcluir);
+      tdAcoes.appendChild(divActions);
+
+      tr.appendChild(tdData);
+      tr.appendChild(tdHora);
+      tr.appendChild(tdTutor);
+      tr.appendChild(tdPet);
+      tr.appendChild(tdTel);
+      tr.appendChild(tdServ);
+      tr.appendChild(tdMimo);
+      tr.appendChild(tdStatus);
+      tr.appendChild(tdNotif);
+      tr.appendChild(tdObs);
+      tr.appendChild(tdAcoes);
+
+      tbodyAgenda.appendChild(tr);
     });
-
-    wrap.appendChild(btnKebab);
-    wrap.appendChild(menu);
-    tdAcoes.appendChild(wrap);
-
-    tr.appendChild(tdData);
-    tr.appendChild(tdHora);
-    tr.appendChild(tdTutor);
-    tr.appendChild(tdPet);
-    tr.appendChild(tdTel);
-    tr.appendChild(tdServ);
-    tr.appendChild(tdMimo);
-    tr.appendChild(tdStatus);
-    tr.appendChild(tdNotif);
-    tr.appendChild(tdObs);
-    tr.appendChild(tdAcoes);
-
-    tbodyAgenda.appendChild(tr);
-  });
-}
-
+  }
 
   function renderAgendaCards(lista) {
     if (!agendaCards) return;
