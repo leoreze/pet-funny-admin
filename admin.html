@@ -737,66 +737,6 @@
   }
 }
 
-/* ===== Agendamentos (Lista): Sort + Kebab menu ===== */
-.sortable-th {
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-.sort-ind {
-  margin-left: 6px;
-  font-size: 11px;
-  opacity: .65;
-}
-
-.kebab-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.kebab-btn {
-  width: 34px;
-  height: 30px;
-  border-radius: 10px;
-  border: 1px solid rgba(0,0,0,.15);
-  background: #fff;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.kebab-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 150px;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,.12);
-  border-radius: 12px;
-  box-shadow: 0 10px 26px rgba(0,0,0,.14);
-  z-index: 999;
-  padding: 6px;
-}
-
-.kebab-item {
-  width: 100%;
-  text-align: left;
-  padding: 9px 10px;
-  border: none;
-  background: transparent;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.kebab-item:hover {
-  background: rgba(0,0,0,.06);
-}
 
 
   </style>
@@ -3141,143 +3081,20 @@
     return serviceLabel;
   }
 
-  /* ===== Agendamentos (Lista): Sort + Kebab menu ===== */
-let agendaSortState = { idx: null, dir: 1 }; // dir: 1 asc, -1 desc
-let agendaSortInited = false;
-
-const AGENDA_COLS = [
-  { name: 'Data', getter: (a) => `${a.date || ''} ${a.time || ''}`.trim() },
-  { name: 'Hora', getter: (a) => `${a.time || ''} ${a.date || ''}`.trim() },
-  { name: 'Tutor(a)', getter: (a) => (a.customer_name || '').toString().toLowerCase() },
-  { name: 'Pet', getter: (a) => (a.pet_name || '').toString().toLowerCase() },
-  { name: 'Telefone', getter: (a) => (String(a.phone || '').replace(/\D/g, '')) },
-  { name: 'Serviço', getter: (a) => (getServiceLabelFromBooking(a) || '').toString().toLowerCase() },
-  { name: 'Mimo', getter: (a) => (a.prize || '').toString().toLowerCase() },
-  { name: 'Status', getter: (a) => (a.status || 'agendado').toString().toLowerCase() },
-  { name: 'Última notificação', getter: (a) => (a.last_notification_at || '') },
-  { name: 'Obs.', getter: (a) => (a.notes || '').toString().toLowerCase() },
-];
-
-function closeAllKebabMenus() {
-  document.querySelectorAll('.kebab-menu').forEach(m => m.classList.add('hidden'));
-  document.querySelectorAll('.kebab-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
-}
-
-function sortAgendaIfNeeded(lista) {
-  if (!agendaSortState || agendaSortState.idx == null) return lista;
-
-  const col = AGENDA_COLS[agendaSortState.idx];
-  if (!col) return lista;
-
-  const dir = agendaSortState.dir || 1;
-
-  // cópia para não quebrar referências
-  const arr = [...lista];
-
-  arr.sort((a, b) => {
-    const va = col.getter(a);
-    const vb = col.getter(b);
-
-    // tenta comparar como data quando parece ISO
-    const da = Date.parse(va);
-    const db = Date.parse(vb);
-    if (!Number.isNaN(da) && !Number.isNaN(db)) {
-      if (da === db) return 0;
-      return (da < db ? -1 : 1) * dir;
-    }
-
-    // numérico (telefone)
-    const na = typeof va === 'string' && va !== '' && /^\d+$/.test(va) ? Number(va) : null;
-    const nb = typeof vb === 'string' && vb !== '' && /^\d+$/.test(vb) ? Number(vb) : null;
-    if (na != null && nb != null) {
-      if (na === nb) return 0;
-      return (na < nb ? -1 : 1) * dir;
-    }
-
-    // string
-    const sa = (va ?? '').toString();
-    const sb = (vb ?? '').toString();
-    const cmp = sa.localeCompare(sb, 'pt-BR', { sensitivity: 'base' });
-    return cmp * dir;
-  });
-
-  return arr;
-}
-
-function initAgendaListSortingOnce() {
-  if (agendaSortInited) return;
-  agendaSortInited = true;
-
-  const theadThs = document.querySelectorAll('#agendaListWrapper table thead th');
-  if (!theadThs || !theadThs.length) return;
-
-  // último TH é Ações (não ordena)
-  theadThs.forEach((th, idx) => {
-    const isActions = (idx === theadThs.length - 1);
-    th.dataset.originalText = th.textContent.trim();
-
-    if (isActions) return;
-
-    th.classList.add('sortable-th');
-    th.title = 'Clique para ordenar';
-    th.addEventListener('click', () => {
-      // toggle direção se clicar na mesma coluna
-      if (agendaSortState.idx === idx) {
-        agendaSortState.dir = agendaSortState.dir * -1;
-      } else {
-        agendaSortState.idx = idx;
-        agendaSortState.dir = 1;
-      }
-
-      // atualiza indicadores
-      theadThs.forEach((th2, j) => {
-        const orig = th2.dataset.originalText || th2.textContent.trim();
-        if (j === theadThs.length - 1) {
-          th2.textContent = orig;
-          return;
-        }
-
-        if (j === agendaSortState.idx) {
-          const arrow = agendaSortState.dir === 1 ? '▲' : '▼';
-          th2.innerHTML = `${orig} <span class="sort-ind">${arrow}</span>`;
-        } else {
-          th2.textContent = orig;
-        }
-      });
-
-      // re-render com ordenação (somente lista)
-      if (Array.isArray(ultimaLista)) renderAgendaByView(ultimaLista);
-    });
-  });
-
-  // fecha menus ao clicar fora
-  document.addEventListener('click', () => closeAllKebabMenus());
-  // evita menu “preso” quando rola
-  document.addEventListener('scroll', () => closeAllKebabMenus(), true);
-}
-
-
   function renderAgendaByView(lista) {
-  // vazio: atualiza ambos estados para evitar inconsistências
-  const isEmpty = !lista || !lista.length;
+    // vazio: atualiza ambos estados para evitar inconsistências
+    const isEmpty = !lista || !lista.length;
 
-  if (agendaView === 'cards') {
-    renderAgendaCards(lista || []);
-    if (estadoVazio) estadoVazio.style.display = 'none';
-    if (estadoVazioCards) estadoVazioCards.classList.toggle('hidden', !isEmpty);
-  } else {
-    // init do sort só quando a tabela existe
-    initAgendaListSortingOnce();
-
-    // ordena apenas na visualização "lista"
-    const sorted = sortAgendaIfNeeded(lista || []);
-    renderAgendaList(sorted);
-
-    if (estadoVazioCards) estadoVazioCards.classList.add('hidden');
-    if (estadoVazio) estadoVazio.style.display = isEmpty ? 'block' : 'none';
+    if (agendaView === 'cards') {
+      renderAgendaCards(lista || []);
+      if (estadoVazio) estadoVazio.style.display = 'none';
+      if (estadoVazioCards) estadoVazioCards.classList.toggle('hidden', !isEmpty);
+    } else {
+      renderAgendaList(lista || []);
+      if (estadoVazioCards) estadoVazioCards.classList.add('hidden');
+      if (estadoVazio) estadoVazio.style.display = isEmpty ? 'block' : 'none';
+    }
   }
-}
-
 
   function renderAgendaList(lista) {
     tbodyAgenda.innerHTML = '';
