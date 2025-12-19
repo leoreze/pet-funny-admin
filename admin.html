@@ -515,6 +515,20 @@
     }
     .footer-info strong { font-size: 13px; color: #263238; }
     .footer-bottom { font-size: 11px; color: #78909c; text-align: center; margin-top: 4px; }
+
+    /* Inputs datetime no mesmo padrão visual */
+  .dt-input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(0,0,0,.20);
+    color: inherit;
+    outline: none;
+  }
+  .dt-input:focus {
+    border-color: rgba(255,255,255,.25);
+  }
   </style>
 </head>
 <body>
@@ -959,80 +973,103 @@
 <!-- TAB: MIMOS -->
 <section id="tab-mimos" class="tab-view">
   <div class="section-title-row">
-    <div class="section-title">Mimos (Roleta)</div>
-    <div class="section-actions">
-      <button class="btn btn-small" id="btnMimosReload" type="button">Recarregar</button>
+    <div class="section-title">Mimos</div>
+
+    <div class="section-actions" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input id="mimosSearch" type="text" placeholder="Buscar mimos..." class="input" style="min-width:260px;" />
+      </div>
+
+      <button class="btn" id="btnNovoMimo" type="button">Novo Mimo</button>
+      <button class="btn btn-secondary btn-small" id="btnMimosReload" type="button">Recarregar</button>
     </div>
   </div>
 
   <div class="card">
-    <div class="grid-2">
-      <div>
-        <h3 style="margin-top:0">Cadastrar / Editar Mimo</h3>
-        <div class="form-row">
-          <label for="mimoTitle">Título</label>
-          <input id="mimoTitle" type="text" placeholder="Ex.: Banho Grátis" maxlength="80" />
-        </div>
 
-        <div class="form-row">
-          <label for="mimoDesc">Descrição (use emojis)</label>
-          <textarea id="mimoDesc" rows="3" placeholder="Ex.: 🎁 Você ganhou 1 banho grátis!"></textarea>
-          <div id="emojiPanel" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; user-select:none"></div>
-          <small style="opacity:.8">Dica: no Windows, também funciona o atalho <b>Win + .</b> para abrir o seletor de emojis.</small>
-        </div>
-
-        <div class="grid-2">
-          <div class="form-row">
-            <label for="mimoValue">Valor (R$)</label>
-            <input id="mimoValue" type="text" inputmode="numeric" placeholder="0,00" />
-          </div>
-          <div class="form-row" style="display:flex; align-items:flex-end; gap:8px;">
-            <label style="display:flex; gap:8px; align-items:center; margin:0;">
-              <input id="mimoActive" type="checkbox" checked />
-              Ativo
-            </label>
-          </div>
-        </div>
-
-        <div class="grid-2">
-          <div class="form-row">
-            <label for="mimoStart">Início (quando entra na roleta)</label>
-            <input id="mimoStart" type="datetime-local" />
-          </div>
-          <div class="form-row">
-            <label for="mimoEnd">Término (quando sai da roleta)</label>
-            <input id="mimoEnd" type="datetime-local" />
-          </div>
-        </div>
-
-        <div style="display:flex; gap:8px; margin-top:10px;">
-          <button class="btn" id="btnMimoSave" type="button">Salvar</button>
-          <button class="btn btn-secondary" id="btnMimoClear" type="button">Limpar</button>
-          <div id="mimoMsg" style="margin-left:auto; align-self:center; opacity:.85"></div>
-        </div>
+    <!-- Form colapsável (fechado por padrão) -->
+    <div id="mimoFormWrap" class="card" style="margin:0 0 16px 0; display:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <h3 style="margin:0;">Cadastrar / Editar Mimo</h3>
+        <button class="btn btn-secondary btn-small" id="btnFecharMimoForm" type="button">Fechar</button>
       </div>
 
-      <div>
-        <h3 style="margin-top:0">Lista de Mimos</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Título</th>
-                <th>Valor</th>
-                <th>Período</th>
-                <th>Ativo</th>
-                <th style="width:160px">Ações</th>
-              </tr>
-            </thead>
-            <tbody id="tbodyMimos"></tbody>
-          </table>
-          <div id="mimosEmpty" class="empty" style="display:none">Nenhum mimo cadastrado.</div>
+      <div class="grid-2" style="margin-top:12px;">
+        <div>
+          <div class="form-row">
+            <label for="mimoTitle">Título</label>
+            <input id="mimoTitle" type="text" placeholder="Ex.: 🎁 Banho Grátis" maxlength="80" />
+          </div>
+
+          <div class="form-row">
+            <label for="mimoDesc">Descrição (com emojis)</label>
+            <textarea id="mimoDesc" rows="3" placeholder="Ex.: 🎉 Você ganhou 1 banho grátis!"></textarea>
+
+            <div id="emojiPanel" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; user-select:none;"></div>
+            <small style="opacity:.75">Dica rápida: no Windows, use <b>Win + .</b> para abrir o seletor de emojis.</small>
+          </div>
+        </div>
+
+        <div>
+          <div class="grid-2">
+            <div class="form-row">
+              <label for="mimoValue">Valor (R$)</label>
+              <input id="mimoValue" type="text" inputmode="numeric" placeholder="0,00" />
+            </div>
+
+            <div class="form-row" style="display:flex; align-items:flex-end;">
+              <label style="display:flex; gap:8px; align-items:center; margin:0;">
+                <input id="mimoActive" type="checkbox" checked />
+                Ativo
+              </label>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-row">
+              <label for="mimoStart">Início</label>
+              <input id="mimoStart" type="datetime-local" class="dt-input" />
+            </div>
+
+            <div class="form-row">
+              <label for="mimoEnd">Término</label>
+              <input id="mimoEnd" type="datetime-local" class="dt-input" />
+            </div>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
+            <button class="btn" id="btnMimoSave" type="button">Salvar</button>
+            <button class="btn btn-secondary" id="btnMimoClear" type="button">Limpar</button>
+            <div id="mimoMsg" style="margin-left:auto; opacity:.85;"></div>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- Lista -->
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin:18px 0 14px 0;">
+      <h3 style="margin:0;">Lista de Mimos</h3>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Título</th>
+            <th>Valor</th>
+            <th>Período</th>
+            <th>Ativo</th>
+            <th style="width:160px;">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyMimos"></tbody>
+      </table>
+      <div id="mimosEmpty" class="empty" style="display:none;">Nenhum mimo cadastrado.</div>
+    </div>
+
   </div>
 </section>
+
 
 
     <!-- TAB: HORÁRIO DE FUNCIONAMENTO -->
@@ -1214,12 +1251,9 @@
 (function () {
   'use strict';
 
-  /* -------------------------
-     Helpers DOM
-  ------------------------- */
   const $ = (id) => document.getElementById(id);
   const elTab = $('tab-mimos');
-  if (!elTab) return; // não existe no HTML, então não faz nada
+  if (!elTab) return;
 
   const els = {
     title: $('mimoTitle'),
@@ -1235,66 +1269,52 @@
     msg: $('mimoMsg'),
     tbody: $('tbodyMimos'),
     empty: $('mimosEmpty'),
-    prizeSelect: document.getElementById('formPrize') || null, // opcional
+    prizeSelect: document.getElementById('formPrize') || null,
+
+    // novos do layout
+    search: $('mimosSearch'),
+    btnNovo: $('btnNovoMimo'),
+    formWrap: $('mimoFormWrap'),
+    btnCloseForm: $('btnFecharMimoForm'),
   };
 
-  // estado interno
   let currentEditId = null;
   let cacheMimos = [];
 
-  /* -------------------------
-     Formatação / Parsing
-  ------------------------- */
   function setMsg(text, isError) {
     if (!els.msg) return;
     els.msg.textContent = text || '';
     els.msg.style.color = isError ? '#c0392b' : '';
   }
 
-  function pad2(n) {
-    return String(n).padStart(2, '0');
-  }
+  function pad2(n) { return String(n).padStart(2, '0'); }
 
-  // Converte ISO/timestamp -> valor para input datetime-local
   function toDatetimeLocalValue(isoOrTs) {
     if (!isoOrTs) return '';
     const d = new Date(isoOrTs);
     if (isNaN(d.getTime())) return '';
-    // datetime-local usa hora local
     return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
   }
 
-  // Converte datetime-local -> ISO (ou null)
   function fromDatetimeLocalValue(v) {
     if (!v) return null;
-    // v = "YYYY-MM-DDTHH:MM"
     const d = new Date(v);
     if (isNaN(d.getTime())) return null;
     return d.toISOString();
   }
 
-  // Valor "R$ 1.234,56" -> cents (int)
   function parseBRLToCents(input) {
     if (input == null) return 0;
-    const s = String(input)
-      .replace(/[^\d,.-]/g, '')  // mantém números, vírgula, ponto, sinal
-      .trim();
-
+    const s = String(input).replace(/[^\d,.-]/g, '').trim();
     if (!s) return 0;
-
-    // Estratégia:
-    // - Remove pontos (milhar), troca vírgula por ponto, parseFloat
-    // - Ex.: "1.234,56" -> "1234.56"
     const normalized = s.replace(/\./g, '').replace(',', '.');
     const n = Number(normalized);
     if (!Number.isFinite(n)) return 0;
     return Math.max(0, Math.round(n * 100));
   }
 
-  // cents -> "1.234,56"
   function formatCentsToBRL(cents) {
     const v = Number(cents || 0) / 100;
-    // pt-BR
     return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
@@ -1306,15 +1326,21 @@
     });
   }
 
-  /* -------------------------
-     Emojis (painel simples)
-     Observação: além disso, o Windows (Win + .) abre o seletor
-  ------------------------- */
   const EMOJI_LIST = [
-    '🎁','🎉','✨','⭐','💎','🏆','🥇','🥈','🥉','🎯','🔥','💥','✅','🧡','💛','💚','💙','💜',
-    '🐶','🐾','🛁','✂️','🧴','🧼','🫧','🦴','🍖','🥩','🦮','🐕','🐩','🐕‍🦺',
-    '💸','🤑','🎟️','🎫','📣','📌','⏳','📅','🔔','🎡','🎲','🎰','🎮'
+    '🎁','🎉','✨','⭐','💎','🏆','🥇','🎯','🔥','✅','🧡','💛','💚','💙','💜',
+    '🐶','🐾','🛁','✂️','🧴','🧼','🫧','🦴','🍖','💸','🎟️','📣','📅','🔔','🎡','🎲'
   ];
+
+  function insertAtCursor(textarea, text) {
+    if (!textarea) return;
+    const start = textarea.selectionStart ?? textarea.value.length;
+    const end = textarea.selectionEnd ?? textarea.value.length;
+    const before = textarea.value.slice(0, start);
+    const after = textarea.value.slice(end);
+    textarea.value = before + text + after;
+    const newPos = start + text.length;
+    textarea.selectionStart = textarea.selectionEnd = newPos;
+  }
 
   function buildEmojiPanel() {
     if (!els.emojiPanel || !els.desc) return;
@@ -1334,20 +1360,25 @@
     });
   }
 
-  function insertAtCursor(textarea, text) {
-    if (!textarea) return;
-    const start = textarea.selectionStart ?? textarea.value.length;
-    const end = textarea.selectionEnd ?? textarea.value.length;
-    const before = textarea.value.slice(0, start);
-    const after = textarea.value.slice(end);
-    textarea.value = before + text + after;
-    const newPos = start + text.length;
-    textarea.selectionStart = textarea.selectionEnd = newPos;
+  function openForm() {
+    if (els.formWrap) els.formWrap.style.display = '';
+  }
+  function closeForm() {
+    if (els.formWrap) els.formWrap.style.display = 'none';
   }
 
-  /* -------------------------
-     API
-  ------------------------- */
+  function clearForm() {
+    currentEditId = null;
+    if (els.title) els.title.value = '';
+    if (els.desc) els.desc.value = '';
+    if (els.value) els.value.value = formatCentsToBRL(0);
+    if (els.start) els.start.value = '';
+    if (els.end) els.end.value = '';
+    if (els.active) els.active.checked = true;
+    setMsg('', false);
+  }
+
+  /* ---------- API ---------- */
   async function apiGetMimos() {
     const r = await fetch('/api/mimos', { method: 'GET' });
     const data = await r.json().catch(() => ({}));
@@ -1384,20 +1415,62 @@
     return true;
   }
 
-  /* -------------------------
-     Render / UI
-  ------------------------- */
+  /* ---------- Render ---------- */
+  function syncPrizeSelect(mimos) {
+    if (!els.prizeSelect) return;
+
+    const now = new Date();
+    const isInPeriod = (m) => {
+      if (!m.is_active) return false;
+      const s = m.starts_at ? new Date(m.starts_at) : null;
+      const e = m.ends_at ? new Date(m.ends_at) : null;
+      if (s && !isNaN(s.getTime()) && now < s) return false;
+      if (e && !isNaN(e.getTime()) && now > e) return false;
+      return true;
+    };
+
+    const active = (mimos || []).filter(isInPeriod);
+    const current = els.prizeSelect.value;
+
+    els.prizeSelect.innerHTML = '';
+    const opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = '— Sem mimo —';
+    els.prizeSelect.appendChild(opt0);
+
+    active.forEach((m) => {
+      const opt = document.createElement('option');
+      opt.value = m.title; // compat: booking.prize é texto
+      opt.textContent = `${m.title} (R$ ${formatCentsToBRL(m.value_cents)})`;
+      opt.setAttribute('data-mimo-id', String(m.id));
+      els.prizeSelect.appendChild(opt);
+    });
+
+    if (current) els.prizeSelect.value = current;
+  }
+
   function renderMimosTable(mimos) {
     if (!els.tbody) return;
     els.tbody.innerHTML = '';
 
-    if (!mimos || mimos.length === 0) {
+    const q = (els.search?.value || '').trim().toLowerCase();
+    const filtered = !q ? (mimos || []) : (mimos || []).filter(m =>
+      String(m.title || '').toLowerCase().includes(q) ||
+      String(m.description || '').toLowerCase().includes(q)
+    );
+
+    if (!filtered || filtered.length === 0) {
       if (els.empty) els.empty.style.display = '';
       return;
     }
     if (els.empty) els.empty.style.display = 'none';
 
-    mimos.forEach((m) => {
+    const fmt = (d) => {
+      if (!d || isNaN(d.getTime())) return '—';
+      return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    };
+
+    filtered.forEach((m) => {
       const tr = document.createElement('tr');
 
       const tdTitle = document.createElement('td');
@@ -1411,11 +1484,6 @@
       const tdPeriod = document.createElement('td');
       const s = m.starts_at ? new Date(m.starts_at) : null;
       const e = m.ends_at ? new Date(m.ends_at) : null;
-
-      const fmt = (d) => {
-        if (!d || isNaN(d.getTime())) return '—';
-        return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      };
       tdPeriod.textContent = `${fmt(s)} → ${fmt(e)}`;
       tr.appendChild(tdPeriod);
 
@@ -1430,7 +1498,17 @@
       btnEdit.type = 'button';
       btnEdit.className = 'btn btn-small';
       btnEdit.textContent = 'Editar';
-      btnEdit.addEventListener('click', () => loadMimoToForm(m));
+      btnEdit.addEventListener('click', () => {
+        currentEditId = m.id;
+        if (els.title) els.title.value = m.title || '';
+        if (els.desc) els.desc.value = m.description || '';
+        if (els.value) els.value.value = formatCentsToBRL(m.value_cents);
+        if (els.start) els.start.value = toDatetimeLocalValue(m.starts_at);
+        if (els.end) els.end.value = toDatetimeLocalValue(m.ends_at);
+        if (els.active) els.active.checked = !!m.is_active;
+        setMsg(`Editando ID ${m.id}`, false);
+        openForm();
+      });
 
       const btnDel = document.createElement('button');
       btnDel.type = 'button';
@@ -1456,73 +1534,6 @@
 
       els.tbody.appendChild(tr);
     });
-  }
-
-  function loadMimoToForm(m) {
-    currentEditId = m.id;
-    if (els.title) els.title.value = m.title || '';
-    if (els.desc) els.desc.value = m.description || '';
-    if (els.value) els.value.value = formatCentsToBRL(m.value_cents);
-    if (els.start) els.start.value = toDatetimeLocalValue(m.starts_at);
-    if (els.end) els.end.value = toDatetimeLocalValue(m.ends_at);
-    if (els.active) els.active.checked = !!m.is_active;
-    setMsg(`Editando ID ${m.id}`, false);
-    // rolar para o topo do card, se quiser:
-    // els.title?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  function clearForm() {
-    currentEditId = null;
-    if (els.title) els.title.value = '';
-    if (els.desc) els.desc.value = '';
-    if (els.value) els.value.value = formatCentsToBRL(0);
-    if (els.start) els.start.value = '';
-    if (els.end) els.end.value = '';
-    if (els.active) els.active.checked = true;
-    setMsg('', false);
-  }
-
-  // Atualiza o select de prêmios no formulário de agendamento (se existir)
-  function syncPrizeSelect(mimos) {
-    if (!els.prizeSelect) return;
-
-    // preserva opção atual
-    const current = els.prizeSelect.value;
-
-    // monta opções (somente ativos e dentro do período atual)
-    const now = new Date();
-    const isInPeriod = (m) => {
-      if (!m.is_active) return false;
-      const s = m.starts_at ? new Date(m.starts_at) : null;
-      const e = m.ends_at ? new Date(m.ends_at) : null;
-      if (s && !isNaN(s.getTime()) && now < s) return false;
-      if (e && !isNaN(e.getTime()) && now > e) return false;
-      return true;
-    };
-
-    const active = (mimos || []).filter(isInPeriod);
-
-    // se já tiver opções estáticas, a gente preserva as primeiras que não tenham data-mimo
-    // Para ser seguro: limpa e recria com uma opção padrão
-    els.prizeSelect.innerHTML = '';
-
-    const opt0 = document.createElement('option');
-    opt0.value = '';
-    opt0.textContent = '— Sem mimo —';
-    els.prizeSelect.appendChild(opt0);
-
-    active.forEach((m) => {
-      const opt = document.createElement('option');
-      // compat com seu sistema: o booking salva prize como texto
-      // aqui usamos o título como texto (mais compatível)
-      opt.value = m.title;
-      opt.textContent = `${m.title} (R$ ${formatCentsToBRL(m.value_cents)})`;
-      opt.setAttribute('data-mimo-id', String(m.id));
-      els.prizeSelect.appendChild(opt);
-    });
-
-    // tenta restaurar o valor anterior
-    if (current) els.prizeSelect.value = current;
   }
 
   async function reloadMimos() {
@@ -1568,14 +1579,12 @@
 
       await reloadMimos();
       clearForm();
+      closeForm();
     } catch (err) {
       setMsg(err.message || 'Erro ao salvar.', true);
     }
   }
 
-  /* -------------------------
-     Eventos
-  ------------------------- */
   function attachEvents() {
     moneyMaskAttach(els.value);
 
@@ -1583,39 +1592,30 @@
     if (els.clear) els.clear.addEventListener('click', clearForm);
     if (els.reload) els.reload.addEventListener('click', () => reloadMimos().catch(e => setMsg(e.message || 'Erro.', true)));
 
-    // Tecla Enter no título salva (sem quebrar textarea)
-    if (els.title) {
-      els.title.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          handleSave();
-        }
-      });
-    }
+    if (els.btnNovo) els.btnNovo.addEventListener('click', () => {
+      clearForm();
+      openForm();
+      els.title?.focus();
+    });
 
-    // Atualiza lista ao abrir a aba (se você tiver sistema de tabs por data-tab)
+    if (els.btnCloseForm) els.btnCloseForm.addEventListener('click', () => {
+      closeForm();
+      setMsg('', false);
+    });
+
+    if (els.search) els.search.addEventListener('input', () => {
+      renderMimosTable(cacheMimos);
+    });
+
     document.addEventListener('click', (e) => {
       const btn = e.target?.closest?.('.tab-btn[data-tab="tab-mimos"]');
       if (!btn) return;
-      // Carrega só quando abre (ou recarrega sempre)
       reloadMimos().catch(err => setMsg(err.message || 'Erro ao carregar mimos.', true));
     });
   }
 
-  /* -------------------------
-     Init
-  ------------------------- */
   buildEmojiPanel();
   attachEvents();
-
-  // Se a aba já estiver visível por padrão, tenta carregar.
-  // (não força se estiver display:none)
-  try {
-    const style = window.getComputedStyle(elTab);
-    const visible = style && style.display !== 'none' && style.visibility !== 'hidden';
-    if (visible) reloadMimos().catch(() => {});
-  } catch { /* ignore */ }
-
 })();
 
   /* ========= CONTROLE DE SESSÃO (30 MIN) ========= */
