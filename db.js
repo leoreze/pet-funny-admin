@@ -128,8 +128,8 @@ async function initDb() {
       status TEXT NOT NULL DEFAULT 'scheduled',
       notes TEXT,
 
-      // Campo legado de “mimo” em texto (mantém compatibilidade com seu admin/agenda)
-      prize TEXT,
+      -- Campo legado de “mimo” em texto (mantém compatibilidade com seu admin/agenda)
+    prize TEXT,
 
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
