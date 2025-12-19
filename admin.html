@@ -657,6 +657,88 @@
 .hidden{ display: none !important; }
 
 
+/* =========================
+   HEADER ADMIN – MENU
+========================= */
+
+.header-admin{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header-left{
+  display: flex;
+  align-items: center;
+  gap: 10px; /* espaçamento pequeno e elegante */
+}
+
+/* Botão Menu */
+.menu-trigger{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(1,173,183,.45);
+  background: linear-gradient(
+    135deg,
+    rgba(1,173,183,.15),
+    rgba(1,173,183,.05)
+  );
+  color: #014c52;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.menu-trigger:hover{
+  background: linear-gradient(
+    135deg,
+    rgba(1,173,183,.25),
+    rgba(1,173,183,.10)
+  );
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+  transform: translateY(-1px);
+}
+
+/* Ícone chamativo */
+.menu-icon{
+  font-size: 20px;
+  line-height: 1;
+  color: #01adb7;
+}
+
+/* Texto MENU */
+.menu-text{
+  font-size: 14px;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+/* Logo-sub inline */
+.logo-inline{
+  font-size: 13px;
+  opacity: .75;
+  white-space: nowrap;
+}
+
+/* Lado direito */
+.header-right{
+  display: flex;
+  align-items: center;
+}
+
+/* Mobile */
+@media (max-width: 720px){
+  .logo-inline{
+    display: none;
+  }
+}
+
+
+
   </style>
 </head>
 <body>
@@ -698,19 +780,33 @@
 
 <div id="adminApp">
   <div class="container">
-<div class="header">
-  <button id="btnMenu" class="hamburger" type="button" aria-label="Abrir menu" aria-expanded="false">
-    <span class="hamburger-lines" aria-hidden="true"></span> - <span class="logo-sub">MENU</span>
-  </button>
+<div class="header header-admin">
+  <!-- Menu + texto + logo-sub (lado esquerdo) -->
+  <div class="header-left">
+    <button
+      id="btnMenu"
+      class="menu-trigger"
+      type="button"
+      aria-label="Abrir menu"
+      aria-expanded="false"
+    >
+      <span class="menu-icon" aria-hidden="true">☰</span>
+      <span class="menu-text">Menu</span>
+    </button>
 
-  <div class="logo-block"> 
-    <div class="logo-sub">Área Administrativa - Pet Funny</div>
+    <div class="logo-sub logo-inline">
+      Área Administrativa – Pet Funny
+    </div>
   </div>
 
-  <div class="filters">
-    <button class="btn btn-danger btn-small" id="btnLogout" type="button">Sair</button>
+  <!-- Ações (lado direito) -->
+  <div class="filters header-right">
+    <button class="btn btn-danger btn-small" id="btnLogout" type="button">
+      Sair
+    </button>
   </div>
 </div>
+
 
 
 <!-- MENU LATERAL (HAMBURGUER) -->
