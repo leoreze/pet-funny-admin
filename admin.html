@@ -898,11 +898,8 @@
           <div class="form-group">
             <label for="formPrize">Mimo (Roleta)</label>
             <select id="formPrize">
-              <option value="Tosa Higiênica">Tosa Higiênica</option>
-              <option value="Hidratação">Hidratação</option>
-              <option value="Foto e Vídeo Profissional">Foto e Vídeo Profissional</option>
-              <option value="Patinhas impecáveis">Patinhas impecáveis</option>
-            </select>
+            <option value="">Carregando mimos…</option>
+          </select>
           </div>
         </div>
 
@@ -919,7 +916,7 @@
           </div>
           <div class="form-group">
             <label for="formTime">Horário</label>
-            <input type="time" id="formTime" />
+            <select id="formTime" class="select" aria-label="Selecione o Horário"></select>
           </div>
         </div>
 
@@ -2369,9 +2366,7 @@
 
   if (formTime) {
     // arredonda para 00/30 e aplica faixa do dia
-    formTime.addEventListener('blur', () => {
-      const range = buildRangeForDate(formDate ? formDate.value : '');
-      const clamped = clampToRange(formTime.value, range);
+          const clamped = clampToRange(formTime.value, range);
       if (clamped) formTime.value = clamped;
     });
   }
@@ -2425,49 +2420,119 @@
   }
 
   /* ===== Estado de disponibilidade (Admin) ===== */
-  let occupiedTimesSet = new Set();
+  
+let occupiedTimesCount = new Map(); // HH:MM -> quantidade (no dia)
 
-  async function refreshBookingDateTimeState(excludeBookingId) {
-    if (!formDate || !formTime) return;
+function hhmmToMinutes(hhmm) {
+  const t = normalizeHHMM(hhmm);
+  if (!t) return null;
+  const [h, m] = t.split(':').map(n => parseInt(n, 10));
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return (h * 60) + m;
+}
 
-    const dateStr = formDate.value;
-    if (!dateStr) return;
+function getRangeMax(range) {
+  const n = Number(range?.max_per_half_hour ?? range?.max ?? range?.maxPerHalfHour ?? 1);
+  return Number.isFinite(n) ? n : 1;
+}
 
-    const range = buildRangeForDate(dateStr);
-    if (!range || range.closed) {
-      formTime.disabled = true;
-      formTime.value = '';
-      occupiedTimesSet = new Set();
-      return;
-    }
+function isTimeAtCapacity(timeStr, range) {
+  const t = normalizeHHMM(timeStr);
+  if (!t) return false;
+  const used = occupiedTimesCount.get(t) || 0;
+  const max = getRangeMax(range);
+  return max >= 0 && used >= max;
+}
 
-    formTime.disabled = false;
-    formTime.step = 1800; // 30 min
+async function refreshBookingDateTimeState(excludeBookingId) {
+  if (!formDate || !formTime) return;
 
-    formTime.min = minutesToHHMM(range.startMin);
-    formTime.max = minutesToHHMM(range.endMin);
+  const dateStr = formDate.value;
+  if (!dateStr) return;
 
-    // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
-    try {
-      occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
-    } catch (e) {
-      console.warn('Falha ao carregar horários ocupados:', e);
-      occupiedTimesSet = new Set();
-    }
-
-    // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
-    if (formTime.value) {
-      const clamped = clampToRange(formTime.value, range);
-      if (clamped) formTime.value = clamped;
-    }
+  const range = buildRangeForDate(dateStr);
+  if (!range || range.closed) {
+    formTime.disabled = true;
+    formTime.innerHTML = '<option value="">Selecione o Horário</option>';
+    occupiedTimesCount = new Map();
+    return;
   }
 
-  function isTimeOccupied(timeStr) {
-    const t = normalizeHHMM(timeStr);
-    return !!t && occupiedTimesSet.has(t);
+  // Carrega bookings do dia para aplicar capacidade (max por 30 min)
+  occupiedTimesCount = new Map();
+  try {
+    const data = await apiGet('/api/bookings', { date: dateStr });
+    const list = (data && data.bookings) ? data.bookings : [];
+    for (const b of list) {
+      if (!b) continue;
+      if (excludeBookingId && Number(b.id) === Number(excludeBookingId)) continue;
+
+      const status = normStr(b.status || '');
+      if (status === 'cancelado') continue;
+
+      const t = normalizeHHMM(b.time || b.start_time || b.starts_at || b.start_at || '');
+      if (!t) continue;
+      occupiedTimesCount.set(t, (occupiedTimesCount.get(t) || 0) + 1);
+    }
+  } catch (err) {
+    // Se falhar, ainda assim habilita para não travar o admin
+    console.warn('⚠️ Falha ao carregar bookings do dia (capacidade não aplicada):', err?.message || err);
   }
 
-  function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
+  // Monta opções de 30 em 30 min, dentro do horário de funcionamento
+  const openStr = range.open_time || range.open || range.openTime || '';
+  const closeStr = range.close_time || range.close || range.closeTime || '';
+
+  const openMin = hhmmToMinutes(openStr);
+  const closeMin = hhmmToMinutes(closeStr);
+  const max = getRangeMax(range);
+
+  formTime.innerHTML = '<option value="">Selecione o Horário</option>';
+
+  if (openMin == null || closeMin == null || closeMin <= openMin || max === 0) {
+    formTime.disabled = true;
+    return;
+  }
+
+  const now = new Date();
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const nowMin = (now.getHours() * 60) + now.getMinutes();
+
+  const prevSelected = normalizeHHMM(formTime.value);
+
+  let countAdded = 0;
+  for (let m = openMin; m < closeMin; m += 30) {
+    // Não mostrar horários do passado para o dia atual
+    if (dateStr === todayISO && m < nowMin) continue;
+
+    const hhmm = minutesToHHMM(m);
+
+    // Respeita capacidade
+    if (isTimeAtCapacity(hhmm, range)) continue;
+
+    const opt = document.createElement('option');
+    opt.value = hhmm;
+    opt.textContent = hhmm;
+    formTime.appendChild(opt);
+    countAdded++;
+  }
+
+  formTime.disabled = (countAdded === 0);
+
+  // Mantém seleção se ainda existir
+  if (prevSelected) {
+    const exists = Array.from(formTime.options).some(o => o.value === prevSelected);
+    if (exists) formTime.value = prevSelected;
+  }
+}
+
+function isTimeOccupied(timeStr) {
+  // Compat: considera ocupado quando já atingiu capacidade do range atual do dia
+  const range = formDate && formDate.value ? buildRangeForDate(formDate.value) : null;
+  return isTimeAtCapacity(timeStr, range);
+}
+
+function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
   function esconderFormAgenda() { formPanel.classList.add('hidden'); }
 
   async function fetchBookings() {
