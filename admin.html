@@ -657,88 +657,6 @@
 .hidden{ display: none !important; }
 
 
-/* =========================
-   HEADER ADMIN – MENU
-========================= */
-
-.header-admin{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.header-left{
-  display: flex;
-  align-items: center;
-  gap: 10px; /* espaçamento pequeno e elegante */
-}
-
-/* Botão Menu */
-.menu-trigger{
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(1,173,183,.45);
-  background: linear-gradient(
-    135deg,
-    rgba(1,173,183,.15),
-    rgba(1,173,183,.05)
-  );
-  color: #014c52;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all .15s ease;
-}
-
-.menu-trigger:hover{
-  background: linear-gradient(
-    135deg,
-    rgba(1,173,183,.25),
-    rgba(1,173,183,.10)
-  );
-  box-shadow: 0 6px 18px rgba(0,0,0,.12);
-  transform: translateY(-1px);
-}
-
-/* Ícone chamativo */
-.menu-icon{
-  font-size: 20px;
-  line-height: 1;
-  color: #01adb7;
-}
-
-/* Texto MENU */
-.menu-text{
-  font-size: 14px;
-  letter-spacing: .03em;
-  text-transform: uppercase;
-}
-
-/* Logo-sub inline */
-.logo-inline{
-  font-size: 13px;
-  opacity: .75;
-  white-space: nowrap;
-}
-
-/* Lado direito */
-.header-right{
-  display: flex;
-  align-items: center;
-}
-
-/* Mobile */
-@media (max-width: 720px){
-  .logo-inline{
-    display: none;
-  }
-}
-
-
-
   </style>
 </head>
 <body>
@@ -820,7 +738,7 @@
 
   <div class="sidebar-links">
     <!-- Reaproveita os MESMOS botões/tab-btn e data-tab -->
-    <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agendamentos</button>
+    <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agenda &amp; Mimos</button>
     <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
     <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
     <button class="tab-btn" data-tab="tab-racas" type="button"><span>🐶</span> Raças de Cães</button>
@@ -834,7 +752,7 @@
     <!-- TAB: AGENDA -->
     <section id="tab-agenda" class="tab-view active">
       <div class="section-title-row">
-         <div class="section-title">Agendamentos</div>
+         <div class="section-title">Agendamentos & Mimos</div>
 
            <div class="agenda-actions-right">
           <!-- NOVO: Toggle Lista/Cards -->
