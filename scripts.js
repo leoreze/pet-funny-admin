@@ -224,31 +224,6 @@ const API_BASE_URL = '';
     if (current) els.prizeSelect.value = current;
   }
 
-  // ===== Uso na Agenda (Novo Agendamento / Edição) =====
-  // Mantém o combo #formPrize sempre sincronizado com os "Mimos" cadastrados.
-  async function ensureMimosLoaded(force = false) {
-    try {
-      if (!force && Array.isArray(cacheMimos) && cacheMimos.length) {
-        syncPrizeSelect(cacheMimos);
-        return cacheMimos;
-      }
-      const mimos = await apiGetMimos();
-      cacheMimos = Array.isArray(mimos) ? mimos : [];
-      syncPrizeSelect(cacheMimos);
-      return cacheMimos;
-    } catch (e) {
-      // Não bloqueia o admin por falha em mimos; apenas mantém "— Sem mimo —"
-      console.warn('Falha ao carregar mimos:', (e && e.message) ? e.message : e);
-      try { syncPrizeSelect([]); } catch (_) {}
-      return [];
-    }
-  }
-
-  // expõe globalmente para outras partes do scripts.js (Agenda)
-  window.ensureMimosLoaded = ensureMimosLoaded;
-
-
-
   function renderMimosTable(mimos) {
     if (!els.tbody) return;
     els.tbody.innerHTML = '';
@@ -466,8 +441,7 @@ const API_BASE_URL = '';
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-            if (window.ensureMimosLoaded) { window.ensureMimosLoaded().catch(() => {}); }
-await loadBreeds();
+      await loadBreeds();
       await loadOpeningHours();
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
@@ -645,45 +619,40 @@ await loadBreeds();
   const todayISO = new Date().toISOString().split('T')[0];
 
   function validarDiaHora(dateStr, timeStr) {
-  if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
 
-  const t = String(timeStr || '').trim();
-  // Aceita HH:MM e HH:MM:SS (alguns browsers retornam segundos)
-  const isoTime = (t.length === 5) ? (t + ':00') : t;
+    const date = new Date(dateStr + 'T' + timeStr + ':00');
+    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
 
-  const date = new Date(`${dateStr}T${isoTime}`);
-  if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
+    const diaSemana = date.getDay();
+    const parts = String(timeStr).split(':');
+    const hh = parseInt(parts[0], 10);
+    const mm = parseInt(parts[1] || '0', 10);
 
-  const diaSemana = date.getDay();
-  const parts = String(isoTime).split(':');
-  const hh = parseInt(parts[0], 10);
-  const mm = parseInt(parts[1] || '0', 10);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
 
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
+    // Admin também deve seguir a regra do cliente: somente 00 ou 30
+    if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
 
-  // Admin também deve seguir a regra do cliente: somente 00 ou 30
-  if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
+    const minutos = hh * 60 + mm;
+    const inicio = 7 * 60 + 30;
 
-  const minutos = hh * 60 + mm;
-  const inicio = 7 * 60 + 30;
+    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+    if (diaSemana >= 1 && diaSemana <= 5) {
+      const fim = 17 * 60 + 30;
+      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+    }
+    if (diaSemana === 6) {
+      const fim = 13 * 60;
+      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+    }
 
-  if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
-  if (diaSemana >= 1 && diaSemana <= 5) {
-    const fim = 17 * 60 + 30;
-    if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+    // Não permite agendar no passado (comparando data/hora local)
+    const now = new Date();
+    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+
+    return null;
   }
-  if (diaSemana === 6) {
-    const fim = 13 * 60;
-    if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
-  }
-
-  // Não permite agendar no passado (comparando data/hora local)
-  const now = new Date();
-  if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
-
-  return null;
-}
-
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -1038,33 +1007,11 @@ await loadBreeds();
   function esconderFormAgenda() { formPanel.classList.add('hidden'); }
 
   async function fetchBookings() {
-    // Filtro no front-end (mais resiliente se a API não estiver aceitando params em produção)
-    const data = await apiGet('/api/bookings');
-    let list = data.bookings || [];
-
-    const date = (filtroData && filtroData.value) ? filtroData.value : '';
-    const qRaw = (filtroBusca && filtroBusca.value) ? filtroBusca.value.trim() : '';
-    const q = normStr(qRaw);
-    const qDigits = qRaw.replace(/\D/g, '');
-
-    if (date) list = list.filter(b => String(b.date || '') === String(date));
-
-    if (q) {
-      list = list.filter(b => {
-        const hay = normStr(
-          (b.customer_name || '') + ' ' +
-          (b.pet_name || '') + ' ' +
-          (b.phone || '') + ' ' +
-          (b.service || b.service_title || '') + ' ' +
-          (b.prize || '') + ' ' +
-          (b.status || '')
-        );
-        const phoneDigits = String(b.phone || '').replace(/\D/g, '');
-        return hay.includes(q) || (qDigits && phoneDigits.includes(qDigits));
-      });
-    }
-
-    return list;
+    const params = {};
+    if (filtroData.value) params.date = filtroData.value;
+    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
+    const data = await apiGet('/api/bookings', params);
+    return data.bookings || [];
   }
 
   function atualizaEstatisticas(lista) {
@@ -1177,16 +1124,9 @@ await loadBreeds();
     bookingId.value = booking.id;
     bookingOriginalStatus.value = booking.status || 'agendado';
 
-    // telefone: normaliza para dígitos e aplica máscara no input
-    (function(){
-      let ph = booking.phone || booking.customer_phone || '';
-      ph = String(ph || '');
-      const digits = ph.replace(/\D/g, '');
-      let local = digits;
-      if (local.startsWith('55') && local.length > 11) local = local.slice(2);
-      formPhone.value = local;
-      applyPhoneMask(formPhone);
-    })();
+    // Ao editar: aplica máscara no valor exibido (mantemos sanitizePhone para salvar)
+    formPhone.value = formatTelefone(booking.phone || '');
+    try { applyPhoneMask(formPhone); } catch (_) {}
     formNome.value = booking.customer_name || '';
     formPrize.value = booking.prize || 'Tosa Higiênica';
 
@@ -2139,8 +2079,7 @@ await loadBreeds();
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', async () => {
-    try { if (window.ensureMimosLoaded) await window.ensureMimosLoaded(); } catch (e) { console.warn('Falha ao carregar mimos:', (e && e.message) ? e.message : e); }
+  btnNovoAgendamento.addEventListener('click', () => {
     limparForm();
     formDate.value = toISODateOnly(new Date());
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
