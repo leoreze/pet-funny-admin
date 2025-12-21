@@ -224,31 +224,6 @@ const API_BASE_URL = '';
     if (current) els.prizeSelect.value = current;
   }
 
-  // ===== Uso na Agenda (Novo Agendamento / Edição) =====
-  // Mantém o combo #formPrize sempre sincronizado com os "Mimos" cadastrados.
-  async function ensureMimosLoaded(force = false)se) {
-    try {
-      if (!force && Array.isArray(cacheMimos) && cacheMimos.length) {
-        syncPrizeSelect(cacheMimos);
-        return cacheMimos;
-      }
-      const mimos = await apiGetMimos();
-      cacheMimos = Array.isArray(mimos) ? mimos : [];
-      syncPrizeSelect(cacheMimos);
-      return cacheMimos;
-    } catch (e) {
-      // Não bloqueia o admin por falha em mimos; apenas mantém "— Sem mimo —"
-      console.warn('Falha ao carregar mimos:', (e && e.message) ? e.message : e);
-      try { syncPrizeSelect([]); } catch (_) {}
-      return [];
-    }
-  }
-
-  // expõe globalmente para outras partes do scripts.js (Agenda)
-  window.ensureMimosLoaded = ensureMimosLoaded;
-
-
-
   function renderMimosTable(mimos) {
     if (!els.tbody) return;
     els.tbody.innerHTML = '';
@@ -466,8 +441,7 @@ const API_BASE_URL = '';
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-            if (window.ensureMimosLoaded) { window.ensureMimosLoaded().catch(() => {}); }
-await loadBreeds();
+      await loadBreeds();
       await loadOpeningHours();
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
@@ -645,45 +619,40 @@ await loadBreeds();
   const todayISO = new Date().toISOString().split('T')[0];
 
   function validarDiaHora(dateStr, timeStr) {
-  if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
 
-  const t = String(timeStr || '').trim();
-  // Aceita HH:MM e HH:MM:SS (alguns browsers retornam segundos)
-  const isoTime = (t.length === 5) ? (t + ':00') : t;
+    const date = new Date(dateStr + 'T' + timeStr + ':00');
+    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
 
-  const date = new Date(`${dateStr}T${isoTime}`);
-  if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
+    const diaSemana = date.getDay();
+    const parts = String(timeStr).split(':');
+    const hh = parseInt(parts[0], 10);
+    const mm = parseInt(parts[1] || '0', 10);
 
-  const diaSemana = date.getDay();
-  const parts = String(isoTime).split(':');
-  const hh = parseInt(parts[0], 10);
-  const mm = parseInt(parts[1] || '0', 10);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
 
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
+    // Admin também deve seguir a regra do cliente: somente 00 ou 30
+    if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
 
-  // Admin também deve seguir a regra do cliente: somente 00 ou 30
-  if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
+    const minutos = hh * 60 + mm;
+    const inicio = 7 * 60 + 30;
 
-  const minutos = hh * 60 + mm;
-  const inicio = 7 * 60 + 30;
+    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+    if (diaSemana >= 1 && diaSemana <= 5) {
+      const fim = 17 * 60 + 30;
+      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+    }
+    if (diaSemana === 6) {
+      const fim = 13 * 60;
+      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+    }
 
-  if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
-  if (diaSemana >= 1 && diaSemana <= 5) {
-    const fim = 17 * 60 + 30;
-    if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+    // Não permite agendar no passado (comparando data/hora local)
+    const now = new Date();
+    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+
+    return null;
   }
-  if (diaSemana === 6) {
-    const fim = 13 * 60;
-    if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
-  }
-
-  // Não permite agendar no passado (comparando data/hora local)
-  const now = new Date();
-  if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
-
-  return null;
-}
-
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -691,28 +660,6 @@ await loadBreeds();
     if (!dateStr) return null;
     const d = new Date(dateStr + 'T00:00:00');
     if (Number.isNaN(d.getTime())) return null;
-
-    // Se a tabela de horário de funcionamento estiver carregada, use-a
-    try {
-      if (Array.isArray(openingHoursCache) && openingHoursCache.length) {
-        const dow = d.getDay(); // 0=Dom ... 6=Sáb
-        const oh = openingHoursCache.find(r => Number(r.dow) === dow);
-        if (oh) {
-          if (oh.is_closed) return { closed: true };
-          const openHHMM = normalizeHHMM(oh.open_time);
-          const closeHHMM = normalizeHHMM(oh.close_time);
-          const startMin = timeToMinutes(openHHMM);
-          const endMin = timeToMinutes(closeHHMM);
-          if (Number.isFinite(startMin) && Number.isFinite(endMin) && endMin > startMin) {
-            return { closed: false, startMin, endMin };
-          }
-        }
-      }
-    } catch (e) {
-      // fallback abaixo
-    }
-
-    // Fallback legado (caso ainda não exista horário de funcionamento)
     const day = d.getDay();
     if (day === 0) return { closed: true };
     const startMin = 7 * 60 + 30;
@@ -735,25 +682,26 @@ await loadBreeds();
     return s !== 'cancelado';
   }
 
-  async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
-    const data = await apiGet('/api/bookings', { date: dateStr });
-    const list = data.bookings || [];
-    const counts = new Map();
+async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
+  const data = await apiGet('/api/bookings', { date: dateStr });
+  const list = data.bookings || [];
 
-    list.forEach(b => {
-      if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
-      if (!isActiveBookingStatus(b.status)) return;
+  // retorna contagem por horário
+  const map = new Map();
 
-      const t = normalizeHHMM(b.time);
-      if (!t) return;
-      counts.set(t, (counts.get(t) || 0) + 1);
-    });
+  list.forEach(b => {
+    if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
+    if (!isActiveBookingStatus(b.status)) return;
 
-    return counts;
+    const t = normalizeHHMM(b.time);
+    if (!t) return;
+
+    map.set(t, (map.get(t) || 0) + 1);
   });
 
-    return set;
-  }
+  return map; // { '07:30' => 1, '08:00' => 2, ... }
+}
+
 
   function minutesToHHMM(totalMin) {
     const hh = Math.floor(totalMin / 60);
@@ -1019,8 +967,7 @@ await loadBreeds();
   }
 
   /* ===== Estado de disponibilidade (Admin) ===== */
-  let occupiedCounts = new Map();
-  let currentSlotCap = 1;
+  let occupiedTimesSet = new Set();
 
   async function refreshBookingDateTimeState(excludeBookingId) {
     if (!formDate || !formTime) return;
@@ -1028,51 +975,13 @@ await loadBreeds();
     const dateStr = formDate.value;
     if (!dateStr) return;
 
-    // garante cache de horário de funcionamento para extrair capacidade
-    if (!Array.isArray(openingHoursCache) || !openingHoursCache.length) {
-      try { await loadOpeningHours(); } catch (e) { /* ignore */ }
-    }
-
     const range = buildRangeForDate(dateStr);
     if (!range || range.closed) {
       formTime.disabled = true;
       formTime.value = '';
-      occupiedCounts = new Map();
-      currentSlotCap = 1;
+      occupiedTimesSet = new Set();
       return;
     }
-
-    // capacidade por 30 min para o DOW do dateStr
-    try {
-      const d = new Date(dateStr + 'T00:00:00');
-      const dow = d.getDay();
-      const oh = Array.isArray(openingHoursCache) ? openingHoursCache.find(r => Number(r.dow) === dow) : null;
-      const cap = oh && !oh.is_closed ? Number(oh.max_per_half_hour) : 1;
-      currentSlotCap = (Number.isFinite(cap) && cap >= 1) ? cap : 1;
-    } catch (e) {
-      currentSlotCap = 1;
-    }
-
-    formTime.disabled = false;
-    formTime.step = 1800; // 30 min
-
-    formTime.min = minutesToHHMM(range.startMin);
-    formTime.max = minutesToHHMM(range.endMin);
-
-    // carrega contagem de horários ocupados do dia (exclui o próprio agendamento se estiver editando)
-    occupiedCounts = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
-
-    // Se <select>, desabilita opções esgotadas
-    if (formTime.tagName === 'SELECT') {
-      const opts = Array.from(formTime.options || []);
-      opts.forEach(opt => {
-        const t = normalizeHHMM(opt.value);
-        if (!t) return;
-        const used = occupiedCounts.get(t) || 0;
-        opt.disabled = used >= currentSlotCap;
-      });
-    }
-  }
 
     formTime.disabled = false;
     formTime.step = 1800; // 30 min
@@ -1082,10 +991,10 @@ await loadBreeds();
 
     // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
     try {
-      occupiedCounts = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+      occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
     } catch (e) {
       console.warn('Falha ao carregar horários ocupados:', e);
-      occupiedCounts = new Map();
+      occupiedTimesSet = new Set();
     }
 
     // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
@@ -1097,42 +1006,18 @@ await loadBreeds();
 
   function isTimeOccupied(timeStr) {
     const t = normalizeHHMM(timeStr);
-    if (!t) return false;
-    const used = occupiedCounts.get(t) || 0;
-    return used >= (currentSlotCap || 1);
+    return !!t && occupiedTimesSet.has(t);
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
   function esconderFormAgenda() { formPanel.classList.add('hidden'); }
 
   async function fetchBookings() {
-    // Filtro no front-end (mais resiliente se a API não estiver aceitando params em produção)
-    const data = await apiGet('/api/bookings');
-    let list = data.bookings || [];
-
-    const date = (filtroData && filtroData.value) ? filtroData.value : '';
-    const qRaw = (filtroBusca && filtroBusca.value) ? filtroBusca.value.trim() : '';
-    const q = normStr(qRaw);
-    const qDigits = qRaw.replace(/\D/g, '');
-
-    if (date) list = list.filter(b => String(b.date || '') === String(date));
-
-    if (q) {
-      list = list.filter(b => {
-        const hay = normStr(
-          (b.customer_name || '') + ' ' +
-          (b.pet_name || '') + ' ' +
-          (b.phone || '') + ' ' +
-          (b.service || b.service_title || '') + ' ' +
-          (b.prize || '') + ' ' +
-          (b.status || '')
-        );
-        const phoneDigits = String(b.phone || '').replace(/\D/g, '');
-        return hay.includes(q) || (qDigits && phoneDigits.includes(qDigits));
-      });
-    }
-
-    return list;
+    const params = {};
+    if (filtroData.value) params.date = filtroData.value;
+    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
+    const data = await apiGet('/api/bookings', params);
+    return data.bookings || [];
   }
 
   function atualizaEstatisticas(lista) {
@@ -1245,16 +1130,9 @@ await loadBreeds();
     bookingId.value = booking.id;
     bookingOriginalStatus.value = booking.status || 'agendado';
 
-    // telefone: normaliza para dígitos e aplica máscara no input
-    (function(){
-      let ph = booking.phone || booking.customer_phone || '';
-      ph = String(ph || '');
-      const digits = ph.replace(/\D/g, '');
-      let local = digits;
-      if (local.startsWith('55') && local.length > 11) local = local.slice(2);
-      formPhone.value = local;
-      applyPhoneMask(formPhone);
-    })();
+    // Ao editar: aplica máscara no valor exibido (mantemos sanitizePhone para salvar)
+    formPhone.value = formatTelefone(booking.phone || '');
+    try { applyPhoneMask(formPhone); } catch (_) {}
     formNome.value = booking.customer_name || '';
     formPrize.value = booking.prize || 'Tosa Higiênica';
 
@@ -2036,11 +1914,7 @@ await loadBreeds();
 
     // Carrega horários ocupados do dia e bloqueia conflito
     await refreshBookingDateTimeState(id);
-    if (isTimeOccupied(time)) {
-      formError.textContent = 'Horário indisponível para esta data. Selecione outro horário.';
-      formError.style.display = 'block';
-      return;
-    }
+
 
     const status = formStatus.value;
     const notes = formNotes.value.trim();
@@ -2207,8 +2081,7 @@ await loadBreeds();
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', async () => {
-    try { if (window.ensureMimosLoaded) await window.ensureMimosLoaded(); } catch (e) { console.warn('Falha ao carregar mimos:', (e && e.message) ? e.message : e); }
+  btnNovoAgendamento.addEventListener('click', () => {
     limparForm();
     formDate.value = toISODateOnly(new Date());
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
