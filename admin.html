@@ -89,8 +89,7 @@
     <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agendamentos</button>
     <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
     <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
-    <button class="tab-btn" data-tab="tab-racas" type="button"><span>🐶</span> Raças de Cães</button>
-    <button class="tab-btn" data-tab="tab-mimos" type="button"><span>🎁</span> Mimos</button>
+<button class="tab-btn" data-tab="tab-mimos" type="button"><span>🎁</span> Mimos</button>
     <button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
     <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
   </div>
@@ -408,73 +407,6 @@
 
     
     <!-- TAB: RAÇAS DE CÃES -->
-    <section id="tab-racas" class="tab-view">
-      <div class="section-title-row">
-        <div class="section-title">Raças de Cães (Catálogo)</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <input type="text" id="breedSearch" placeholder="Buscar raça..." style="min-width:220px;" />
-          <button class="btn btn-light" id="btnNovoBreed" type="button">+ Nova raça</button>
-        </div>
-      </div>
-
-      <div class="form-panel hidden" id="breedFormPanel">
-        <input type="hidden" id="breedId" />
-        <div class="form-row-2">
-          <div class="form-group">
-            <label for="breedName">Raça (nome)</label>
-            <input type="text" id="breedName" placeholder="Ex: Shih Tzu" />
-          </div>
-          <div class="form-group">
-            <label for="breedSize">Porte</label>
-            <select id="breedSize">
-              <option value="pequeno">Pequeno</option>
-              <option value="medio">Médio</option>
-              <option value="grande">Grande</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="breedCoat">Pelagem</label>
-            <select id="breedCoat">
-              <option value="curta">Curta</option>
-              <option value="media">Média</option>
-              <option value="longa">Longa</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="breedHistory">História (breve)</label>
-          <textarea id="breedHistory" placeholder="Resumo histórico e especificidades relevantes (temperamento, origem, cuidados)."></textarea>
-        </div>
-
-        <div id="breedError" class="error-msg" style="display:none;"></div>
-
-        <div class="form-actions">
-          <button class="btn btn-secondary" id="btnBreedCancel" type="button">Limpar / cancelar</button>
-          <button class="btn" id="btnBreedSave" type="button">Salvar</button>
-        </div>
-      </div>
-
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Raça</th>
-              <th>Porte</th>
-              <th>Pelagem</th>
-              <th>História</th>
-              <th>Criado em</th>
-              <th>Atualizado em</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody id="tbodyBreeds"></tbody>
-        </table>
-        <div id="breedsEmpty" class="empty" style="display:none;">Nenhuma raça cadastrada ainda.</div>
-      </div>
-    </section>
-
 <!-- TAB: MIMOS -->
 <section id="tab-mimos" class="tab-view">
   <div class="section-title-row">
