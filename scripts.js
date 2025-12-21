@@ -735,7 +735,31 @@ async function ensureOpeningHoursLoadedForBooking() {
   }
 }
 
-  function normalizeHHMM(t) {
+  
+function isDateClosed(dateStr) {
+  const r = buildRangeForDate(dateStr);
+  return !r || !!r.closed;
+}
+
+// Se a data padrão cair em dia fechado (ex: domingo), escolhe o próximo dia aberto.
+function nextOpenDateISO(startDateISO) {
+  try {
+    const start = new Date(startDateISO + 'T00:00:00');
+    if (Number.isNaN(start.getTime())) return startDateISO;
+
+    const d = new Date(start);
+    for (let i = 0; i < 14; i++) { // procura até 2 semanas à frente
+      const iso = toISODateOnly(d);
+      const r = buildRangeForDate(iso);
+      if (r && !r.closed) return iso;
+      d.setDate(d.getDate() + 1);
+    }
+  } catch (_) {}
+  return startDateISO;
+}
+
+
+function normalizeHHMM(t) {
     const s = String(t || '').trim();
     const m = s.match(/^(\d{1,2}):(\d{1,2})/);
     if (!m) return null;
@@ -966,10 +990,12 @@ async function ensureOpeningHoursLoadedForBooking() {
 
   // Revalida e aplica limites quando a data/horário mudam
   if (formDate) {
-    formDate.addEventListener('change', async () => {
+    const handleDateChange = async () => {
       const excludeId = bookingId && bookingId.value ? Number(bookingId.value) : null;
       await refreshBookingDateTimeState(excludeId);
-    });
+        };
+    formDate.addEventListener('change', handleDateChange);
+    formDate.addEventListener('input', handleDateChange);
   }
 
   if (formTime) {
@@ -2159,7 +2185,8 @@ async function ensureOpeningHoursLoadedForBooking() {
   btnNovoAgendamento.addEventListener('click', async () => {
     try { await (window.ensureMimosLoaded ? window.ensureMimosLoaded(false) : Promise.resolve()); } catch (e) { console.warn(e); }
     limparForm();
-    formDate.value = toISODateOnly(new Date());
+    const today = toISODateOnly(new Date());
+  formDate.value = nextOpenDateISO(today);
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
     formPetSelect.disabled = true;
     formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
