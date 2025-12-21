@@ -311,30 +311,6 @@ const API_BASE_URL = '';
     });
   }
 
-  // Disponibiliza carregamento de mimos para outras áreas (ex: Novo Agendamento)
-  async function ensureMimosLoaded(force = false) {
-    try {
-      if (!force && Array.isArray(cacheMimos) && cacheMimos.length) {
-        syncPrizeSelect(cacheMimos);
-        return cacheMimos;
-      }
-      const mimos = await apiGetMimos();
-      cacheMimos = mimos;
-      syncPrizeSelect(mimos);
-      return mimos;
-    } catch (e) {
-      // Não bloqueia o admin por falha em mimos; apenas mantém "— Sem mimo —"
-      console.warn('Falha ao carregar mimos:', (e && e.message) ? e.message : e);
-      return [];
-    }
-  }
-
-  // expõe no escopo global (usado no fluxo de agendamento)
-  try { window.ensureMimosLoaded = ensureMimosLoaded; } catch (_) {}
-  try { window.__pf_mimos_cache = cacheMimos; } catch (_) {}
-
-
-
   async function reloadMimos() {
     setMsg('Carregando...', false);
     const mimos = await apiGetMimos();
@@ -1031,11 +1007,30 @@ const API_BASE_URL = '';
   function esconderFormAgenda() { formPanel.classList.add('hidden'); }
 
   async function fetchBookings() {
-    const params = {};
-    if (filtroData.value) params.date = filtroData.value;
-    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
-    const data = await apiGet('/api/bookings', params);
-    return data.bookings || [];
+    // Busca todos e filtra localmente (fallback robusto caso o backend ignore parâmetros)
+    const data = await apiGet('/api/bookings');
+    let list = data.bookings || [];
+
+    // Filtro por data (YYYY-MM-DD)
+    const d = (filtroData && filtroData.value) ? filtroData.value : '';
+    if (d) {
+      list = list.filter(b => String(b.date || '') === d);
+    }
+
+    // Filtro por busca (nome, pet, telefone, serviço, status, mimo)
+    const qRaw = (filtroBusca && filtroBusca.value) ? filtroBusca.value.trim() : '';
+    if (qRaw) {
+      const q = normStr(qRaw);
+      list = list.filter(b => {
+        const hay = [
+          b.customer_name, b.pet_name, b.phone, b.service, b.service_title,
+          b.status, b.prize, b.notes
+        ].map(x => normStr(x)).join(' ');
+        return hay.includes(q);
+      });
+    }
+
+    return list;
   }
 
   function atualizaEstatisticas(lista) {
@@ -1148,23 +1143,26 @@ const API_BASE_URL = '';
     bookingId.value = booking.id;
     bookingOriginalStatus.value = booking.status || 'agendado';
 
-    // Alguns backends enviam tanto booking.phone quanto customer_phone.
-    // Priorizamos o telefone do cliente/tutor.
-    const phoneValue = booking.customer_phone || booking.phone || '';
-    formPhone.value = phoneValue;
+    let _digits = sanitizePhone(booking.phone || '');
+    // se vier com DDI (55), remove para exibir no padrão BR
+    if (_digits.startsWith('55') && _digits.length > 11) _digits = _digits.slice(2);
+    formPhone.value = _digits;
+    applyPhoneMask(formPhone);
     formNome.value = booking.customer_name || '';
-    formPrize.value = booking.prize || '';
+    formPrize.value = booking.prize || 'Tosa Higiênica';
 
     // serviço (preferência: service_id)
     const sid = booking.service_id ?? booking.serviceId ?? '';
-    if (sid && String(sid) !== 'null') {
-      formService.value = String(sid);
-    } else {
+    if (sid && String(sid) !== 'null') formService.value = String(sid);
+    else {
       // fallback: tenta casar pelo texto
       const txt = booking.service || booking.service_title || '';
       const match = servicesCache.find(s => normStr(s.title) === normStr(txt));
       formService.value = match ? String(match.id) : '';
-    }
+      
+    // Atualiza limites e disponibilidade para a data (exclui o próprio agendamento)
+    refreshBookingDateTimeState(booking.id);
+  }
 
     formDate.value = booking.date || '';
     formTime.value = booking.time || '';
@@ -1193,14 +1191,11 @@ const API_BASE_URL = '';
     }
 
     mostrarFormAgenda();
-
-    // Atualiza limites e disponibilidade para a data (exclui o próprio agendamento)
-    refreshBookingDateTimeState(booking.id);
-
+    refreshBookingDateTimeState(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-/* ===== Serviços (cache, dropdown e CRUD) ===== */
+  /* ===== Serviços (cache, dropdown e CRUD) ===== */
   const btnNovoServico = document.getElementById('btnNovoServico');
   const serviceFormPanel = document.getElementById('serviceFormPanel');
   const serviceId = document.getElementById('serviceId');
@@ -1671,7 +1666,7 @@ const API_BASE_URL = '';
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone || a.phone);
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
 
       const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
 
@@ -1787,7 +1782,7 @@ const API_BASE_URL = '';
 
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
-      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone || a.phone)}</span>`;
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.phone)}</span>`;
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
@@ -2041,7 +2036,7 @@ const API_BASE_URL = '';
         a.time || '',
         (a.customer_name || '').replace(/;/g, ','),
         (a.pet_name || '').replace(/;/g, ','),
-        formatTelefone(a.customer_phone || a.phone),
+        formatTelefone(a.phone),
         (serviceLabel || '').replace(/;/g, ','),
         (a.prize || '').replace(/;/g, ','),
         (a.status || 'agendado'),
@@ -2105,12 +2100,7 @@ const API_BASE_URL = '';
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', async () => {
-    // garante que o combo de Mimos (Roleta) esteja carregado
-    try {
-      if (window.ensureMimosLoaded) await window.ensureMimosLoaded(false);
-    } catch (e) { console.warn('Falha ao carregar mimos:', e); }
-
+  btnNovoAgendamento.addEventListener('click', () => {
     limparForm();
     formDate.value = toISODateOnly(new Date());
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
