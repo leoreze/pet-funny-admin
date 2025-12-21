@@ -224,6 +224,31 @@ const API_BASE_URL = '';
     if (current) els.prizeSelect.value = current;
   }
 
+  // ===== Uso na Agenda (Novo Agendamento / Edição) =====
+  // Mantém o combo #formPrize sempre sincronizado com os "Mimos" cadastrados.
+  async function ensureMimosLoaded(force = false) {
+    try {
+      if (!force && Array.isArray(cacheMimos) && cacheMimos.length) {
+        syncPrizeSelect(cacheMimos);
+        return cacheMimos;
+      }
+      const mimos = await apiGetMimos();
+      cacheMimos = Array.isArray(mimos) ? mimos : [];
+      syncPrizeSelect(cacheMimos);
+      return cacheMimos;
+    } catch (e) {
+      // Não bloqueia o admin por falha em mimos; apenas mantém "— Sem mimo —"
+      console.warn('Falha ao carregar mimos:', (e && e.message) ? e.message : e);
+      try { syncPrizeSelect([]); } catch (_) {}
+      return [];
+    }
+  }
+
+  // expõe globalmente para outras partes do scripts.js (Agenda)
+  window.ensureMimosLoaded = ensureMimosLoaded;
+
+
+
   function renderMimosTable(mimos) {
     if (!els.tbody) return;
     els.tbody.innerHTML = '';
@@ -441,7 +466,8 @@ const API_BASE_URL = '';
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-      await loadBreeds();
+            if (window.ensureMimosLoaded) { window.ensureMimosLoaded().catch(() => {}); }
+await loadBreeds();
       await loadOpeningHours();
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
@@ -1007,26 +1033,29 @@ const API_BASE_URL = '';
   function esconderFormAgenda() { formPanel.classList.add('hidden'); }
 
   async function fetchBookings() {
-    // Busca todos e filtra localmente (fallback robusto caso o backend ignore parâmetros)
+    // Filtro no front-end (mais resiliente se a API não estiver aceitando params em produção)
     const data = await apiGet('/api/bookings');
     let list = data.bookings || [];
 
-    // Filtro por data (YYYY-MM-DD)
-    const d = (filtroData && filtroData.value) ? filtroData.value : '';
-    if (d) {
-      list = list.filter(b => String(b.date || '') === d);
-    }
-
-    // Filtro por busca (nome, pet, telefone, serviço, status, mimo)
+    const date = (filtroData && filtroData.value) ? filtroData.value : '';
     const qRaw = (filtroBusca && filtroBusca.value) ? filtroBusca.value.trim() : '';
-    if (qRaw) {
-      const q = normStr(qRaw);
+    const q = normStr(qRaw);
+    const qDigits = qRaw.replace(/\D/g, '');
+
+    if (date) list = list.filter(b => String(b.date || '') === String(date));
+
+    if (q) {
       list = list.filter(b => {
-        const hay = [
-          b.customer_name, b.pet_name, b.phone, b.service, b.service_title,
-          b.status, b.prize, b.notes
-        ].map(x => normStr(x)).join(' ');
-        return hay.includes(q);
+        const hay = normStr(
+          (b.customer_name || '') + ' ' +
+          (b.pet_name || '') + ' ' +
+          (b.phone || '') + ' ' +
+          (b.service || b.service_title || '') + ' ' +
+          (b.prize || '') + ' ' +
+          (b.status || '')
+        );
+        const phoneDigits = String(b.phone || '').replace(/\D/g, '');
+        return hay.includes(q) || (qDigits && phoneDigits.includes(qDigits));
       });
     }
 
@@ -1143,11 +1172,16 @@ const API_BASE_URL = '';
     bookingId.value = booking.id;
     bookingOriginalStatus.value = booking.status || 'agendado';
 
-    let _digits = sanitizePhone(booking.phone || '');
-    // se vier com DDI (55), remove para exibir no padrão BR
-    if (_digits.startsWith('55') && _digits.length > 11) _digits = _digits.slice(2);
-    formPhone.value = _digits;
-    applyPhoneMask(formPhone);
+    // telefone: normaliza para dígitos e aplica máscara no input
+    (function(){
+      let ph = booking.phone || booking.customer_phone || '';
+      ph = String(ph || '');
+      const digits = ph.replace(/\D/g, '');
+      let local = digits;
+      if (local.startsWith('55') && local.length > 11) local = local.slice(2);
+      formPhone.value = local;
+      applyPhoneMask(formPhone);
+    })();
     formNome.value = booking.customer_name || '';
     formPrize.value = booking.prize || 'Tosa Higiênica';
 
@@ -2100,7 +2134,8 @@ const API_BASE_URL = '';
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', () => {
+  btnNovoAgendamento.addEventListener('click', async () => {
+    try { if (window.ensureMimosLoaded) await window.ensureMimosLoaded(); } catch (e) { console.warn('Falha ao carregar mimos:', (e && e.message) ? e.message : e); }
     limparForm();
     formDate.value = toISODateOnly(new Date());
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
