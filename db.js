@@ -1,430 +1,172 @@
-// db.js
-const { Pool } = require('pg');
+// backend/db.js
+'use strict';
 
-if (!process.env.DATABASE_URL) {
-  console.error('❌ DATABASE_URL não definido. Configure no seu host (Render/Prod).');
-}
+const { Pool } = require('pg');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('localhost')
+  ssl: process.env.DATABASE_SSL === 'false'
     ? false
-    : { rejectUnauthorized: false },
+    : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false),
 });
 
 async function query(sql, params = []) {
-  const client = await pool.connect();
-  try {
-    return await client.query(sql, params);
-  } finally {
-    client.release();
-  }
+  return pool.query(sql, params);
 }
 
 async function all(sql, params = []) {
-  const res = await query(sql, params);
-  return res.rows || [];
+  const r = await query(sql, params);
+  return r.rows;
 }
 
 async function get(sql, params = []) {
-  const res = await query(sql, params);
-  return (res.rows && res.rows[0]) ? res.rows[0] : null;
+  const r = await query(sql, params);
+  return r.rows[0] || null;
 }
 
 async function run(sql, params = []) {
-  const res = await query(sql, params);
-  return { rowCount: res.rowCount };
+  await query(sql, params);
+  return true;
 }
 
-/* =========================
-   Helpers (compat)
-========================= */
-function normalizePhone(phone) {
-  if (!phone) return null;
-  return String(phone).replace(/\D/g, '');
-}
-function normalizePlate(plate) {
-  if (!plate) return null;
-  return String(plate).trim().toUpperCase();
-}
-function normalizeCPF(cpf) {
-  if (!cpf) return null;
-  return String(cpf).replace(/\D/g, '');
-}
-function safeJsonParse(str, fallback = null) {
-  if (str == null) return fallback;
-  if (typeof str === 'object') return str;
-  try { return JSON.parse(str); } catch { return fallback; }
-}
-function normalizeBreedHistory(b) {
-  const history = safeJsonParse(b.history, []);
-  return { ...b, history };
-}
-function uniqueBreedsByName(rows) {
-  const map = new Map();
-  for (const b of rows) {
-    const key = (b.name || '').trim().toLowerCase();
-    if (!key) continue;
-    if (!map.has(key)) map.set(key, b);
-  }
-  return Array.from(map.values());
-}
-
-/* =========================
-   Init / Migration
-========================= */
 async function initDb() {
-  /* -------------------------
-     Core
-  ------------------------- */
-  await query(`
+  // Customers
+  await run(`
     CREATE TABLE IF NOT EXISTS customers (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      email TEXT,
-      cpf TEXT,
-      address TEXT,
-      notes TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      phone TEXT UNIQUE NOT NULL,
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  await query(`CREATE INDEX IF NOT EXISTS customers_phone_idx ON customers (phone);`);
 
-  await query(`
+  // Pets
+  await run(`
     CREATE TABLE IF NOT EXISTS pets (
       id SERIAL PRIMARY KEY,
       customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      species TEXT NOT NULL DEFAULT 'dog',
-      breed TEXT,
-      size TEXT,
-      coat TEXT,
-      notes TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      breed TEXT DEFAULT '',
+      size TEXT DEFAULT '',
+      coat TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  await query(`CREATE INDEX IF NOT EXISTS pets_customer_idx ON pets (customer_id);`);
 
-  // IMPORTANTE: este schema de services é o que o server.js usa (date,title,value_cents)
-  await query(`
+  // Services (value_cents = centavos)
+  await run(`
     CREATE TABLE IF NOT EXISTS services (
       id SERIAL PRIMARY KEY,
-      date DATE NOT NULL,
       title TEXT NOT NULL,
       value_cents INTEGER NOT NULL DEFAULT 0,
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
 
-  // bookings (agendamentos) - compat com seu server.js (date/time como texto)
-  await query(`
+  // Bookings
+  await run(`
     CREATE TABLE IF NOT EXISTS bookings (
       id SERIAL PRIMARY KEY,
       customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-      pet_id INTEGER REFERENCES pets(id) ON DELETE SET NULL,
-      service_id INTEGER REFERENCES services(id) ON DELETE SET NULL,
-      date TEXT NOT NULL,
+      pet_id INTEGER NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+      service TEXT NOT NULL DEFAULT '',
+      service_id INTEGER NULL REFERENCES services(id) ON DELETE SET NULL,
+      date DATE NOT NULL,
       time TEXT NOT NULL,
-      service TEXT,
-      prize TEXT NOT NULL DEFAULT '',
-      notes TEXT,
-      status TEXT NOT NULL DEFAULT 'agendado',
-      last_notification_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      prize TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
 
-  // índices úteis
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_service_id ON bookings(service_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_date_time ON bookings(date, time);`);
-
-  /* -------------------------
-     BREEDS (LEGADO) - se existir, mantém
-     (Não derrubar o serviço por seed inválido)
-  ------------------------- */
-  await query(`
-    CREATE TABLE IF NOT EXISTS breeds (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      history TEXT,
-      size TEXT,
-      coat TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  /* -------------------------
-     dog_breeds (CRUD atual do server.js)
-     - Alinhado com o server.js: history TEXT, characteristics TEXT
-  ------------------------- */
-  await query(`
+  // Dog breeds
+  await run(`
     CREATE TABLE IF NOT EXISTS dog_breeds (
       id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
-      history TEXT,
-      size TEXT,
-      coat TEXT,
-      characteristics TEXT,
+      name TEXT NOT NULL UNIQUE,
+      history TEXT DEFAULT '',
+      size TEXT NOT NULL DEFAULT '',
+      coat TEXT NOT NULL DEFAULT '',
+      characteristics TEXT DEFAULT '',
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
 
-  // índice único por LOWER(name) para ON CONFLICT (LOWER(name))
-  await query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes
-        WHERE schemaname='public' AND tablename='dog_breeds' AND indexname='dog_breeds_name_lower_unique'
-      ) THEN
-        CREATE UNIQUE INDEX dog_breeds_name_lower_unique ON dog_breeds (LOWER(name));
-      END IF;
-    END $$;
-  `);
-
-  /* -------------------------
-     Ajustes de compatibilidade + Migração best-effort: breeds -> dog_breeds
-     - Garante colunas e tipos compatíveis com o server.js (history TEXT, characteristics TEXT)
-     - Migra dados do legado (breeds) sem derrubar o serviço
-  ------------------------- */
-  try {
-    await query(`
-      DO $$
-      BEGIN
-        -- Se existir coluna "notes" (versões antigas), renomeia para "characteristics"
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='notes'
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='characteristics'
-        )
-        THEN
-          ALTER TABLE dog_breeds RENAME COLUMN notes TO characteristics;
-        END IF;
-
-        -- Garante coluna characteristics
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='characteristics'
-        )
-        THEN
-          ALTER TABLE dog_breeds ADD COLUMN characteristics TEXT;
-        END IF;
-
-        -- Se history estiver como JSONB (versões antigas), converte para TEXT
-        IF EXISTS (
-          SELECT 1
-          FROM information_schema.columns
-          WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='history' AND data_type='jsonb'
-        )
-        THEN
-          ALTER TABLE dog_breeds
-            ALTER COLUMN history TYPE TEXT
-            USING (history::text);
-        END IF;
-
-        -- Migra do legado (breeds) se existir
-        IF EXISTS (
-          SELECT 1 FROM information_schema.tables
-          WHERE table_schema='public' AND table_name='breeds'
-        ) THEN
-          INSERT INTO dog_breeds (name, history, size, coat, characteristics, is_active, updated_at)
-          SELECT
-            b.name,
-            b.history,
-            b.size,
-            b.coat,
-            NULL,
-            TRUE,
-            NOW()
-          FROM breeds b
-          ON CONFLICT (LOWER(name)) DO NOTHING;
-        END IF;
-      END $$;
-    `);
-  } catch (err) {
-    console.warn('⚠️ Compat/migração dog_breeds falhou (ignorada):', err?.message || err);
-  }
-
-  /* -------------------------
-     MIMOS (novo)
-  ------------------------- */
-  await query(`
+  // Mimos
+  await run(`
     CREATE TABLE IF NOT EXISTS mimos (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
+      description TEXT DEFAULT '',
       value_cents INTEGER NOT NULL DEFAULT 0,
-      starts_at TIMESTAMPTZ,
-      ends_at TIMESTAMPTZ,
+      starts_at TIMESTAMPTZ NULL,
+      ends_at TIMESTAMPTZ NULL,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  await query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes
-        WHERE schemaname='public' AND tablename='mimos' AND indexname='mimos_active_period_idx'
-      ) THEN
-        CREATE INDEX mimos_active_period_idx ON mimos(is_active, starts_at, ends_at);
-      END IF;
-    END $$;
-  `);
 
-  /* -------------------------
-     opening_hours
-  ------------------------- */
-  await query(`
+  // Opening Hours (dow 0-6)
+  await run(`
     CREATE TABLE IF NOT EXISTS opening_hours (
-      dow INTEGER,
+      dow INTEGER NOT NULL,
       is_closed BOOLEAN NOT NULL DEFAULT FALSE,
-      open_time TEXT,
-      close_time TEXT,
+      open_time TEXT DEFAULT '08:00',
+      close_time TEXT DEFAULT '18:00',
       max_per_half_hour INTEGER NOT NULL DEFAULT 1,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
 
-  await query(`
+  // Garantir UNIQUE em dow (necessário para ON CONFLICT (dow))
+  await run(`
     DO $$
     BEGIN
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='day_of_week'
-      )
-      AND NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='dow'
-      )
-      THEN
-        ALTER TABLE opening_hours RENAME COLUMN day_of_week TO dow;
-      END IF;
-
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='max_per_slot'
-      )
-      AND NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='max_per_half_hour'
-      )
-      THEN
-        ALTER TABLE opening_hours RENAME COLUMN max_per_slot TO max_per_half_hour;
-      END IF;
-
       IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='dow'
+        SELECT 1
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND indexname = 'opening_hours_dow_unique'
       ) THEN
-        ALTER TABLE opening_hours ADD COLUMN dow INTEGER;
-      END IF;
+        -- remove duplicados antes de criar unique
+        DELETE FROM opening_hours a
+        USING opening_hours b
+        WHERE a.dow = b.dow
+          AND a.ctid < b.ctid;
 
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='is_closed'
-      ) THEN
-        ALTER TABLE opening_hours ADD COLUMN is_closed BOOLEAN NOT NULL DEFAULT FALSE;
-      END IF;
-
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='open_time'
-      ) THEN
-        ALTER TABLE opening_hours ADD COLUMN open_time TEXT;
-      END IF;
-
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='close_time'
-      ) THEN
-        ALTER TABLE opening_hours ADD COLUMN close_time TEXT;
-      END IF;
-
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='max_per_half_hour'
-      ) THEN
-        ALTER TABLE opening_hours ADD COLUMN max_per_half_hour INTEGER NOT NULL DEFAULT 1;
-      END IF;
-
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='opening_hours' AND column_name='updated_at'
-      ) THEN
-        ALTER TABLE opening_hours ADD COLUMN updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
-      END IF;
-
-      UPDATE opening_hours SET is_closed = FALSE WHERE is_closed IS NULL;
-      UPDATE opening_hours SET max_per_half_hour = 0 WHERE max_per_half_hour IS NULL;
-
-      DELETE FROM opening_hours WHERE dow IS NULL OR dow < 0 OR dow > 6;
-
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes
-        WHERE schemaname='public' AND tablename='opening_hours' AND indexname='opening_hours_dow_unique'
-      ) THEN
         CREATE UNIQUE INDEX opening_hours_dow_unique ON opening_hours(dow);
       END IF;
-    END $$;
+    END$$;
   `);
 
-  // seed se vazio
-  const ohCount = await get(`SELECT COUNT(*)::int AS n FROM opening_hours;`);
-  if ((ohCount?.n || 0) === 0) {
-    const seed = [
-      { dow: 1, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
-      { dow: 2, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
-      { dow: 3, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
-      { dow: 4, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
-      { dow: 5, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
-      { dow: 6, is_closed: false, open_time: '07:30', close_time: '13:00', max: 1 },
-      { dow: 0, is_closed: true,  open_time: null,   close_time: null,   max: 0 },
-    ];
-    for (const r of seed) {
-      await run(
-        `INSERT INTO opening_hours (dow, is_closed, open_time, close_time, max_per_half_hour)
-         VALUES ($1,$2,$3,$4,$5)
-         ON CONFLICT (dow) DO UPDATE
-           SET is_closed=EXCLUDED.is_closed,
-               open_time=EXCLUDED.open_time,
-               close_time=EXCLUDED.close_time,
-               max_per_half_hour=EXCLUDED.max_per_half_hour,
-               updated_at=NOW()`,
-        [r.dow, r.is_closed, r.open_time, r.close_time, r.max]
-      );
-    }
-    console.log('✔ opening_hours seeded');
-  }
-
-  console.log('✔ initDb finalizado');
+  // Backfill padrão de 0..6 caso vazio
+  await run(`
+    DO $$
+    DECLARE d INT;
+    BEGIN
+      FOR d IN 0..6 LOOP
+        INSERT INTO opening_hours (dow, is_closed, open_time, close_time, max_per_half_hour, updated_at)
+        VALUES (d, FALSE, '08:00', '18:00', 1, NOW())
+        ON CONFLICT (dow) DO NOTHING;
+      END LOOP;
+    END$$;
+  `);
 }
 
 module.exports = {
   pool,
-  initDb,
+  query,
   all,
   get,
   run,
-  query,
-  normalizePhone,
-  normalizePlate,
-  normalizeCPF,
-  safeJsonParse,
-  normalizeBreedHistory,
-  uniqueBreedsByName,
+  initDb,
 };
