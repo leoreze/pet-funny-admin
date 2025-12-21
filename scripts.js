@@ -457,7 +457,8 @@ async function reloadMimos() {
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-      await ensureMimosLoaded();
+      ensureMimosLoaded().catch(console.error);
+
       // await loadBreeds(); // removido
       await loadOpeningHours();
       await loadDashboard();
@@ -478,7 +479,6 @@ async function reloadMimos() {
     clearSession();
     if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
     limparForm();
-    await ensureMimosLoaded();
     limparClienteForm();
     clearServiceForm();
     adminApp.style.display = 'none';
@@ -2095,16 +2095,25 @@ async function reloadMimos() {
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', async () => {
-    limparForm();
-    formDate.value = toISODateOnly(new Date());
-    // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
-    formPetSelect.disabled = true;
-    formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
-    mostrarFormAgenda();
-    refreshBookingDateTimeState(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
+btnNovoAgendamento.addEventListener('click', async () => {
+  try {
+    await ensureMimosLoaded(); // ✅ carrega e preenche o combo de mimos
+  } catch (err) {
+    console.error('Erro ao carregar mimos:', err);
+  }
+
+  limparForm();
+  formDate.value = toISODateOnly(new Date());
+
+  // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
+  formPetSelect.disabled = true;
+  formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
+
+  mostrarFormAgenda();
+  refreshBookingDateTimeState(null);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
 
   formPhone.addEventListener('input', () => applyPhoneMask(formPhone));
 
