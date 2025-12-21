@@ -680,16 +680,47 @@ const API_BASE_URL = '';
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
-  function buildRangeForDate(dateStr) {
-    if (!dateStr) return null;
-    const d = new Date(dateStr + 'T00:00:00');
-    if (Number.isNaN(d.getTime())) return null;
-    const day = d.getDay();
-    if (day === 0) return { closed: true };
-    const startMin = 7 * 60 + 30;
-    const endMin = (day === 6) ? (13 * 60) : (17 * 60 + 30);
-    return { closed: false, startMin, endMin };
+  function hhmmToMinutes(hhmm) {
+  const t = normalizeHHMM(hhmm);
+  if (!t) return null;
+  const [hh, mm] = t.split(':').map(n => parseInt(n, 10));
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  return hh * 60 + mm;
+}
+
+function getOpeningConfigForDow(dow) {
+  // Tenta usar configuração salva em "Horário de Funcionamento"
+  if (Array.isArray(openingHoursCache) && openingHoursCache.length) {
+    const row = openingHoursCache.find(r => Number(r.dow) === Number(dow));
+    if (row) return row;
   }
+
+  // Fallback: regras padrão
+  if (dow === 0) return { dow, is_closed: true, open_time: null, close_time: null, max_per_half_hour: 0 };
+  if (dow === 6) return { dow, is_closed: false, open_time: '07:30', close_time: '13:00', max_per_half_hour: 1 };
+  return { dow, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 };
+}
+
+function buildRangeForDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return null;
+
+  const dow = d.getDay();
+  const cfg = getOpeningConfigForDow(dow);
+
+  if (cfg && cfg.is_closed) return { closed: true, cap: 0 };
+
+  const startMin = hhmmToMinutes(cfg?.open_time || '07:30');
+  const endMin = hhmmToMinutes(cfg?.close_time || (dow === 6 ? '13:00' : '17:30'));
+
+  if (startMin == null || endMin == null) return { closed: true, cap: 0 };
+
+  let cap = Number(cfg?.max_per_half_hour);
+  if (!Number.isFinite(cap) || cap < 1) cap = 1;
+
+  return { closed: false, startMin, endMin, cap };
+}
 
   function normalizeHHMM(t) {
     const s = String(t || '').trim();
@@ -709,16 +740,17 @@ const API_BASE_URL = '';
   async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
     const data = await apiGet('/api/bookings', { date: dateStr });
     const list = data.bookings || [];
-    const set = new Set();
+    const map = new Map(); // HH:MM -> count
 
     list.forEach(b => {
       if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
       if (!isActiveBookingStatus(b.status)) return;
       const t = normalizeHHMM(b.time);
-      if (t) set.add(t);
+      if (!t) return;
+      map.set(t, (map.get(t) || 0) + 1);
     });
 
-    return set;
+    return map;
   }
 
   function minutesToHHMM(totalMin) {
@@ -971,6 +1003,8 @@ const API_BASE_URL = '';
   const dashAvgTicket = document.getElementById('dashAvgTicket');
 
   let ultimaLista = [];
+  let openingHoursCache = []; // cache global de horários de funcionamento (carregado via /api/opening-hours)
+
   let clientesCache = [];
   let clienteSelecionadoId = null;
   let petsCache = [];
@@ -985,7 +1019,8 @@ const API_BASE_URL = '';
   }
 
   /* ===== Estado de disponibilidade (Admin) ===== */
-  let occupiedTimesSet = new Set();
+  let occupiedTimesCount = new Map(); // HH:MM -> count
+  let currentSlotCap = 1; // capacidade por slot (30 min) conforme Horário de Funcionamento
 
   async function refreshBookingDateTimeState(excludeBookingId) {
     if (!formDate || !formTime) return;
@@ -997,7 +1032,8 @@ const API_BASE_URL = '';
     if (!range || range.closed) {
       formTime.disabled = true;
       formTime.value = '';
-      occupiedTimesSet = new Set();
+      occupiedTimesCount = new Map();
+      currentSlotCap = 1;
       return;
     }
 
@@ -1009,10 +1045,13 @@ const API_BASE_URL = '';
 
     // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
     try {
-      occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+      occupiedTimesCount = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+      currentSlotCap = Number(range.cap || 1);
+      if (!Number.isFinite(currentSlotCap) || currentSlotCap < 1) currentSlotCap = 1;
     } catch (e) {
       console.warn('Falha ao carregar horários ocupados:', e);
-      occupiedTimesSet = new Set();
+      occupiedTimesCount = new Map();
+      currentSlotCap = 1;
     }
 
     // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
@@ -1024,7 +1063,9 @@ const API_BASE_URL = '';
 
   function isTimeOccupied(timeStr) {
     const t = normalizeHHMM(timeStr);
-    return !!t && occupiedTimesSet.has(t);
+    if (!t) return false;
+    const cnt = occupiedTimesCount.get(t) || 0;
+    return cnt >= currentSlotCap;
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
@@ -2620,7 +2661,7 @@ const API_BASE_URL = '';
     6: 'Sábado'
   };
 
-  let openingHoursCache = []; // [{dow,is_closed,open_time,close_time,max_per_half_hour,updated_at}]
+  openingHoursCache = []; // [{dow,is_closed,open_time,close_time,max_per_half_hour,updated_at}]
 
   function normalizeHHMM(v, fallback) {
     const s = String(v || '').trim();

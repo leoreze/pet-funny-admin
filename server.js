@@ -25,7 +25,7 @@ function sanitizePhone(phone) {
 
 function timeToMinutes(hhmm) {
   // Aceita HH:MM e HH:MM:SS (Postgres TIME costuma vir como HH:MM:SS)
-  const m = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(String(hhmm || '').trim());
+  const m = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d)(?:\.\d+)?)?$/.exec(String(hhmm || '').trim());
   if (!m) return NaN;
   return Number(m[1]) * 60 + Number(m[2]);
 }
