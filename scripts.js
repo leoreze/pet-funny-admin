@@ -87,6 +87,18 @@ const API_BASE_URL = '';
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
+
+function asBool(v) {
+  if (v === true || v === false) return v;
+  if (v === 1 || v === 0) return v === 1;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (['true','t','1','yes','y','sim'].includes(s)) return true;
+    if (['false','f','0','no','n','nao','não'].includes(s)) return false;
+  }
+  return !!v;
+}
+
   function toDatetimeLocalValue(isoOrTs) {
     if (!isoOrTs) return '';
     const d = new Date(isoOrTs);
@@ -1058,7 +1070,11 @@ async function ensureOpeningHoursLoadedForBooking() {
   let currentSlotCap = 1; // capacidade por slot (30 min) conforme Horário de Funcionamento
 
   async function refreshBookingDateTimeState(excludeBookingId) {
+    const formDate = document.getElementById('formDate');
+    const formTime = document.getElementById('formTime');
     if (!formDate || !formTime) return;
+
+    await ensureOpeningHoursLoadedForBooking();
 
     const dateStr = formDate.value;
     if (!dateStr) return;
