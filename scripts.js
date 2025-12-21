@@ -311,23 +311,31 @@ const API_BASE_URL = '';
     });
   }
 
-  
+  // Disponibiliza carregamento de mimos para outras áreas (ex: Novo Agendamento)
   async function ensureMimosLoaded(force = false) {
     try {
       if (!force && Array.isArray(cacheMimos) && cacheMimos.length) {
         syncPrizeSelect(cacheMimos);
-        return;
+        return cacheMimos;
       }
       const mimos = await apiGetMimos();
       cacheMimos = mimos;
       syncPrizeSelect(mimos);
+      return mimos;
     } catch (e) {
-      // Não bloqueia o admin por falha em mimos; apenas mantém "Sem mimo"
-      console.warn('Falha ao carregar mimos:', e?.message || e);
+      // Não bloqueia o admin por falha em mimos; apenas mantém "— Sem mimo —"
+      console.warn('Falha ao carregar mimos:', (e && e.message) ? e.message : e);
+      return [];
     }
   }
 
-async function reloadMimos() {
+  // expõe no escopo global (usado no fluxo de agendamento)
+  try { window.ensureMimosLoaded = ensureMimosLoaded; } catch (_) {}
+  try { window.__pf_mimos_cache = cacheMimos; } catch (_) {}
+
+
+
+  async function reloadMimos() {
     setMsg('Carregando...', false);
     const mimos = await apiGetMimos();
     cacheMimos = mimos;
@@ -457,9 +465,7 @@ async function reloadMimos() {
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-      ensureMimosLoaded().catch(console.error);
-
-      // await loadBreeds(); // removido
+      await loadBreeds();
       await loadOpeningHours();
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
@@ -1142,22 +1148,23 @@ async function reloadMimos() {
     bookingId.value = booking.id;
     bookingOriginalStatus.value = booking.status || 'agendado';
 
-    formPhone.value = booking.phone || '';
+    // Alguns backends enviam tanto booking.phone quanto customer_phone.
+    // Priorizamos o telefone do cliente/tutor.
+    const phoneValue = booking.customer_phone || booking.phone || '';
+    formPhone.value = phoneValue;
     formNome.value = booking.customer_name || '';
-    formPrize.value = booking.prize || 'Tosa Higiênica';
+    formPrize.value = booking.prize || '';
 
     // serviço (preferência: service_id)
     const sid = booking.service_id ?? booking.serviceId ?? '';
-    if (sid && String(sid) !== 'null') formService.value = String(sid);
-    else {
+    if (sid && String(sid) !== 'null') {
+      formService.value = String(sid);
+    } else {
       // fallback: tenta casar pelo texto
       const txt = booking.service || booking.service_title || '';
       const match = servicesCache.find(s => normStr(s.title) === normStr(txt));
       formService.value = match ? String(match.id) : '';
-      
-    // Atualiza limites e disponibilidade para a data (exclui o próprio agendamento)
-    refreshBookingDateTimeState(booking.id);
-  }
+    }
 
     formDate.value = booking.date || '';
     formTime.value = booking.time || '';
@@ -1186,11 +1193,14 @@ async function reloadMimos() {
     }
 
     mostrarFormAgenda();
-    refreshBookingDateTimeState(null);
+
+    // Atualiza limites e disponibilidade para a data (exclui o próprio agendamento)
+    refreshBookingDateTimeState(booking.id);
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  /* ===== Serviços (cache, dropdown e CRUD) ===== */
+/* ===== Serviços (cache, dropdown e CRUD) ===== */
   const btnNovoServico = document.getElementById('btnNovoServico');
   const serviceFormPanel = document.getElementById('serviceFormPanel');
   const serviceId = document.getElementById('serviceId');
@@ -1661,7 +1671,7 @@ async function reloadMimos() {
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone || a.phone);
 
       const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
 
@@ -1777,7 +1787,7 @@ async function reloadMimos() {
 
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
-      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.phone)}</span>`;
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone || a.phone)}</span>`;
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
@@ -2031,7 +2041,7 @@ async function reloadMimos() {
         a.time || '',
         (a.customer_name || '').replace(/;/g, ','),
         (a.pet_name || '').replace(/;/g, ','),
-        formatTelefone(a.phone),
+        formatTelefone(a.customer_phone || a.phone),
         (serviceLabel || '').replace(/;/g, ','),
         (a.prize || '').replace(/;/g, ','),
         (a.status || 'agendado'),
@@ -2095,25 +2105,21 @@ async function reloadMimos() {
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-btnNovoAgendamento.addEventListener('click', async () => {
-  try {
-    await ensureMimosLoaded(); // ✅ carrega e preenche o combo de mimos
-  } catch (err) {
-    console.error('Erro ao carregar mimos:', err);
-  }
+  btnNovoAgendamento.addEventListener('click', async () => {
+    // garante que o combo de Mimos (Roleta) esteja carregado
+    try {
+      if (window.ensureMimosLoaded) await window.ensureMimosLoaded(false);
+    } catch (e) { console.warn('Falha ao carregar mimos:', e); }
 
-  limparForm();
-  formDate.value = toISODateOnly(new Date());
-
-  // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
-  formPetSelect.disabled = true;
-  formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
-
-  mostrarFormAgenda();
-  refreshBookingDateTimeState(null);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-});
-
+    limparForm();
+    formDate.value = toISODateOnly(new Date());
+    // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
+    formPetSelect.disabled = true;
+    formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
+    mostrarFormAgenda();
+    refreshBookingDateTimeState(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 
   formPhone.addEventListener('input', () => applyPhoneMask(formPhone));
 
