@@ -202,65 +202,85 @@ async function initDb() {
      - Migra dados do legado (breeds) sem derrubar o serviço
   ------------------------- */
   try {
-    await query(`
-      DO $$
-      BEGIN
-        -- Se existir coluna "notes" (versões antigas), renomeia para "characteristics"
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='notes'
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='characteristics'
-        )
-        THEN
-          ALTER TABLE dog_breeds RENAME COLUMN notes TO characteristics;
-        END IF;
+  await query(`
+    DO $$
+    DECLARE
+      c_name TEXT;
+    BEGIN
+      -- Se existir coluna "notes" (versões antigas), renomeia para "characteristics"
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='notes'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='characteristics'
+      )
+      THEN
+        ALTER TABLE dog_breeds RENAME COLUMN notes TO characteristics;
+      END IF;
 
-        -- Garante coluna characteristics
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='characteristics'
-        )
-        THEN
-          ALTER TABLE dog_breeds ADD COLUMN characteristics TEXT;
-        END IF;
+      -- Garante coluna characteristics
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='characteristics'
+      )
+      THEN
+        ALTER TABLE dog_breeds ADD COLUMN characteristics TEXT;
+      END IF;
 
-        -- Se history estiver como JSONB (versões antigas), converte para TEXT
-        IF EXISTS (
-          SELECT 1
-          FROM information_schema.columns
-          WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='history' AND data_type='jsonb'
-        )
-        THEN
-          ALTER TABLE dog_breeds
-            ALTER COLUMN history TYPE TEXT
-            USING (history::text);
-        END IF;
+      -- Se history estiver como JSONB (versões antigas), converte para TEXT
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='history' AND data_type='jsonb'
+      )
+      THEN
+        ALTER TABLE dog_breeds
+          ALTER COLUMN history TYPE TEXT
+          USING (history::text);
+      END IF;
 
-        -- Migra do legado (breeds) se existir
-        IF EXISTS (
-          SELECT 1 FROM information_schema.tables
-          WHERE table_schema='public' AND table_name='breeds'
-        ) THEN
-          INSERT INTO dog_breeds (name, history, size, coat, characteristics, is_active, updated_at)
-          SELECT
-            b.name,
-            b.history,
-            b.size,
-            b.coat,
-            NULL,
-            TRUE,
-            NOW()
-          FROM breeds b
-          ON CONFLICT (LOWER(name)) DO NOTHING;
-        END IF;
-      END $$;
-    `);
-  } catch (err) {
-    console.warn('⚠️ Compat/migração dog_breeds falhou (ignorada):', err?.message || err);
-  }
+      /* =========================
+         PATCH: remover CHECK antiga do coat (se existir)
+         (evita "violates check constraint dog_breeds_coat_check")
+      ========================= */
+      SELECT con.conname INTO c_name
+      FROM pg_constraint con
+      JOIN pg_class rel ON rel.oid = con.conrelid
+      JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+      WHERE nsp.nspname='public'
+        AND rel.relname='dog_breeds'
+        AND con.contype='c'
+        AND con.conname ILIKE '%coat%';
+
+      IF c_name IS NOT NULL THEN
+        EXECUTE format('ALTER TABLE public.dog_breeds DROP CONSTRAINT %I', c_name);
+      END IF;
+
+      -- Migra do legado (breeds) se existir
+      IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema='public' AND table_name='breeds'
+      ) THEN
+        INSERT INTO dog_breeds (name, history, size, coat, characteristics, is_active, updated_at)
+        SELECT
+          b.name,
+          b.history,
+          b.size,
+          b.coat,
+          NULL,
+          TRUE,
+          NOW()
+        FROM breeds b
+        ON CONFLICT (LOWER(name)) DO NOTHING;
+      END IF;
+    END $$;
+  `);
+} catch (err) {
+  console.warn('⚠️ Compat/migração dog_breeds falhou (ignorada):', err?.message || err);
+}
+
 
   /* -------------------------
      MIMOS (novo)
