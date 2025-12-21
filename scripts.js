@@ -311,7 +311,23 @@ const API_BASE_URL = '';
     });
   }
 
-  async function reloadMimos() {
+  
+  async function ensureMimosLoaded(force = false) {
+    try {
+      if (!force && Array.isArray(cacheMimos) && cacheMimos.length) {
+        syncPrizeSelect(cacheMimos);
+        return;
+      }
+      const mimos = await apiGetMimos();
+      cacheMimos = mimos;
+      syncPrizeSelect(mimos);
+    } catch (e) {
+      // Não bloqueia o admin por falha em mimos; apenas mantém "Sem mimo"
+      console.warn('Falha ao carregar mimos:', e?.message || e);
+    }
+  }
+
+async function reloadMimos() {
     setMsg('Carregando...', false);
     const mimos = await apiGetMimos();
     cacheMimos = mimos;
@@ -441,9 +457,9 @@ const API_BASE_URL = '';
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-      await loadBreeds();
+      await ensureMimosLoaded();
+      // await loadBreeds(); // removido
       await loadOpeningHours();
-      try { if (window.PF_reloadMimos) await window.PF_reloadMimos(); } catch (_) {}
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
@@ -462,6 +478,7 @@ const API_BASE_URL = '';
     clearSession();
     if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
     limparForm();
+    await ensureMimosLoaded();
     limparClienteForm();
     clearServiceForm();
     adminApp.style.display = 'none';
@@ -1942,7 +1959,7 @@ const API_BASE_URL = '';
       let customer = null;
       try {
         const lookup = await apiPost('/api/customers/lookup', { phone });
-        if (lookup && lookup.customer) customer = lookup.customer;
+        if (lookup.exists && lookup.customer) customer = lookup.customer;
       } catch (_) {}
 
       if (!customer) {
@@ -2078,7 +2095,7 @@ const API_BASE_URL = '';
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', () => {
+  btnNovoAgendamento.addEventListener('click', async () => {
     limparForm();
     formDate.value = toISODateOnly(new Date());
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
@@ -2098,33 +2115,37 @@ const API_BASE_URL = '';
     try {
       const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
 
-      const customer = (lookup && lookup.customer) ? lookup.customer : null;
-      const exists = (lookup && typeof lookup.exists === 'boolean') ? lookup.exists : !!customer;
-
-      if (exists && customer) {
+      if (lookup.exists && lookup.customer) {
         // Cliente existe: preenche nome e carrega pets para seleção
-        formNome.value = customer.name || '';
+        formNome.value = lookup.customer.name || '';
         formPetSelect.disabled = false;
-
-        await loadPetsForCustomer(customer.id);
+        await loadPetsForCustomer(lookup.customer.id);
 
         // Se o cliente não tem pets, força cadastro antes de agendar
         if (formPetSelect.options.length <= 1) {
           formPetSelect.disabled = true;
           formPetSelect.innerHTML = '<option value="">(Cadastre ao menos 1 pet para este cliente)</option>';
-          showToast('Cliente encontrado, mas sem pets. Cadastre o pet na aba "Clientes & Pets".', 'warning');
+          formError.textContent = 'Cliente encontrado, mas sem pets cadastrados. Cadastre os pets na aba "Clientes & Pets" antes de agendar.';
+          formError.style.display = 'block';
+        } else {
+          formError.style.display = 'none';
+          formError.textContent = '';
         }
       } else {
-        // Não encontrado
+        // Cliente não existe: avisa e orienta cadastro
         formNome.value = '';
         formPetSelect.disabled = true;
-        formPetSelect.innerHTML = '<option value="">(Cadastre o cliente e o pet primeiro)</option>';
-        showToast('Cliente não cadastrado. Cadastre na aba "Clientes & Pets" antes de criar o agendamento.', 'warning');
+        formPetSelect.innerHTML = '<option value="">(Cadastre o cliente e os pets primeiro)</option>';
+
+        formError.textContent = 'Cliente não cadastrado. Vá na aba "Clientes & Pets" para cadastrar o tutor e os pets antes de criar o agendamento.';
+        formError.style.display = 'block';
       }
-    } catch (err) {
-      console.error('Lookup cliente (telefone) falhou:', err);
-      // Não travar a UI por erro de rede; apenas orientar
-      showToast('Não foi possível validar o cliente agora. Verifique a conexão e tente novamente.', 'warning');
+    } catch (e) {
+      // Em caso de erro na API, mantém o fluxo mas informa
+      formPetSelect.disabled = true;
+      formPetSelect.innerHTML = '<option value="">(Erro ao buscar cliente)</option>';
+      formError.textContent = 'Erro ao buscar cliente pelo telefone. Tente novamente. Detalhe: ' + (e.message || e);
+      formError.style.display = 'block';
     }
   });
 
