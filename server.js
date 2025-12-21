@@ -386,7 +386,7 @@ app.post('/api/bookings', async (req, res) => {
     const status = req.body.status ? String(req.body.status).trim() : 'agendado';
     const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
-    if (!customer_id || !date || !time || !prize) {
+    if (!customer_id || !date || !time ) {
       return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
     }
 
