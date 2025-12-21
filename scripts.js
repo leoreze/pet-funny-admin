@@ -645,40 +645,45 @@ await loadBreeds();
   const todayISO = new Date().toISOString().split('T')[0];
 
   function validarDiaHora(dateStr, timeStr) {
-    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+  if (!dateStr || !timeStr) return 'Informe a data e o horário.';
 
-    const date = new Date(dateStr + 'T' + timeStr + ':00');
-    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
+  const t = String(timeStr || '').trim();
+  // Aceita HH:MM e HH:MM:SS (alguns browsers retornam segundos)
+  const isoTime = (t.length === 5) ? (t + ':00') : t;
 
-    const diaSemana = date.getDay();
-    const parts = String(timeStr).split(':');
-    const hh = parseInt(parts[0], 10);
-    const mm = parseInt(parts[1] || '0', 10);
+  const date = new Date(`${dateStr}T${isoTime}`);
+  if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
 
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
+  const diaSemana = date.getDay();
+  const parts = String(isoTime).split(':');
+  const hh = parseInt(parts[0], 10);
+  const mm = parseInt(parts[1] || '0', 10);
 
-    // Admin também deve seguir a regra do cliente: somente 00 ou 30
-    if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
 
-    const minutos = hh * 60 + mm;
-    const inicio = 7 * 60 + 30;
+  // Admin também deve seguir a regra do cliente: somente 00 ou 30
+  if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
 
-    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
-    if (diaSemana >= 1 && diaSemana <= 5) {
-      const fim = 17 * 60 + 30;
-      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
-    }
-    if (diaSemana === 6) {
-      const fim = 13 * 60;
-      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
-    }
+  const minutos = hh * 60 + mm;
+  const inicio = 7 * 60 + 30;
 
-    // Não permite agendar no passado (comparando data/hora local)
-    const now = new Date();
-    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
-
-    return null;
+  if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+  if (diaSemana >= 1 && diaSemana <= 5) {
+    const fim = 17 * 60 + 30;
+    if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
   }
+  if (diaSemana === 6) {
+    const fim = 13 * 60;
+    if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+  }
+
+  // Não permite agendar no passado (comparando data/hora local)
+  const now = new Date();
+  if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+
+  return null;
+}
+
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
