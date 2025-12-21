@@ -682,20 +682,26 @@ const API_BASE_URL = '';
     return s !== 'cancelado';
   }
 
-  async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
-    const data = await apiGet('/api/bookings', { date: dateStr });
-    const list = data.bookings || [];
-    const set = new Set();
+async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
+  const data = await apiGet('/api/bookings', { date: dateStr });
+  const list = data.bookings || [];
 
-    list.forEach(b => {
-      if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
-      if (!isActiveBookingStatus(b.status)) return;
-      const t = normalizeHHMM(b.time);
-      if (t) set.add(t);
-    });
+  // retorna contagem por horário
+  const map = new Map();
 
-    return set;
-  }
+  list.forEach(b => {
+    if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
+    if (!isActiveBookingStatus(b.status)) return;
+
+    const t = normalizeHHMM(b.time);
+    if (!t) return;
+
+    map.set(t, (map.get(t) || 0) + 1);
+  });
+
+  return map; // { '07:30' => 1, '08:00' => 2, ... }
+}
+
 
   function minutesToHHMM(totalMin) {
     const hh = Math.floor(totalMin / 60);
@@ -1908,11 +1914,7 @@ const API_BASE_URL = '';
 
     // Carrega horários ocupados do dia e bloqueia conflito
     await refreshBookingDateTimeState(id);
-    if (isTimeOccupied(time)) {
-      formError.textContent = 'Horário indisponível para esta data. Selecione outro horário.';
-      formError.style.display = 'block';
-      return;
-    }
+
 
     const status = formStatus.value;
     const notes = formNotes.value.trim();
