@@ -12,6 +12,10 @@ const pool = new Pool({
     : { rejectUnauthorized: false },
 });
 
+pool.on('error', (err) => {
+  console.error('❌ Erro inesperado no pool do PostgreSQL:', err);
+});
+
 async function query(sql, params = []) {
   const client = await pool.connect();
   try {
@@ -291,7 +295,7 @@ async function initDb() {
   ------------------------- */
   await query(`
     CREATE TABLE IF NOT EXISTS opening_hours (
-      dow INTEGER,
+      dow INTEGER PRIMARY KEY,
       is_closed BOOLEAN NOT NULL DEFAULT FALSE,
       open_time TEXT,
       close_time TEXT,
@@ -331,7 +335,7 @@ async function initDb() {
         SELECT 1 FROM information_schema.columns
         WHERE table_schema='public' AND table_name='opening_hours' AND column_name='dow'
       ) THEN
-        ALTER TABLE opening_hours ADD COLUMN dow INTEGER;
+        ALTER TABLE opening_hours ADD COLUMN dow INT;
       END IF;
 
       IF NOT EXISTS (
@@ -387,13 +391,13 @@ async function initDb() {
   const ohCount = await get(`SELECT COUNT(*)::int AS n FROM opening_hours;`);
   if ((ohCount?.n || 0) === 0) {
     const seed = [
+      { dow: 0, is_closed: true, open_time: null, close_time: null, max: 0 }, // domingo fechado
       { dow: 1, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
       { dow: 2, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
       { dow: 3, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
       { dow: 4, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
       { dow: 5, is_closed: false, open_time: '07:30', close_time: '17:30', max: 1 },
-      { dow: 6, is_closed: false, open_time: '07:30', close_time: '13:00', max: 1 },
-      { dow: 0, is_closed: true,  open_time: null,   close_time: null,   max: 0 },
+      { dow: 6, is_closed: false, open_time: '07:30', close_time: '12:00', max: 1 }, // sábado meio período
     ];
     for (const r of seed) {
       await run(
