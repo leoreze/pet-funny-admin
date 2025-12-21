@@ -56,6 +56,29 @@ const API_BASE_URL = '';
   let currentEditId = null;
   let cacheMimos = [];
 
+  // Disponibiliza o carregamento de mimos para outras áreas (ex: Agendamentos)
+  async function ensureMimosLoaded(force = false) {
+    try {
+      if (!force && Array.isArray(cacheMimos) && cacheMimos.length) {
+        syncPrizeSelect(cacheMimos);
+        return cacheMimos;
+      }
+      const mimos = await apiGetMimos();
+      cacheMimos = Array.isArray(mimos) ? mimos : [];
+      syncPrizeSelect(cacheMimos);
+      return cacheMimos;
+    } catch (e) {
+      // Não bloqueia o admin por falha em mimos; mantém o select com “Sem mimo”
+      console.warn('Falha ao carregar mimos:', e?.message || e);
+      try { syncPrizeSelect([]); } catch (_) {}
+      return [];
+    }
+  }
+
+  // Exponha para o restante do scripts.js (Agendamentos, etc.)
+  window.ensureMimosLoaded = ensureMimosLoaded;
+
+
   function setMsg(text, isError) {
     if (!els.msg) return;
     els.msg.textContent = text || '';
@@ -441,6 +464,7 @@ const API_BASE_URL = '';
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
+      try { if (window.ensureMimosLoaded) await window.ensureMimosLoaded(false); } catch (_) {}
       await loadBreeds();
       await loadOpeningHours();
       await loadDashboard();
@@ -682,26 +706,20 @@ const API_BASE_URL = '';
     return s !== 'cancelado';
   }
 
-async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
-  const data = await apiGet('/api/bookings', { date: dateStr });
-  const list = data.bookings || [];
+  async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
+    const data = await apiGet('/api/bookings', { date: dateStr });
+    const list = data.bookings || [];
+    const set = new Set();
 
-  // retorna contagem por horário
-  const map = new Map();
+    list.forEach(b => {
+      if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
+      if (!isActiveBookingStatus(b.status)) return;
+      const t = normalizeHHMM(b.time);
+      if (t) set.add(t);
+    });
 
-  list.forEach(b => {
-    if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
-    if (!isActiveBookingStatus(b.status)) return;
-
-    const t = normalizeHHMM(b.time);
-    if (!t) return;
-
-    map.set(t, (map.get(t) || 0) + 1);
-  });
-
-  return map; // { '07:30' => 1, '08:00' => 2, ... }
-}
-
+    return set;
+  }
 
   function minutesToHHMM(totalMin) {
     const hh = Math.floor(totalMin / 60);
@@ -1130,8 +1148,7 @@ async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
     bookingId.value = booking.id;
     bookingOriginalStatus.value = booking.status || 'agendado';
 
-    // Ao editar: aplica máscara no valor exibido (mantemos sanitizePhone para salvar)
-    formPhone.value = formatTelefone(booking.phone || '');
+    formPhone.value = booking.phone || '';
     try { applyPhoneMask(formPhone); } catch (_) {}
     formNome.value = booking.customer_name || '';
     formPrize.value = booking.prize || 'Tosa Higiênica';
@@ -1914,7 +1931,11 @@ async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
 
     // Carrega horários ocupados do dia e bloqueia conflito
     await refreshBookingDateTimeState(id);
-
+    if (isTimeOccupied(time)) {
+      formError.textContent = 'Horário indisponível para esta data. Selecione outro horário.';
+      formError.style.display = 'block';
+      return;
+    }
 
     const status = formStatus.value;
     const notes = formNotes.value.trim();
@@ -2081,7 +2102,8 @@ async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', () => {
+  btnNovoAgendamento.addEventListener('click', async () => {
+    try { await (window.ensureMimosLoaded ? window.ensureMimosLoaded(false) : Promise.resolve()); } catch (e) { console.warn(e); }
     limparForm();
     formDate.value = toISODateOnly(new Date());
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
