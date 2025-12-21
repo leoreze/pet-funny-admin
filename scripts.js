@@ -1941,7 +1941,7 @@ const API_BASE_URL = '';
       let customer = null;
       try {
         const lookup = await apiPost('/api/customers/lookup', { phone });
-        if (lookup.exists && lookup.customer) customer = lookup.customer;
+        if (lookup && lookup.customer) customer = lookup.customer;
       } catch (_) {}
 
       if (!customer) {
@@ -2097,37 +2097,33 @@ const API_BASE_URL = '';
     try {
       const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
 
-      if (lookup.exists && lookup.customer) {
+      const customer = (lookup && lookup.customer) ? lookup.customer : null;
+      const exists = (lookup && typeof lookup.exists === 'boolean') ? lookup.exists : !!customer;
+
+      if (exists && customer) {
         // Cliente existe: preenche nome e carrega pets para seleção
-        formNome.value = lookup.customer.name || '';
+        formNome.value = customer.name || '';
         formPetSelect.disabled = false;
-        await loadPetsForCustomer(lookup.customer.id);
+
+        await loadPetsForCustomer(customer.id);
 
         // Se o cliente não tem pets, força cadastro antes de agendar
         if (formPetSelect.options.length <= 1) {
           formPetSelect.disabled = true;
           formPetSelect.innerHTML = '<option value="">(Cadastre ao menos 1 pet para este cliente)</option>';
-          formError.textContent = 'Cliente encontrado, mas sem pets cadastrados. Cadastre os pets na aba "Clientes & Pets" antes de agendar.';
-          formError.style.display = 'block';
-        } else {
-          formError.style.display = 'none';
-          formError.textContent = '';
+          showToast('Cliente encontrado, mas sem pets. Cadastre o pet na aba "Clientes & Pets".', 'warning');
         }
       } else {
-        // Cliente não existe: avisa e orienta cadastro
+        // Não encontrado
         formNome.value = '';
         formPetSelect.disabled = true;
-        formPetSelect.innerHTML = '<option value="">(Cadastre o cliente e os pets primeiro)</option>';
-
-        formError.textContent = 'Cliente não cadastrado. Vá na aba "Clientes & Pets" para cadastrar o tutor e os pets antes de criar o agendamento.';
-        formError.style.display = 'block';
+        formPetSelect.innerHTML = '<option value="">(Cadastre o cliente e o pet primeiro)</option>';
+        showToast('Cliente não cadastrado. Cadastre na aba "Clientes & Pets" antes de criar o agendamento.', 'warning');
       }
-    } catch (e) {
-      // Em caso de erro na API, mantém o fluxo mas informa
-      formPetSelect.disabled = true;
-      formPetSelect.innerHTML = '<option value="">(Erro ao buscar cliente)</option>';
-      formError.textContent = 'Erro ao buscar cliente pelo telefone. Tente novamente. Detalhe: ' + (e.message || e);
-      formError.style.display = 'block';
+    } catch (err) {
+      console.error('Lookup cliente (telefone) falhou:', err);
+      // Não travar a UI por erro de rede; apenas orientar
+      showToast('Não foi possível validar o cliente agora. Verifique a conexão e tente novamente.', 'warning');
     }
   });
 

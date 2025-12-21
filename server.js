@@ -146,16 +146,31 @@ app.get('/api/customers', async (req, res) => {
 // Lookup por telefone
 app.post('/api/customers/lookup', async (req, res) => {
   try {
-    const phone = sanitizePhone(req.body.phone || '');
+    const phoneRaw = req.body.phone || '';
+    const phone = sanitizePhone(phoneRaw);
     if (!phone) return res.status(400).json({ error: 'Informe um telefone.' });
 
+    // Compatibilidade: alguns cadastros podem ter "55" (DDI) gravado e outros não.
+    // Tentamos múltiplas variações para aumentar a taxa de match sem quebrar o legado.
+    const variants = new Set();
+    variants.add(phone);
+
+    // Se vier 11 dígitos (DDD+cel), tenta com DDI 55
+    if (phone.length === 11) variants.add('55' + phone);
+
+    // Se vier com 55 + 11 dígitos (13), tenta sem 55
+    if (phone.length === 13 && phone.startsWith('55')) variants.add(phone.slice(2));
+
+    const arr = Array.from(variants);
     const row = await db.get(
-      `SELECT * FROM customers WHERE phone = $1 LIMIT 1`,
-      [phone]
+      `SELECT * FROM customers
+       WHERE phone = ANY($1::text[])
+       LIMIT 1`,
+      [arr]
     );
 
-    if (!row) return res.json({ customer: null });
-    res.json({ customer: row });
+    if (!row) return res.json({ exists: false, customer: null });
+    res.json({ exists: true, customer: row });
   } catch (err) {
     console.error('Erro em lookup customers:', err);
     res.status(500).json({ error: 'Erro interno ao buscar cliente.' });
@@ -241,12 +256,21 @@ app.delete('/api/customers/:id', async (req, res) => {
 // Listar pets
 app.get('/api/pets', async (req, res) => {
   try {
-    const rows = await db.all(
-      `SELECT p.*, c.name AS customer_name
-       FROM pets p
-       JOIN customers c ON c.id = p.customer_id
-       ORDER BY p.name`
-    );
+    const customerId = req.query.customer_id ? Number(req.query.customer_id) : null;
+
+    let sql = `
+      SELECT p.*, c.name AS customer_name
+      FROM pets p
+      JOIN customers c ON c.id = p.customer_id
+    `;
+    const params = [];
+    if (customerId) {
+      params.push(customerId);
+      sql += ` WHERE p.customer_id = $1 `;
+    }
+    sql += ` ORDER BY p.name `;
+
+    const rows = await db.all(sql, params);
     res.json({ pets: rows });
   } catch (err) {
     console.error('Erro ao listar pets:', err);
