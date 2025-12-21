@@ -443,6 +443,7 @@ const API_BASE_URL = '';
       await loadClientes();
       await loadBreeds();
       await loadOpeningHours();
+      try { if (window.PF_reloadMimos) await window.PF_reloadMimos(); } catch (_) {}
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
