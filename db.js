@@ -151,54 +151,66 @@ async function initDb() {
 
   await run(`
     CREATE TABLE IF NOT EXISTS booking_services (
-      id SERIAL PRIMARY KEY,
       booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
       service_id INTEGER NOT NULL REFERENCES services(id),
       qty INTEGER NOT NULL DEFAULT 1,
-      created_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE (booking_id, service_id)
+      PRIMARY KEY (booking_id, service_id)
     );
-  `);
+    `);
 
-  // Compat: se a tabela booking_services já existia sem a coluna qty, adiciona agora
-  await run(`ALTER TABLE booking_services ADD COLUMN IF NOT EXISTS qty INTEGER NOT NULL DEFAULT 1;`);
+    // Garantias de migração (produção pode já ter booking_services sem qty/PK)
+    await run(`ALTER TABLE booking_services ADD COLUMN IF NOT EXISTS qty INTEGER NOT NULL DEFAULT 1;`);
 
-  // Migração: traz agendamentos antigos (bookings.service_id / bookings.service) para booking_services
-  await run(`
-    INSERT INTO booking_services (booking_id, service_id, qty)
-    SELECT b.id, b.service_id, 1
-    FROM bookings b
-    WHERE b.service_id IS NOT NULL
-      AND NOT EXISTS (
-        SELECT 1 FROM booking_services bs
-        WHERE bs.booking_id = b.id AND bs.service_id = b.service_id
-      );
-  `);
+    // PK/Unique (ON CONFLICT exige unique/PK)
+    await run(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'booking_services_pkey'
+        ) THEN
+          ALTER TABLE booking_services ADD CONSTRAINT booking_services_pkey PRIMARY KEY (booking_id, service_id);
+        END IF;
+      END $$;
+    `);
 
-  await run(`
-    INSERT INTO booking_services (booking_id, service_id, qty)
-    SELECT b.id, s.id, 1
-    FROM bookings b
-    -- services usa a coluna "title" (não "name")
-    JOIN services s ON LOWER(TRIM(s.title)) = LOWER(TRIM(b.service))
-    WHERE (b.service_id IS NULL OR b.service_id = 0)
-      AND b.service IS NOT NULL AND TRIM(b.service) <> ''
-      AND NOT EXISTS (
-        SELECT 1 FROM booking_services bs
-        WHERE bs.booking_id = b.id AND bs.service_id = s.id
-      );
-  `);
+    // Migra bookings legados (bookings.service_id) para booking_services quando ainda não tiver linhas
+    await run(`
+      INSERT INTO booking_services (booking_id, service_id, qty)
+      SELECT b.id, b.service_id, 1
+      FROM bookings b
+      WHERE b.service_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_services bs WHERE bs.booking_id = b.id
+        );
+    `);
 
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_service_id ON bookings(service_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_date_time ON bookings(date, time);`);
 
-  /* -------------------------
-     BREEDS (LEGADO) - se existir, mantém
-     (Não derrubar o serviço por seed inválido)
-  ------------------------- */
-  await query(`
+    // PK/Unique (ON CONFLICT exige unique/PK)
+    await run(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'booking_services_pkey'
+        ) THEN
+          ALTER TABLE booking_services ADD CONSTRAINT booking_services_pkey PRIMARY KEY (booking_id, service_id);
+        END IF;
+      END $$;
+    `);
+
+    // Migra bookings legados (bookings.service_id) para booking_services quando ainda não tiver linhas
+    await run(`
+      INSERT INTO booking_services (booking_id, service_id, qty)
+      SELECT b.id, b.service_id, 1
+      FROM bookings b
+      WHERE b.service_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_services bs WHERE bs.booking_id = b.id
+        );
+    `);
+
+    await run(`
     CREATE TABLE IF NOT EXISTS breeds (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
