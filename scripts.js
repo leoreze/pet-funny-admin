@@ -558,48 +558,18 @@ const API_BASE_URL = '';
   });
 
   // ===== API HELPERS =====
-  async function apiGet(path, params) {
-    const url = new URL(API_BASE_URL + path, window.location.origin);
-    if (params) {
-      Object.keys(params).forEach(k => {
-        const v = params[k];
-        if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
-      });
-    }
-    const resp = await fetch(url.toString());
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
-    return data;
+ 
+  // (extraído para pf_api.js — mantém os mesmos contratos de chamada)
+  const PF_API = (window.PF_API || null);
+  if (!PF_API) {
+    throw new Error('PF_API não foi carregado. Verifique se pf_api.js está incluído ANTES de scripts.js no admin.html.');
   }
 
-  async function apiPost(path, body) {
-    const resp = await fetch(API_BASE_URL + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
-    return data;
-  }
+  const apiGet = PF_API.get;
+  const apiPost = PF_API.post;
+  const apiPut = PF_API.put;
+  const apiDelete = PF_API.del;
 
-  async function apiPut(path, body) {
-    const resp = await fetch(API_BASE_URL + path, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao atualizar.');
-    return data;
-  }
-
-  async function apiDelete(path) {
-    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao apagar.');
-    return data;
-  }
 
   function sanitizePhone(phone) { return (phone || '').replace(/\D/g, ''); }
 
