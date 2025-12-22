@@ -143,20 +143,48 @@ async function initDb() {
     );
   `);
 
-
-// booking_services (multi-serviços por agendamento)
-await query(`
-  CREATE TABLE IF NOT EXISTS booking_services (
-    booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
-    PRIMARY KEY (booking_id, service_id)
-  );
-`);
-
-await query(`CREATE INDEX IF NOT EXISTS idx_booking_services_booking_id ON booking_services(booking_id);`);
-await query(`CREATE INDEX IF NOT EXISTS idx_booking_services_service_id ON booking_services(service_id);`);
-
   // índices úteis
+
+  /* =========================
+     BOOKING SERVICES (N:N)
+  ========================= */
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS booking_services (
+      id SERIAL PRIMARY KEY,
+      booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      service_id INTEGER NOT NULL REFERENCES services(id),
+      qty INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE (booking_id, service_id)
+    );
+  `);
+
+  // Migração: traz agendamentos antigos (bookings.service_id / bookings.service) para booking_services
+  await run(`
+    INSERT INTO booking_services (booking_id, service_id, qty)
+    SELECT b.id, b.service_id, 1
+    FROM bookings b
+    WHERE b.service_id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM booking_services bs
+        WHERE bs.booking_id = b.id AND bs.service_id = b.service_id
+      );
+  `);
+
+  await run(`
+    INSERT INTO booking_services (booking_id, service_id, qty)
+    SELECT b.id, s.id, 1
+    FROM bookings b
+    JOIN services s ON LOWER(TRIM(s.name)) = LOWER(TRIM(b.service))
+    WHERE (b.service_id IS NULL OR b.service_id = 0)
+      AND b.service IS NOT NULL AND TRIM(b.service) <> ''
+      AND NOT EXISTS (
+        SELECT 1 FROM booking_services bs
+        WHERE bs.booking_id = b.id AND bs.service_id = s.id
+      );
+  `);
+
   await query(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_bookings_service_id ON bookings(service_id);`);
