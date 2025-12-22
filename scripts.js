@@ -1136,7 +1136,7 @@ function normalizeHHMM(t) {
     statTotal.textContent = total;
     statTosa.textContent = contTosa;
     statHidratacao.textContent = contHidra;
-    statFoto.textContent = contFoto;
+    statFotoVideo.textContent = contFoto;
     statPatinhas.textContent = contPatinhas;
 
     // ===== Mimos (dinâmico, respeita período do mimo X data do agendamento) =====
