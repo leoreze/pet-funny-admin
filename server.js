@@ -384,36 +384,18 @@ app.get('/api/bookings', async (req, res) => {
         c.phone AS customer_phone,
         pet.name AS pet_name,
 
-        -- fallback legado (um serviço)
+        -- serviço (único)
         s.title AS service_title,
         s.value_cents AS service_value_cents,
 
-        -- nova lógica (múltiplos serviços)
-        COALESCE(bs.services, '[]'::json) AS services,
-        COALESCE(bs.total_value_cents, COALESCE(s.value_cents, 0)) AS services_total_cents
+        -- compatibilidade com UI (campos que existiam na versão multi-serviços)
+        '[]'::json AS services,
+        COALESCE(s.value_cents, 0) AS services_total_cents
       FROM bookings b
       JOIN customers c ON c.id = b.customer_id
       LEFT JOIN pets pet ON pet.id = b.pet_id
       LEFT JOIN services s ON s.id = b.service_id
-      LEFT JOIN LATERAL (
-        SELECT
-          COALESCE(
-            json_agg(
-              json_build_object(
-                'service_id', s2.id,
-                'title', s2.title,
-                'value_cents', s2.value_cents,
-                'qty', bs2.qty
-              )
-              ORDER BY s2.title
-            ),
-            '[]'::json
-          ) AS services,
-          COALESCE(SUM(bs2.qty * s2.value_cents), 0) AS total_value_cents
-        FROM booking_services bs2
-        JOIN services s2 ON s2.id = bs2.service_id
-        WHERE bs2.booking_id = b.id
-      ) bs ON true
+      -- multi-serviços removido: não join em booking_services
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY b.date DESC, b.time DESC, b.id DESC
     `;
@@ -513,6 +495,107 @@ app.delete('/api/bookings/:id', async (req, res) => {
   } catch (err) {
     console.error('Erro ao deletar booking:', err);
     res.status(500).json({ error: 'Erro interno ao excluir agendamento.' });
+  }
+});
+
+/* =========================
+   BREEDS (dog_breeds) - NOVO CRUD
+========================= */
+
+app.get('/api/breeds', async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const active = String(req.query.active || '').trim(); // "1" para apenas ativos
+
+    let sql = `SELECT * FROM dog_breeds WHERE 1=1`;
+    const params = [];
+
+    if (active === '1') sql += ` AND is_active = TRUE`;
+
+    if (q) {
+      params.push(`%${q.toLowerCase()}%`);
+      sql += ` AND (LOWER(name) LIKE $${params.length} OR LOWER(size) LIKE $${params.length} OR LOWER(coat) LIKE $${params.length})`;
+    }
+
+    sql += ` ORDER BY name ASC`;
+    const rows = await db.all(sql, params);
+    res.json({ breeds: rows });
+  } catch (err) {
+    console.error('Erro ao listar breeds:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar raças.' });
+  }
+});
+
+app.post('/api/breeds', async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    const history = String(req.body.history || '').trim();
+    const size = String(req.body.size || '').trim(); // pequeno|medio|grande
+    const coat = String(req.body.coat || '').trim(); // curta|media|longa
+    const characteristics = String(req.body.characteristics || '').trim();
+    const is_active = req.body.is_active === false ? false : true;
+
+    if (!name || !size || !coat) {
+      return res.status(400).json({ error: 'name, size e coat são obrigatórios.' });
+    }
+
+    const row = await db.get(
+      `
+      INSERT INTO dog_breeds (name, history, size, coat, characteristics, is_active, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      RETURNING *
+      `,
+      [name, history, size, coat, characteristics, is_active]
+    );
+
+    res.json({ breed: row });
+  } catch (err) {
+    console.error('Erro ao criar breed:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar raça (pode ser nome duplicado).' });
+  }
+});
+
+app.put('/api/breeds/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const name = String(req.body.name || '').trim();
+    const history = String(req.body.history || '').trim();
+    const size = String(req.body.size || '').trim();
+    const coat = String(req.body.coat || '').trim();
+    const characteristics = String(req.body.characteristics || '').trim();
+    const is_active = req.body.is_active === false ? false : true;
+
+    if (!id || !name || !size || !coat) {
+      return res.status(400).json({ error: 'id, name, size e coat são obrigatórios.' });
+    }
+
+    const row = await db.get(
+      `
+      UPDATE dog_breeds
+      SET name=$2, history=$3, size=$4, coat=$5, characteristics=$6, is_active=$7, updated_at=NOW()
+      WHERE id=$1
+      RETURNING *
+      `,
+      [id, name, history, size, coat, characteristics, is_active]
+    );
+
+    res.json({ breed: row });
+  } catch (err) {
+    console.error('Erro ao atualizar breed:', err);
+    res.status(500).json({ error: 'Erro interno ao atualizar raça.' });
+  }
+});
+
+app.delete('/api/breeds/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    await db.run('DELETE FROM dog_breeds WHERE id = $1', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao deletar breed:', err);
+    res.status(500).json({ error: 'Erro interno ao excluir raça.' });
   }
 });
 
