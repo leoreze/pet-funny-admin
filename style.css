@@ -728,3 +728,9 @@
     display: none;
   }
 }
+
+
+/* Admin - Horário de Funcionamento: campo Capacidade por horário */
+.hours-capacity{
+  max-width: 120px;
+}

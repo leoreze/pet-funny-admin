@@ -27,8 +27,9 @@ const API_BASE_URL = '';
   'use strict';
 
   const $ = (id) => document.getElementById(id);
+  // Mesmo que a aba de Mimos não exista no DOM (variações de layout),
+  // ainda precisamos carregar os mimos para o select do agendamento (#formPrize).
   const elTab = $('tab-mimos');
-  if (!elTab) return;
 
   const els = {
     title: $('mimoTitle'),
@@ -55,6 +56,23 @@ const API_BASE_URL = '';
 
   let currentEditId = null;
   let cacheMimos = [];
+
+  // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
+  // seja populado mesmo sem o usuário abrir a aba "Mimos".
+  async function ensureMimosLoaded(force = false) {
+    if (!force && Array.isArray(cacheMimos) && cacheMimos.length > 0) {
+      syncPrizeSelect();
+      return;
+    }
+    await reloadMimos();
+  }
+
+  // Expor funções para o fluxo de agendamento (novo/edição)
+  // sem depender do usuário abrir a aba "Mimos".
+  window.PF_MIMOS = window.PF_MIMOS || {};
+  window.PF_MIMOS.ensureLoaded = ensureMimosLoaded;
+  window.PF_MIMOS.reload = reloadMimos;
+  window.PF_MIMOS.syncSelect = syncPrizeSelect;
 
   function setMsg(text, isError) {
     if (!els.msg) return;
@@ -192,7 +210,8 @@ const API_BASE_URL = '';
 
   /* ---------- Render ---------- */
   function syncPrizeSelect(mimos) {
-    if (!els.prizeSelect) return;
+    const prizeSelect = document.getElementById('formPrize');
+    if (!prizeSelect) return;
 
     const now = new Date();
     const isInPeriod = (m) => {
@@ -205,23 +224,23 @@ const API_BASE_URL = '';
     };
 
     const active = (mimos || []).filter(isInPeriod);
-    const current = els.prizeSelect.value;
+    const current = prizeSelect.value;
 
-    els.prizeSelect.innerHTML = '';
+    prizeSelect.innerHTML = '';
     const opt0 = document.createElement('option');
     opt0.value = '';
     opt0.textContent = '— Sem mimo —';
-    els.prizeSelect.appendChild(opt0);
+    prizeSelect.appendChild(opt0);
 
     active.forEach((m) => {
       const opt = document.createElement('option');
       opt.value = m.title; // compat: booking.prize é texto
       opt.textContent = `${m.title} (R$ ${formatCentsToBRL(m.value_cents)})`;
       opt.setAttribute('data-mimo-id', String(m.id));
-      els.prizeSelect.appendChild(opt);
+      prizeSelect.appendChild(opt);
     });
 
-    if (current) els.prizeSelect.value = current;
+    if (current) prizeSelect.value = current;
   }
 
   function renderMimosTable(mimos) {
@@ -311,30 +330,7 @@ const API_BASE_URL = '';
     });
   }
 
-  
-  // ---------- Booking: garante que o select de Mimo (Roleta) esteja populado mesmo sem abrir a aba "Mimos" ----------
-  async function ensureMimosLoaded(force = false) {
-    try {
-      if (!force && Array.isArray(cacheMimos) && cacheMimos.length) {
-        syncPrizeSelect(cacheMimos);
-        return cacheMimos;
-      }
-      const mimos = await apiGetMimos();
-      cacheMimos = mimos;
-      syncPrizeSelect(mimos);
-      return mimos;
-    } catch (e) {
-      console.warn('Falha ao carregar mimos:', e?.message || e);
-      // mantém ao menos a opção "Sem mimo"
-      try { syncPrizeSelect([]); } catch (_) {}
-      return [];
-    }
-  }
-
-  // expõe para o restante do admin (novo agendamento / edição)
-  try { window.ensureMimosLoaded = ensureMimosLoaded; } catch (_) {}
-
-async function reloadMimos() {
+  async function reloadMimos() {
     setMsg('Carregando...', false);
     const mimos = await apiGetMimos();
     cacheMimos = mimos;
@@ -464,9 +460,15 @@ async function reloadMimos() {
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-      try { await (window.ensureMimosLoaded ? window.ensureMimosLoaded() : Promise.resolve()); } catch (_) {}
       await loadBreeds();
       await loadOpeningHours();
+
+      // Garante que o select de mimos no agendamento esteja preenchido,
+      // mesmo sem navegar na aba "Mimos".
+      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
+        await window.PF_MIMOS.ensureLoaded(true);
+      }
+
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
@@ -682,16 +684,50 @@ async function reloadMimos() {
 
   function buildRangeForDate(dateStr) {
     if (!dateStr) return null;
-    const d = new Date(dateStr + 'T00:00:00');
+
+    // IMPORTANT: interpret the selected date in America/Sao_Paulo regardless of server/browser timezone.
+    // Using an explicit -03:00 offset avoids the common "weekday shifted" bug.
+    const d = new Date(dateStr + 'T00:00:00-03:00');
     if (Number.isNaN(d.getTime())) return null;
-    const day = d.getDay();
-    if (day === 0) return { closed: true };
+    const dow = d.getUTCDay(); // 0=Sun..6=Sat (São Paulo)
+
+    // Prefer configured Opening Hours (admin menu "Horário de Funcionamento")
+    const oh = Array.isArray(openingHoursCache)
+      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
+      : null;
+
+    if (oh) {
+      if (oh.is_closed) return { closed: true };
+      const openMin = hhmmToMinutes(normalizeHHMM(String(oh.open_time || '')));
+      const closeMin = hhmmToMinutes(normalizeHHMM(String(oh.close_time || '')));
+      if (!Number.isFinite(openMin) || !Number.isFinite(closeMin) || closeMin <= openMin) return { closed: true };
+      return { closed: false, startMin: openMin, endMin: closeMin };
+    }
+
+    // Fallback (if Opening Hours were not loaded)
+    if (dow === 0) return { closed: true };
     const startMin = 7 * 60 + 30;
-    const endMin = (day === 6) ? (13 * 60) : (17 * 60 + 30);
+    const endMin = (dow === 6) ? (12 * 60) : (17 * 60 + 30);
     return { closed: false, startMin, endMin };
   }
 
-  function normalizeHHMM(t) {
+  function getMaxPerHalfHourForDate(dateStr) {
+    if (!dateStr) return 1;
+    const d = new Date(dateStr + 'T00:00:00-03:00');
+    if (Number.isNaN(d.getTime())) return 1;
+    const dow = d.getUTCDay();
+
+    const oh = Array.isArray(openingHoursCache)
+      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
+      : null;
+
+    if (!oh) return 1;
+    if (oh.is_closed) return 0;
+    const cap = parseInt(oh.max_per_half_hour, 10);
+    return Number.isFinite(cap) && cap > 0 ? cap : 1;
+  }
+
+function normalizeHHMM(t) {
     const s = String(t || '').trim();
     const m = s.match(/^(\d{1,2}):(\d{1,2})/);
     if (!m) return null;
@@ -709,16 +745,17 @@ async function reloadMimos() {
   async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
     const data = await apiGet('/api/bookings', { date: dateStr });
     const list = data.bookings || [];
-    const set = new Set();
+    const map = new Map();
 
     list.forEach(b => {
       if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
       if (!isActiveBookingStatus(b.status)) return;
       const t = normalizeHHMM(b.time);
-      if (t) set.add(t);
+      if (!t) return;
+      map.set(t, (map.get(t) || 0) + 1);
     });
 
-    return set;
+    return map;
   }
 
   function minutesToHHMM(totalMin) {
@@ -998,7 +1035,7 @@ async function reloadMimos() {
   }
 
   /* ===== Estado de disponibilidade (Admin) ===== */
-  let occupiedTimesSet = new Set();
+  let occupiedTimesMap = new Map();
 
   async function refreshBookingDateTimeState(excludeBookingId) {
     if (!formDate || !formTime) return;
@@ -1010,7 +1047,7 @@ async function reloadMimos() {
     if (!range || range.closed) {
       formTime.disabled = true;
       formTime.value = '';
-      occupiedTimesSet = new Set();
+      occupiedTimesMap = new Map();
       return;
     }
 
@@ -1022,10 +1059,10 @@ async function reloadMimos() {
 
     // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
     try {
-      occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+      occupiedTimesMap = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
     } catch (e) {
       console.warn('Falha ao carregar horários ocupados:', e);
-      occupiedTimesSet = new Set();
+      occupiedTimesMap = new Map();
     }
 
     // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
@@ -1035,9 +1072,26 @@ async function reloadMimos() {
     }
   }
 
+  function getCapacityForDate(dateStr) {
+    const cache = (window.__pf_openingHoursCache || []);
+    if (!dateStr) return 1;
+    const d = new Date(dateStr + "T12:00:00");
+    if (Number.isNaN(d.getTime())) return 1;
+    const dow = d.getDay();
+    const row = cache.find(r => Number(r.dow) === Number(dow));
+    if (!row) return 1;
+    if (row.is_closed) return 0;
+    const cap = Number(row.max_per_half_hour);
+    return Number.isFinite(cap) ? cap : 1;
+  }
+
   function isTimeOccupied(timeStr) {
     const t = normalizeHHMM(timeStr);
-    return !!t && occupiedTimesSet.has(t);
+    if (!t) return false;
+    const cap = getCapacityForDate(formDate ? formDate.value : "");
+    if (cap <= 0) return true;
+    const used = occupiedTimesMap.get(t) || 0;
+    return used >= cap;
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
@@ -1158,14 +1212,12 @@ async function reloadMimos() {
   }
 
   function preencherFormEdicao(booking) {
-    try { if (window.ensureMimosLoaded) window.ensureMimosLoaded(); } catch (_) {}
-
     bookingId.value = booking.id;
     bookingOriginalStatus.value = booking.status || 'agendado';
 
     formPhone.value = booking.phone || '';
     formNome.value = booking.customer_name || '';
-    formPrize.value = booking.prize || '';
+    formPrize.value = booking.prize || 'Tosa Higiênica';
 
     // serviço (preferência: service_id)
     const sid = booking.service_id ?? booking.serviceId ?? '';
@@ -1926,7 +1978,6 @@ async function reloadMimos() {
     const petIdNum = petIdRaw ? parseInt(petIdRaw, 10) : null;
 
     const prize = formPrize.value;
-    const prizeLabel = prize || 'Sem mimo';
 
     // serviço selecionado do banco (id)
     const serviceIdSelected = formService.value ? parseInt(formService.value, 10) : null;
@@ -1960,7 +2011,6 @@ async function reloadMimos() {
       formError.style.display = 'block';
       return;
     }
-    // Mimo é opcional (pode ser "Sem mimo")
     // Novo agendamento: Pet obrigatório
     if (!id && !petIdNum) {
       formError.textContent = 'Para NOVO agendamento, selecione um pet.';
@@ -2005,7 +2055,7 @@ async function reloadMimos() {
           ? (formPetSelect.options[formPetSelect.selectedIndex]?.textContent || 'seu pet')
           : 'seu pet';
 
-        const msg = buildStatusMessage(status, nome, petLabel, serviceTitleSelected, dataBR, time, prizeLabel);
+        const msg = buildStatusMessage(status, nome, petLabel, serviceTitleSelected, dataBR, time, prize);
 
         let fullPhone = phone;
         if (!(fullPhone.startsWith('55') && fullPhone.length > 11)) fullPhone = '55' + fullPhone;
@@ -2114,13 +2164,26 @@ async function reloadMimos() {
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
   btnNovoAgendamento.addEventListener('click', async () => {
-  try { await (window.ensureMimosLoaded ? window.ensureMimosLoaded(true) : Promise.resolve()); } catch (e) { console.warn(e); }
-
     limparForm();
+    // Garantir caches carregados (horários e mimos) para o NOVO agendamento
+    try { await loadOpeningHours(); } catch (e) {}
+    try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
+
     formDate.value = toISODateOnly(new Date());
+    // dispara change porque set programtico no dispara evento
+    try { formDate.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
     formPetSelect.disabled = true;
     formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
+    // Carrega mimos antes de abrir o formulário (evita select vazio no primeiro uso).
+    try {
+      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
+        await window.PF_MIMOS.ensureLoaded(true);
+      }
+    } catch (e) {
+      console.warn('Falha ao carregar mimos:', e);
+    }
+
     mostrarFormAgenda();
     // Garante que o estado do horário seja recalculado após o form ficar visível.
     // (Alguns browsers podem não aplicar corretamente enable/disable quando o elemento ainda está oculto.)
@@ -2298,7 +2361,6 @@ async function reloadMimos() {
             tbodyPets.innerHTML = '';
           }
           await loadClientes();
-      try { await (window.ensureMimosLoaded ? window.ensureMimosLoaded() : Promise.resolve()); } catch (_) {}
           await loadDashboard();
           await renderTabela();
         } catch (e) { alert(e.message); }
@@ -2350,7 +2412,6 @@ async function reloadMimos() {
       badgeClienteSelecionado.classList.remove('hidden');
       petsCard.classList.remove('hidden');
       await loadClientes();
-      try { await (window.ensureMimosLoaded ? window.ensureMimosLoaded() : Promise.resolve()); } catch (_) {}
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadDashboard();
       await renderTabela();
@@ -2401,7 +2462,6 @@ async function reloadMimos() {
           await apiDelete('/api/pets/' + p.id);
           await loadPetsForClienteTab(clienteSelecionadoId);
           await loadClientes();
-      try { await (window.ensureMimosLoaded ? window.ensureMimosLoaded() : Promise.resolve()); } catch (_) {}
           await loadDashboard();
           await renderTabela();
         } catch (e) { alert(e.message); }
@@ -2456,7 +2516,6 @@ async function reloadMimos() {
       limparPetsForm();
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadClientes();
-      try { await (window.ensureMimosLoaded ? window.ensureMimosLoaded() : Promise.resolve()); } catch (_) {}
       await loadBreeds();
       await loadDashboard();
       await renderTabela();
@@ -2647,7 +2706,7 @@ async function reloadMimos() {
 
   let openingHoursCache = []; // [{dow,is_closed,open_time,close_time,max_per_half_hour,updated_at}]
 
-  function normalizeHHMM(v, fallback) {
+  function normalizeHHMM_OH(v, fallback) {
     const s = String(v || '').trim();
     if (/^([01]\d|2[0-3]):[0-5]\d$/.test(s)) return s;
     return fallback;
@@ -2750,6 +2809,7 @@ async function reloadMimos() {
     try {
       const data = await apiGet('/api/opening-hours');
       openingHoursCache = data.opening_hours || [];
+      window.__pf_openingHoursCache = openingHoursCache;
       renderOpeningHoursTable();
     } catch (e) {
       console.error(e);
@@ -2772,8 +2832,8 @@ async function reloadMimos() {
       const closeEl = document.getElementById('oh_close_' + dow);
       const capEl = document.getElementById('oh_cap_' + dow);
 
-      let open_time = openEl ? normalizeHHMM(openEl.value, '07:30') : '07:30';
-      let close_time = closeEl ? normalizeHHMM(closeEl.value, '17:30') : '17:30';
+      let open_time = openEl ? normalizeHHMM_OH(openEl.value, '07:30') : '07:30';
+      let close_time = closeEl ? normalizeHHMM_OH(closeEl.value, '17:30') : '17:30';
       let max_per_half_hour = capEl ? Number(capEl.value) : 1;
 
       if (!Number.isFinite(max_per_half_hour) || max_per_half_hour < 0) max_per_half_hour = 0;
@@ -2797,6 +2857,7 @@ async function reloadMimos() {
       const payload = { opening_hours: rows };
       const data = await apiPut('/api/opening-hours', payload);
       openingHoursCache = data.opening_hours || [];
+      window.__pf_openingHoursCache = openingHoursCache;
       renderOpeningHoursTable();
       if (hoursMsg) hoursMsg.textContent = 'Horários salvos com sucesso.';
     } catch (e) {
@@ -2861,4 +2922,59 @@ async function reloadMimos() {
     const btn = e.target.closest('.tab-btn');
     if (btn) closeMenu();
   });
-})();
+})();function hhmmToMinutes(hhmm) {
+    const m = String(hhmm || '').match(/^(\d{2}):(\d{2})$/);
+    if (!m) return NaN;
+    const h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    if (!Number.isFinite(h) || !Number.isFinite(min)) return NaN;
+    if (h < 0 || h > 23 || min < 0 || min > 59) return NaN;
+    return h * 60 + min;
+  }
+
+  function buildRangeForDate(dateStr) {
+    if (!dateStr) return null;
+
+    // IMPORTANT: interpret the selected date in America/Sao_Paulo regardless of server/browser timezone.
+    // Using an explicit -03:00 offset avoids the common "weekday shifted" bug.
+    const d = new Date(dateStr + 'T00:00:00-03:00');
+    if (Number.isNaN(d.getTime())) return null;
+    const dow = d.getUTCDay(); // 0=Sun..6=Sat (São Paulo)
+
+    // Prefer configured Opening Hours (admin menu "Horário de Funcionamento")
+    const oh = Array.isArray(openingHoursCache)
+      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
+      : null;
+
+    if (oh) {
+      if (oh.is_closed) return { closed: true };
+      const openMin = hhmmToMinutes(normalizeHHMM(String(oh.open_time || '')));
+      const closeMin = hhmmToMinutes(normalizeHHMM(String(oh.close_time || '')));
+      if (!Number.isFinite(openMin) || !Number.isFinite(closeMin) || closeMin <= openMin) return { closed: true };
+      return { closed: false, startMin: openMin, endMin: closeMin };
+    }
+
+    // Fallback (if Opening Hours were not loaded)
+    if (dow === 0) return { closed: true };
+    const startMin = 7 * 60 + 30;
+    const endMin = (dow === 6) ? (12 * 60) : (17 * 60 + 30);
+    return { closed: false, startMin, endMin };
+  }
+
+  function getMaxPerHalfHourForDate(dateStr) {
+    if (!dateStr) return 1;
+    const d = new Date(dateStr + 'T00:00:00-03:00');
+    if (Number.isNaN(d.getTime())) return 1;
+    const dow = d.getUTCDay();
+
+    const oh = Array.isArray(openingHoursCache)
+      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
+      : null;
+
+    if (!oh) return 1;
+    if (oh.is_closed) return 0;
+    const cap = parseInt(oh.max_per_half_hour, 10);
+    return Number.isFinite(cap) && cap > 0 ? cap : 1;
+  }
+
+
