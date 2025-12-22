@@ -1,8 +1,8 @@
-// backend/server.js (UPDATED)
+// backend/server.js
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const db = require('./db');
+const db = require('./db'); // PostgreSQL helpers + initDb
 
 const app = express();
 app.use(cors());
@@ -11,99 +11,62 @@ app.use(express.json());
 // Static files (admin.html, index.html, assets)
 app.use(express.static(__dirname));
 
-app.get(['/admin', '/admin/'], (req, res) => {
-  return res.sendFile(path.join(__dirname, 'admin.html'));
-});
-
-
-
-// Converte YYYY-MM-DD para weekday local (evita bug de timezone do Date('YYYY-MM-DD') que é interpretado como UTC)
-function weekdayFromISO(dateStr) {
-  if (!dateStr || typeof dateStr !== 'string') return null;
-  const parts = dateStr.split('-').map(Number);
-  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
-  const [y, m, d] = parts;
-  const dt = new Date(y, m - 1, d); // local time
-  return dt.getDay();
-}
-/* =========================
+/* =========================================================
    HELPERS
-========================= */
-function sanitizePhone(phone) {
-  return String(phone || '').replace(/\D/g, '');
+========================================================= */
+function toInt(val, fallback = null) {
+  const n = Number(val);
+  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+}
+function sanitizeTimeHHMM(v) {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  // Accept "HH:MM" only (24h)
+  if (!/^\d{2}:\d{2}$/.test(s)) return null;
+  const [hh, mm] = s.split(':').map(Number);
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+}
+function sanitizeDateYYYYMMDD(v) {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return s;
+}
+function parseServicesPayload(payload) {
+  // Accept:
+  // - { service_id } legacy
+  // - { service_ids: [1,2] }
+  // - { services: [{service_id, qty}] }
+  if (!payload || typeof payload !== 'object') return [];
+  const out = [];
+  if (Array.isArray(payload.services)) {
+    for (const it of payload.services) {
+      const sid = toInt(it?.service_id, null);
+      if (!sid) continue;
+      const qty = Math.max(1, toInt(it?.qty, 1) || 1);
+      out.push({ service_id: sid, qty });
+    }
+  } else if (Array.isArray(payload.service_ids)) {
+    for (const sidRaw of payload.service_ids) {
+      const sid = toInt(sidRaw, null);
+      if (sid) out.push({ service_id: sid, qty: 1 });
+    }
+  } else if (payload.service_id) {
+    const sid = toInt(payload.service_id, null);
+    if (sid) out.push({ service_id: sid, qty: 1 });
+  }
+  // de-dup by summing qty
+  const map = new Map();
+  for (const it of out) {
+    map.set(it.service_id, (map.get(it.service_id) || 0) + it.qty);
+  }
+  return [...map.entries()].map(([service_id, qty]) => ({ service_id, qty }));
 }
 
-function timeToMinutes(hhmm) {
-  // Aceita HH:MM e HH:MM:SS (Postgres TIME costuma vir como HH:MM:SS)
-  const m = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d)(?:\.\d+)?)?$/.exec(String(hhmm || '').trim());
-  if (!m) return NaN;
-  return Number(m[1]) * 60 + Number(m[2]);
-}
-
-function getDowFromISODate(dateStr) {
-  // dateStr: YYYY-MM-DD (interpreta como meia-noite local)
-  const d = new Date(`${dateStr}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.getDay(); // 0=Dom..6=Sáb
-}
-
-async function validateBookingSlot({ date, time, excludeBookingId = null }) {
-  const dow = getDowFromISODate(date);
-  if (dow == null) return { ok: false, error: 'Data inválida.' };
-
-  const oh = await db.get(
-    `SELECT dow, is_closed, open_time, close_time, max_per_half_hour
-     FROM opening_hours WHERE dow = $1`,
-    [dow]
-  );
-
-  // Se não existir linha (banco antigo), assume aberto padrão.
-  if (!oh) return { ok: true };
-  if (oh.is_closed) return { ok: false, error: 'Dia fechado para agendamentos.' };
-
-  const t = timeToMinutes(time);
-  const open = timeToMinutes(oh.open_time);
-  const close = timeToMinutes(oh.close_time);
-  if (!Number.isFinite(t) || !Number.isFinite(open) || !Number.isFinite(close)) {
-    return { ok: false, error: 'Horário inválido.' };
-  }
-  if (t < open || t >= close) {
-    return { ok: false, error: 'Horário fora do funcionamento.' };
-  }
-  if ((t - open) % 30 !== 0) {
-    return { ok: false, error: 'Horário deve ser em intervalos de 30 minutos.' };
-  }
-
-  const cap = Number(oh.max_per_half_hour);
-  if (!Number.isFinite(cap) || cap <= 0) {
-    return { ok: false, error: 'Capacidade do horário está zerada.' };
-  }
-
-  const params = [date, String(time).slice(0, 5)];
-  let sql = `
-    SELECT COUNT(*)::int AS n
-    FROM bookings
-    WHERE date = $1
-      AND time = $2
-      AND COALESCE(status,'') NOT IN ('cancelado','cancelada')
-  `;
-  if (excludeBookingId) {
-    params.push(Number(excludeBookingId));
-    sql += ` AND id <> $${params.length}`;
-  }
-  const cnt = await db.get(sql, params);
-  const n = cnt?.n || 0;
-  if (n >= cap) {
-    return { ok: false, error: 'Este horário já atingiu o limite de agendamentos.' };
-  }
-  return { ok: true };
-}
-
-/* =========================
+/* =========================================================
    CUSTOMERS
-========================= */
-
-// List customers
+========================================================= */
 app.get('/api/customers', async (req, res) => {
   try {
     const sql = `
@@ -120,120 +83,113 @@ app.get('/api/customers', async (req, res) => {
   }
 });
 
-// Lookup by phone
 app.post('/api/customers/lookup', async (req, res) => {
   try {
-    const phone = sanitizePhone(req.body.phone);
-    if (!phone) return res.status(400).json({ error: 'Telefone é obrigatório.' });
+    const phone = (req.body?.phone || '').toString().trim();
+    if (!phone) return res.status(400).json({ error: 'Telefone obrigatório.' });
 
-    const row = await db.get('SELECT * FROM customers WHERE phone = $1', [phone]);
-    if (!row) return res.json({ exists: false });
+    const customer = await db.get(`SELECT * FROM customers WHERE phone = $1`, [phone]);
+    if (!customer) return res.json({ found: false });
 
-    res.json({ exists: true, customer: row });
+    const pets = await db.all(`SELECT * FROM pets WHERE customer_id = $1 ORDER BY name`, [customer.id]);
+    res.json({ found: true, customer, pets });
   } catch (err) {
     console.error('Erro em lookup customers:', err);
     res.status(500).json({ error: 'Erro interno ao buscar cliente.' });
   }
 });
 
-// Create/update customer (idempotente por phone)
 app.post('/api/customers', async (req, res) => {
   try {
-    const phone = sanitizePhone(req.body.phone);
-    const name = String(req.body.name || '').trim();
-    if (!phone || !name) return res.status(400).json({ error: 'Telefone e nome são obrigatórios.' });
+    const name = (req.body?.name || '').toString().trim();
+    const phone = (req.body?.phone || '').toString().trim();
+    if (!name) return res.status(400).json({ error: 'Nome obrigatório.' });
+    if (!phone) return res.status(400).json({ error: 'Telefone obrigatório.' });
 
-    const existing = await db.get('SELECT * FROM customers WHERE phone = $1', [phone]);
-
-    if (!existing) {
-      const ins = await db.get(
-        'INSERT INTO customers (phone, name) VALUES ($1,$2) RETURNING *',
-        [phone, name]
-      );
-      return res.json({ customer: ins });
-    }
-
-    const upd = await db.get(
-      'UPDATE customers SET name = $2 WHERE phone = $1 RETURNING *',
-      [phone, name]
+    const row = await db.get(
+      `INSERT INTO customers (name, phone) VALUES ($1,$2) RETURNING *`,
+      [name, phone]
     );
-    res.json({ customer: upd });
+    res.json({ customer: row });
   } catch (err) {
-    console.error('Erro ao salvar customer:', err);
-    res.status(500).json({ error: 'Erro interno ao salvar cliente.' });
+    console.error('Erro ao criar customer:', err);
+    res.status(500).json({ error: 'Erro interno ao criar cliente.' });
+  }
+});
+
+app.put('/api/customers/:id', async (req, res) => {
+  try {
+    const id = toInt(req.params.id, null);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    const name = (req.body?.name || '').toString().trim();
+    const phone = (req.body?.phone || '').toString().trim();
+    if (!name) return res.status(400).json({ error: 'Nome obrigatório.' });
+    if (!phone) return res.status(400).json({ error: 'Telefone obrigatório.' });
+
+    const row = await db.get(
+      `UPDATE customers SET name=$1, phone=$2 WHERE id=$3 RETURNING *`,
+      [name, phone, id]
+    );
+    res.json({ customer: row });
+  } catch (err) {
+    console.error('Erro ao atualizar customer:', err);
+    res.status(500).json({ error: 'Erro interno ao atualizar cliente.' });
   }
 });
 
 app.delete('/api/customers/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const id = toInt(req.params.id, null);
     if (!id) return res.status(400).json({ error: 'ID inválido.' });
-
-    await db.run('DELETE FROM customers WHERE id = $1', [id]);
+    await db.run(`DELETE FROM customers WHERE id=$1`, [id]);
     res.json({ ok: true });
   } catch (err) {
     console.error('Erro ao deletar customer:', err);
-    res.status(500).json({ error: 'Erro interno ao excluir cliente.' });
+    res.status(500).json({ error: 'Erro interno ao deletar cliente.' });
   }
 });
 
-/* =========================
+/* =========================================================
    PETS
-========================= */
-
-// List pets (by customer_id)
-app.get('/api/pets', async (req, res) => {
-  try {
-    const customerId = Number(req.query.customer_id);
-    if (!customerId) return res.status(400).json({ error: 'customer_id é obrigatório.' });
-
-    const rows = await db.all(
-      'SELECT * FROM pets WHERE customer_id = $1 ORDER BY id DESC',
-      [customerId]
-    );
-    res.json({ pets: rows });
-  } catch (err) {
-    console.error('Erro ao listar pets:', err);
-    res.status(500).json({ error: 'Erro interno ao buscar pets.' });
-  }
-});
-
-// Create pet
+========================================================= */
 app.post('/api/pets', async (req, res) => {
   try {
-    const customerId = Number(req.body.customer_id);
-    const name = String(req.body.name || '').trim();
-    const breed = req.body.breed ? String(req.body.breed).trim() : null;
-    const info = req.body.info ? String(req.body.info).trim() : null;
+    const customer_id = toInt(req.body?.customer_id, null);
+    const name = (req.body?.name || '').toString().trim();
+    const breed = (req.body?.breed || '').toString().trim();
+    const size = (req.body?.size || '').toString().trim();
 
-    if (!customerId || !name) return res.status(400).json({ error: 'customer_id e name são obrigatórios.' });
+    if (!customer_id) return res.status(400).json({ error: 'Cliente obrigatório.' });
+    if (!name) return res.status(400).json({ error: 'Nome do pet obrigatório.' });
 
-    const row = await db.get(
-      'INSERT INTO pets (customer_id, name, breed, info) VALUES ($1,$2,$3,$4) RETURNING *',
-      [customerId, name, breed, info]
+    const pet = await db.get(
+      `INSERT INTO pets (customer_id, name, breed, size)
+       VALUES ($1,$2,$3,$4) RETURNING *`,
+      [customer_id, name, breed, size]
     );
-    res.json({ pet: row });
+    res.json({ pet });
   } catch (err) {
     console.error('Erro ao criar pet:', err);
-    res.status(500).json({ error: 'Erro interno ao salvar pet.' });
+    res.status(500).json({ error: 'Erro interno ao criar pet.' });
   }
 });
 
-// Update pet
 app.put('/api/pets/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    const name = String(req.body.name || '').trim();
-    const breed = req.body.breed ? String(req.body.breed).trim() : null;
-    const info = req.body.info ? String(req.body.info).trim() : null;
+    const id = toInt(req.params.id, null);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
 
-    if (!id || !name) return res.status(400).json({ error: 'ID e name são obrigatórios.' });
+    const name = (req.body?.name || '').toString().trim();
+    const breed = (req.body?.breed || '').toString().trim();
+    const size = (req.body?.size || '').toString().trim();
+    if (!name) return res.status(400).json({ error: 'Nome do pet obrigatório.' });
 
-    const row = await db.get(
-      'UPDATE pets SET name=$2, breed=$3, info=$4 WHERE id=$1 RETURNING *',
-      [id, name, breed, info]
+    const pet = await db.get(
+      `UPDATE pets SET name=$1, breed=$2, size=$3 WHERE id=$4 RETURNING *`,
+      [name, breed, size, id]
     );
-    res.json({ pet: row });
+    res.json({ pet });
   } catch (err) {
     console.error('Erro ao atualizar pet:', err);
     res.status(500).json({ error: 'Erro interno ao atualizar pet.' });
@@ -242,24 +198,59 @@ app.put('/api/pets/:id', async (req, res) => {
 
 app.delete('/api/pets/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const id = toInt(req.params.id, null);
     if (!id) return res.status(400).json({ error: 'ID inválido.' });
-
-    await db.run('DELETE FROM pets WHERE id = $1', [id]);
+    await db.run(`DELETE FROM pets WHERE id=$1`, [id]);
     res.json({ ok: true });
   } catch (err) {
     console.error('Erro ao deletar pet:', err);
-    res.status(500).json({ error: 'Erro interno ao excluir pet.' });
+    res.status(500).json({ error: 'Erro interno ao deletar pet.' });
   }
 });
 
-/* =========================
-   SERVICES (value_cents)
-========================= */
+/* =========================================================
+   BREEDS
+========================================================= */
+app.get('/api/breeds', async (req, res) => {
+  try {
+    const rows = await db.all(`SELECT * FROM breeds ORDER BY name`);
+    res.json({ breeds: rows });
+  } catch (err) {
+    console.error('Erro ao listar raças:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar raças.' });
+  }
+});
 
+app.post('/api/breeds', async (req, res) => {
+  try {
+    const name = (req.body?.name || '').toString().trim();
+    if (!name) return res.status(400).json({ error: 'Nome obrigatório.' });
+    const row = await db.get(`INSERT INTO breeds (name) VALUES ($1) RETURNING *`, [name]);
+    res.json({ breed: row });
+  } catch (err) {
+    console.error('Erro ao criar raça:', err);
+    res.status(500).json({ error: 'Erro interno ao criar raça.' });
+  }
+});
+
+app.delete('/api/breeds/:id', async (req, res) => {
+  try {
+    const id = toInt(req.params.id, null);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    await db.run(`DELETE FROM breeds WHERE id=$1`, [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao deletar raça:', err);
+    res.status(500).json({ error: 'Erro interno ao deletar raça.' });
+  }
+});
+
+/* =========================================================
+   SERVICES
+========================================================= */
 app.get('/api/services', async (req, res) => {
   try {
-    const rows = await db.all('SELECT * FROM services ORDER BY date DESC, id DESC');
+    const rows = await db.all(`SELECT * FROM services ORDER BY title`);
     res.json({ services: rows });
   } catch (err) {
     console.error('Erro ao listar services:', err);
@@ -269,48 +260,35 @@ app.get('/api/services', async (req, res) => {
 
 app.post('/api/services', async (req, res) => {
   try {
-    const date = String(req.body.date || '').slice(0, 10);
-    const title = String(req.body.title || '').trim();
-    const value_cents = Number(req.body.value_cents);
-
-    if (!date || !title || !Number.isFinite(value_cents)) {
-      return res.status(400).json({ error: 'date, title e value_cents são obrigatórios.' });
-    }
+    const title = (req.body?.title || '').toString().trim();
+    const value_cents = toInt(req.body?.value_cents, null);
+    if (!title) return res.status(400).json({ error: 'Título obrigatório.' });
+    if (value_cents === null || value_cents < 0) return res.status(400).json({ error: 'Valor inválido.' });
 
     const row = await db.get(
-      `
-      INSERT INTO services (date, title, value_cents, updated_at)
-      VALUES ($1,$2,$3,NOW())
-      RETURNING *
-      `,
-      [date, title, value_cents]
+      `INSERT INTO services (title, value_cents) VALUES ($1,$2) RETURNING *`,
+      [title, value_cents]
     );
     res.json({ service: row });
   } catch (err) {
     console.error('Erro ao criar service:', err);
-    res.status(500).json({ error: 'Erro interno ao salvar serviço.' });
+    res.status(500).json({ error: 'Erro interno ao criar serviço.' });
   }
 });
 
 app.put('/api/services/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    const date = String(req.body.date || '').slice(0, 10);
-    const title = String(req.body.title || '').trim();
-    const value_cents = Number(req.body.value_cents);
+    const id = toInt(req.params.id, null);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
 
-    if (!id || !date || !title || !Number.isFinite(value_cents)) {
-      return res.status(400).json({ error: 'id, date, title e value_cents são obrigatórios.' });
-    }
+    const title = (req.body?.title || '').toString().trim();
+    const value_cents = toInt(req.body?.value_cents, null);
+    if (!title) return res.status(400).json({ error: 'Título obrigatório.' });
+    if (value_cents === null || value_cents < 0) return res.status(400).json({ error: 'Valor inválido.' });
 
     const row = await db.get(
-      `
-      UPDATE services
-      SET date=$2, title=$3, value_cents=$4, updated_at=NOW()
-      WHERE id=$1
-      RETURNING *
-      `,
-      [id, date, title, value_cents]
+      `UPDATE services SET title=$1, value_cents=$2 WHERE id=$3 RETURNING *`,
+      [title, value_cents, id]
     );
     res.json({ service: row });
   } catch (err) {
@@ -321,312 +299,349 @@ app.put('/api/services/:id', async (req, res) => {
 
 app.delete('/api/services/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const id = toInt(req.params.id, null);
     if (!id) return res.status(400).json({ error: 'ID inválido.' });
-
-    await db.run('DELETE FROM services WHERE id = $1', [id]);
+    await db.run(`DELETE FROM services WHERE id=$1`, [id]);
     res.json({ ok: true });
   } catch (err) {
     console.error('Erro ao deletar service:', err);
-    res.status(500).json({ error: 'Erro interno ao excluir serviço.' });
+    res.status(500).json({ error: 'Erro interno ao deletar serviço.' });
   }
 });
 
-/* =========================
-   BOOKINGS (Agendamentos) — multi-serviços + capacidade por slot
-========================= */
+/* =========================================================
+   MIMOS
+========================================================= */
+app.get('/api/mimos', async (req, res) => {
+  try {
+    const rows = await db.all(`SELECT * FROM mimos ORDER BY id DESC`);
+    res.json({ mimos: rows });
+  } catch (err) {
+    console.error('Erro ao listar mimos:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar mimos.' });
+  }
+});
 
-/**
- * Helper: normaliza "YYYY-MM-DD" e retorna weekday (0=Dom..6=Sáb) usando SQL.
- * Evita bugs de timezone do JS em produção.
- */
+app.post('/api/mimos', async (req, res) => {
+  try {
+    const title = (req.body?.title || '').toString().trim();
+    const start_date = sanitizeDateYYYYMMDD(req.body?.start_date || '');
+    const end_date = sanitizeDateYYYYMMDD(req.body?.end_date || '');
+    if (!title) return res.status(400).json({ error: 'Título obrigatório.' });
 
-/**
- * Lista agendamentos com:
- * - services (array)
- * - services_total_cents
- * - service_id (legado: primeiro serviço)
- */
+    const row = await db.get(
+      `INSERT INTO mimos (title, start_date, end_date) VALUES ($1,$2,$3) RETURNING *`,
+      [title, start_date, end_date]
+    );
+    res.json({ mimo: row });
+  } catch (err) {
+    console.error('Erro ao criar mimo:', err);
+    res.status(500).json({ error: 'Erro interno ao criar mimo.' });
+  }
+});
+
+app.put('/api/mimos/:id', async (req, res) => {
+  try {
+    const id = toInt(req.params.id, null);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    const title = (req.body?.title || '').toString().trim();
+    const start_date = sanitizeDateYYYYMMDD(req.body?.start_date || '');
+    const end_date = sanitizeDateYYYYMMDD(req.body?.end_date || '');
+    if (!title) return res.status(400).json({ error: 'Título obrigatório.' });
+
+    const row = await db.get(
+      `UPDATE mimos SET title=$1, start_date=$2, end_date=$3 WHERE id=$4 RETURNING *`,
+      [title, start_date, end_date, id]
+    );
+    res.json({ mimo: row });
+  } catch (err) {
+    console.error('Erro ao atualizar mimo:', err);
+    res.status(500).json({ error: 'Erro interno ao atualizar mimo.' });
+  }
+});
+
+app.delete('/api/mimos/:id', async (req, res) => {
+  try {
+    const id = toInt(req.params.id, null);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    await db.run(`DELETE FROM mimos WHERE id=$1`, [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao deletar mimo:', err);
+    res.status(500).json({ error: 'Erro interno ao deletar mimo.' });
+  }
+});
+
+/* =========================================================
+   OPENING HOURS
+   weekday: 0=Sunday .. 6=Saturday
+========================================================= */
+app.get('/api/opening-hours', async (req, res) => {
+  try {
+    const rows = await db.all(`SELECT * FROM opening_hours ORDER BY weekday`);
+    res.json({ opening_hours: rows });
+  } catch (err) {
+    console.error('Erro ao listar horários:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar horários.' });
+  }
+});
+
+app.post('/api/opening-hours', async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.opening_hours) ? req.body.opening_hours : [];
+    for (const it of items) {
+      const weekday = toInt(it.weekday, null);
+      if (weekday === null || weekday < 0 || weekday > 6) continue;
+      const closed = !!it.closed;
+      const open_time = sanitizeTimeHHMM(it.open_time || '');
+      const close_time = sanitizeTimeHHMM(it.close_time || '');
+      const max_per_slot = Math.max(0, toInt(it.max_per_slot, 0) || 0);
+
+      await db.run(
+        `INSERT INTO opening_hours (weekday, open_time, close_time, closed, max_per_slot)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (weekday)
+         DO UPDATE SET open_time=EXCLUDED.open_time,
+                       close_time=EXCLUDED.close_time,
+                       closed=EXCLUDED.closed,
+                       max_per_slot=EXCLUDED.max_per_slot`,
+        [weekday, open_time, close_time, closed, max_per_slot]
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao salvar horários:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar horários de funcionamento.' });
+  }
+});
+
+/* =========================================================
+   BOOKINGS (multi-services + mimo period)
+========================================================= */
+async function getCapacityFor(dateStr) {
+  // dateStr: YYYY-MM-DD (local calendar date)
+  // weekday in Postgres: EXTRACT(DOW) returns 0=Sun..6=Sat
+  const r = await db.get(
+    `SELECT weekday, closed, open_time, close_time, COALESCE(max_per_slot,0) AS max_per_slot
+     FROM opening_hours
+     WHERE weekday = EXTRACT(DOW FROM ($1::date))::int`,
+    [dateStr]
+  );
+  return r; // may be null
+}
+
 app.get('/api/bookings', async (req, res) => {
   try {
-    const { from, to, date, q, customer_id, pet_id, mimo_id } = req.query;
-
-    const where = [];
+    const { date, from, to, q } = req.query;
     const params = [];
-    let i = 1;
+    const where = [];
 
-    // Filtros de data
-    if (date) { where.push(`b.date = $${i++}`); params.push(date); }
-    if (from) { where.push(`b.date >= $${i++}`); params.push(from); }
-    if (to)   { where.push(`b.date <= $${i++}`); params.push(to); }
-
-    // Filtros diretos
-    if (customer_id) { where.push(`b.customer_id = $${i++}`); params.push(Number(customer_id)); }
-    if (pet_id)      { where.push(`b.pet_id = $${i++}`); params.push(Number(pet_id)); }
-
-    // Filtro por mimo (nullable)
-    if (mimo_id === 'null') {
-      where.push(`b.mimo_id IS NULL`);
-    } else if (mimo_id) {
-      where.push(`b.mimo_id = $${i++}`); params.push(Number(mimo_id));
+    if (date) {
+      const d = sanitizeDateYYYYMMDD(date);
+      if (d) { params.push(d); where.push(`b.date = $${params.length}`); }
     }
-
-    // Busca textual (cliente/pet/telefone)
-    if (q && String(q).trim()) {
-      const term = `%${String(q).trim().toLowerCase()}%`;
-      where.push(`(
-        LOWER(c.name) LIKE $${i} OR
-        LOWER(p.name) LIKE $${i} OR
-        LOWER(COALESCE(c.phone,'')) LIKE $${i}
-      )`);
+    if (from) {
+      const d = sanitizeDateYYYYMMDD(from);
+      if (d) { params.push(d); where.push(`b.date >= $${params.length}`); }
+    }
+    if (to) {
+      const d = sanitizeDateYYYYMMDD(to);
+      if (d) { params.push(d); where.push(`b.date <= $${params.length}`); }
+    }
+    if (q) {
+      const term = `%${q.toString().trim().toLowerCase()}%`;
       params.push(term);
-      i++;
+      where.push(`(LOWER(c.name) LIKE $${params.length} OR LOWER(p.name) LIKE $${params.length} OR b.phone LIKE $${params.length})`);
     }
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const sql = `
       SELECT
-        b.*,
+        b.id, b.date, b.time, b.phone, b.notes, b.prize, b.customer_id, b.pet_id, b.mimo_id, b.created_at,
         c.name AS customer_name,
-        c.phone AS customer_phone,
         p.name AS pet_name,
         m.title AS mimo_title,
-
         COALESCE(
           json_agg(
             json_build_object(
               'service_id', s.id,
               'title', s.title,
               'value_cents', s.value_cents,
-              'qty', bs.qty
+              'qty', COALESCE(bs.qty,1)
             )
-            ORDER BY s.title
           ) FILTER (WHERE s.id IS NOT NULL),
           '[]'::json
         ) AS services,
-
-        COALESCE(SUM(s.value_cents * bs.qty), 0)::int AS services_total_cents,
-
-        MIN(s.id) FILTER (WHERE s.id IS NOT NULL) AS service_id -- legado (primeiro serviço)
+        COALESCE(SUM(s.value_cents * COALESCE(bs.qty,1)), 0)::int AS total_services_value_cents,
+        MIN(s.id) AS legacy_service_id
       FROM bookings b
-      JOIN customers c ON c.id = b.customer_id
-      JOIN pets p ON p.id = b.pet_id
+      LEFT JOIN customers c ON c.id = b.customer_id
+      LEFT JOIN pets p ON p.id = b.pet_id
       LEFT JOIN mimos m ON m.id = b.mimo_id
       LEFT JOIN booking_services bs ON bs.booking_id = b.id
       LEFT JOIN services s ON s.id = bs.service_id
       ${whereSql}
-      GROUP BY b.id, c.id, p.id, m.id
+      GROUP BY b.id, c.name, p.name, m.title
       ORDER BY b.date DESC, b.time DESC, b.id DESC
     `;
 
     const rows = await db.all(sql, params);
-    res.json({ bookings: rows });
+    // keep backward compatibility keys
+    const bookings = rows.map(r => ({
+      ...r,
+      service_id: r.legacy_service_id || null
+    }));
+    res.json({ bookings });
   } catch (err) {
     console.error('Erro ao listar agendamentos:', err);
     res.status(500).json({ error: 'Erro interno ao listar agendamentos.' });
   }
 });
 
-/**
- * Cria agendamento
- * Aceita:
- * - services: [{service_id, qty}]  (preferencial)
- * - service_ids: [id, id, ...]     (compat)
- * - service_id: id                 (legado)
- * - mimo_id: id | null
- */
 app.post('/api/bookings', async (req, res) => {
   try {
-    const {
-      customer_id,
-      pet_id,
-      date,
-      time,
-      notes,
-      mimo_id,
-      services,
-      service_ids,
-      service_id
-    } = req.body;
+    const date = sanitizeDateYYYYMMDD(req.body?.date || '');
+    const time = sanitizeTimeHHMM(req.body?.time || '');
+    const phone = (req.body?.phone || '').toString().trim();
+    const notes = (req.body?.notes || '').toString().trim();
+    const prize = (req.body?.prize || '').toString().trim() || null;
 
-    if (!customer_id || !pet_id || !date || !time) {
-      return res.status(400).json({ error: 'Campos obrigatórios: customer_id, pet_id, date, time.' });
+    const customer_id = toInt(req.body?.customer_id, null);
+    const pet_id = toInt(req.body?.pet_id, null);
+
+    // mimo_id can be null / "sem mimo"
+    const mimo_id_raw = req.body?.mimo_id;
+    const mimo_id = (mimo_id_raw === null || mimo_id_raw === '' || mimo_id_raw === 'null' || mimo_id_raw === '0')
+      ? null
+      : toInt(mimo_id_raw, null);
+
+    if (!date) return res.status(400).json({ error: 'Data inválida.' });
+    if (!time) return res.status(400).json({ error: 'Horário inválido.' });
+
+    const cap = await getCapacityFor(date);
+    if (!cap || cap.closed) {
+      return res.status(400).json({ error: 'Dia fechado.' });
     }
 
-    // Normaliza serviços
-    let items = [];
-    if (Array.isArray(services) && services.length) {
-      items = services
-        .map(x => ({ service_id: Number(x.service_id), qty: Math.max(1, Number(x.qty || 1)) }))
-        .filter(x => Number.isFinite(x.service_id));
-    } else if (Array.isArray(service_ids) && service_ids.length) {
-      items = service_ids.map(id => ({ service_id: Number(id), qty: 1 })).filter(x => Number.isFinite(x.service_id));
-    } else if (service_id) {
-      items = [{ service_id: Number(service_id), qty: 1 }];
+    // capacity per slot (0 => unlimited)
+    const maxPerSlot = Number(cap.max_per_slot || 0);
+    if (maxPerSlot > 0) {
+      const existing = await db.get(
+        `SELECT COUNT(*)::int AS cnt FROM bookings WHERE date=$1 AND time=$2`,
+        [date, time]
+      );
+      if ((existing?.cnt || 0) >= maxPerSlot) {
+        return res.status(400).json({ error: 'Capacidade máxima atingida para este horário.' });
+      }
     }
 
-    if (!items.length) {
+    // Validate mimo period (if mimo selected)
+    if (mimo_id) {
+      const m = await db.get(`SELECT * FROM mimos WHERE id=$1`, [mimo_id]);
+      if (!m) return res.status(400).json({ error: 'Mimo inválido.' });
+      const okStart = !m.start_date || (date >= m.start_date);
+      const okEnd = !m.end_date || (date <= m.end_date);
+      if (!okStart || !okEnd) {
+        return res.status(400).json({ error: 'Mimo fora do período permitido.' });
+      }
+    }
+
+    const services = parseServicesPayload(req.body);
+    if (!services.length) {
       return res.status(400).json({ error: 'Selecione ao menos 1 serviço.' });
     }
 
-    // Capacidade por slot (30 min) conforme weekday
-    const capRow = await db.get(
-      `SELECT oh.is_closed, COALESCE(oh.max_per_half_hour, 1) AS cap
-       FROM opening_hours oh
-       WHERE oh.weekday = EXTRACT(DOW FROM $1::date)::int`,
-      [date]
+    const booking = await db.get(
+      `INSERT INTO bookings (date, time, phone, notes, prize, customer_id, pet_id, mimo_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [date, time, phone, notes, prize, customer_id, pet_id, mimo_id]
     );
 
-    if (capRow && capRow.is_closed) {
-      return res.status(400).json({ error: 'Dia fechado para agendamentos.' });
-    }
-
-    const cap = capRow ? Number(capRow.cap) : 1;
-
-    const occupied = await db.get(
-      `SELECT COUNT(*)::int AS cnt
-       FROM bookings
-       WHERE date = $1::date AND time = $2`,
-      [date, time]
-    );
-
-    if (occupied && occupied.cnt >= cap) {
-      return res.status(400).json({ error: 'Horário lotado para este dia.' });
-    }
-
-    // Cria booking (mantém b.service_id legado)
-    const firstServiceId = items[0].service_id;
-
-    const row = await db.get(
-      `INSERT INTO bookings (customer_id, pet_id, date, time, notes, mimo_id, service_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
-       RETURNING *`,
-      [
-        Number(customer_id),
-        Number(pet_id),
-        date,
-        time,
-        notes || '',
-        (mimo_id === null || mimo_id === 'null' || mimo_id === '' || mimo_id === undefined) ? null : Number(mimo_id),
-        Number(firstServiceId)
-      ]
-    );
-
-    // Insere itens
-    for (const it of items) {
+    for (const s of services) {
       await db.run(
         `INSERT INTO booking_services (booking_id, service_id, qty)
-         VALUES ($1,$2,$3)
-         ON CONFLICT (booking_id, service_id) DO UPDATE SET qty = EXCLUDED.qty`,
-        [row.id, it.service_id, it.qty]
+         VALUES ($1,$2,$3)`,
+        [booking.id, s.service_id, s.qty]
       );
     }
 
-    res.json({ booking: row });
+    res.json({ booking_id: booking.id });
   } catch (err) {
     console.error('Erro ao criar agendamento:', err);
     res.status(500).json({ error: 'Erro interno ao criar agendamento.' });
   }
 });
 
-/**
- * Atualiza agendamento
- */
 app.put('/api/bookings/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'ID inválido.' });
+    const id = toInt(req.params.id, null);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
 
-    const {
-      customer_id,
-      pet_id,
-      date,
-      time,
-      notes,
-      mimo_id,
-      services,
-      service_ids,
-      service_id
-    } = req.body;
+    const date = sanitizeDateYYYYMMDD(req.body?.date || '');
+    const time = sanitizeTimeHHMM(req.body?.time || '');
+    const phone = (req.body?.phone || '').toString().trim();
+    const notes = (req.body?.notes || '').toString().trim();
+    const prize = (req.body?.prize || '').toString().trim() || null;
 
-    // Normaliza serviços (se vierem no payload)
-    let items = null;
-    if (Array.isArray(services)) {
-      items = services
-        .map(x => ({ service_id: Number(x.service_id), qty: Math.max(1, Number(x.qty || 1)) }))
-        .filter(x => Number.isFinite(x.service_id));
-    } else if (Array.isArray(service_ids)) {
-      items = service_ids.map(sid => ({ service_id: Number(sid), qty: 1 })).filter(x => Number.isFinite(x.service_id));
-    } else if (service_id) {
-      items = [{ service_id: Number(service_id), qty: 1 }];
+    const customer_id = toInt(req.body?.customer_id, null);
+    const pet_id = toInt(req.body?.pet_id, null);
+
+    const mimo_id_raw = req.body?.mimo_id;
+    const mimo_id = (mimo_id_raw === null || mimo_id_raw === '' || mimo_id_raw === 'null' || mimo_id_raw === '0')
+      ? null
+      : toInt(mimo_id_raw, null);
+
+    if (!date) return res.status(400).json({ error: 'Data inválida.' });
+    if (!time) return res.status(400).json({ error: 'Horário inválido.' });
+
+    const cap = await getCapacityFor(date);
+    if (!cap || cap.closed) {
+      return res.status(400).json({ error: 'Dia fechado.' });
     }
 
-    // Se atualizar data/hora, valida capacidade
-    if (date && time) {
-      const capRow = await db.get(
-        `SELECT oh.is_closed, COALESCE(oh.max_per_half_hour, 1) AS cap
-         FROM opening_hours oh
-         WHERE oh.weekday = EXTRACT(DOW FROM $1::date)::int`,
-        [date]
-      );
-      if (capRow && capRow.is_closed) {
-        return res.status(400).json({ error: 'Dia fechado para agendamentos.' });
-      }
-      const cap = capRow ? Number(capRow.cap) : 1;
-      const occupied = await db.get(
-        `SELECT COUNT(*)::int AS cnt
-         FROM bookings
-         WHERE date = $1::date AND time = $2 AND id <> $3`,
+    const maxPerSlot = Number(cap.max_per_slot || 0);
+    if (maxPerSlot > 0) {
+      const existing = await db.get(
+        `SELECT COUNT(*)::int AS cnt FROM bookings WHERE date=$1 AND time=$2 AND id <> $3`,
         [date, time, id]
       );
-      if (occupied && occupied.cnt >= cap) {
-        return res.status(400).json({ error: 'Horário lotado para este dia.' });
+      if ((existing?.cnt || 0) >= maxPerSlot) {
+        return res.status(400).json({ error: 'Capacidade máxima atingida para este horário.' });
       }
     }
 
-    const updated = await db.get(
+    if (mimo_id) {
+      const m = await db.get(`SELECT * FROM mimos WHERE id=$1`, [mimo_id]);
+      if (!m) return res.status(400).json({ error: 'Mimo inválido.' });
+      const okStart = !m.start_date || (date >= m.start_date);
+      const okEnd = !m.end_date || (date <= m.end_date);
+      if (!okStart || !okEnd) {
+        return res.status(400).json({ error: 'Mimo fora do período permitido.' });
+      }
+    }
+
+    await db.run(
       `UPDATE bookings
-       SET
-         customer_id = COALESCE($1, customer_id),
-         pet_id      = COALESCE($2, pet_id),
-         date        = COALESCE($3, date),
-         time        = COALESCE($4, time),
-         notes       = COALESCE($5, notes),
-         mimo_id     = $6
-       WHERE id = $7
-       RETURNING *`,
-      [
-        customer_id ? Number(customer_id) : null,
-        pet_id ? Number(pet_id) : null,
-        date || null,
-        time || null,
-        (notes === undefined) ? null : (notes || ''),
-        (mimo_id === null || mimo_id === 'null' || mimo_id === '' || mimo_id === undefined) ? null : Number(mimo_id),
-        id
-      ]
+       SET date=$1, time=$2, phone=$3, notes=$4, prize=$5, customer_id=$6, pet_id=$7, mimo_id=$8
+       WHERE id=$9`,
+      [date, time, phone, notes, prize, customer_id, pet_id, mimo_id, id]
     );
 
-    // Atualiza itens de serviço (se enviados)
-    if (items) {
-      if (!items.length) return res.status(400).json({ error: 'Selecione ao menos 1 serviço.' });
-
-      await db.run(`DELETE FROM booking_services WHERE booking_id = $1`, [id]);
-
-      for (const it of items) {
+    const services = parseServicesPayload(req.body);
+    if (services.length) {
+      await db.run(`DELETE FROM booking_services WHERE booking_id=$1`, [id]);
+      for (const s of services) {
         await db.run(
           `INSERT INTO booking_services (booking_id, service_id, qty)
-           VALUES ($1,$2,$3)
-           ON CONFLICT (booking_id, service_id) DO UPDATE SET qty = EXCLUDED.qty`,
-          [id, it.service_id, it.qty]
+           VALUES ($1,$2,$3)`,
+          [id, s.service_id, s.qty]
         );
       }
-
-      // atualiza legado
-      await db.run(`UPDATE bookings SET service_id = $1 WHERE id = $2`, [items[0].service_id, id]);
     }
 
-    res.json({ booking: updated });
+    res.json({ ok: true });
   } catch (err) {
     console.error('Erro ao atualizar agendamento:', err);
     res.status(500).json({ error: 'Erro interno ao atualizar agendamento.' });
@@ -635,10 +650,9 @@ app.put('/api/bookings/:id', async (req, res) => {
 
 app.delete('/api/bookings/:id', async (req, res) => {
   try {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'ID inválido.' });
-
-    await db.run(`DELETE FROM bookings WHERE id = $1`, [id]);
+    const id = toInt(req.params.id, null);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    await db.run(`DELETE FROM bookings WHERE id=$1`, [id]);
     res.json({ ok: true });
   } catch (err) {
     console.error('Erro ao deletar agendamento:', err);
@@ -646,407 +660,17 @@ app.delete('/api/bookings/:id', async (req, res) => {
   }
 });
 
-/* =========================
-   BREEDS (dog_breeds) - NOVO CRUD
-========================= */
+/* =========================================================
+   BOOT
+========================================================= */
+const PORT = process.env.PORT || 3000;
 
-app.get('/api/breeds', async (req, res) => {
-  try {
-    const q = String(req.query.q || '').trim();
-    const active = String(req.query.active || '').trim(); // "1" para apenas ativos
-
-    let sql = `SELECT * FROM dog_breeds WHERE 1=1`;
-    const params = [];
-
-    if (active === '1') sql += ` AND is_active = TRUE`;
-
-    if (q) {
-      params.push(`%${q.toLowerCase()}%`);
-      sql += ` AND (LOWER(name) LIKE $${params.length} OR LOWER(size) LIKE $${params.length} OR LOWER(coat) LIKE $${params.length})`;
-    }
-
-    sql += ` ORDER BY name ASC`;
-    const rows = await db.all(sql, params);
-    res.json({ breeds: rows });
-  } catch (err) {
-    console.error('Erro ao listar breeds:', err);
-    res.status(500).json({ error: 'Erro interno ao buscar raças.' });
-  }
-});
-
-app.post('/api/breeds', async (req, res) => {
-  try {
-    const name = String(req.body.name || '').trim();
-    const history = String(req.body.history || '').trim();
-    const size = String(req.body.size || '').trim(); // pequeno|medio|grande
-    const coat = String(req.body.coat || '').trim(); // curta|media|longa
-    const characteristics = String(req.body.characteristics || '').trim();
-    const is_active = req.body.is_active === false ? false : true;
-
-    if (!name || !size || !coat) {
-      return res.status(400).json({ error: 'name, size e coat são obrigatórios.' });
-    }
-
-    const row = await db.get(
-      `
-      INSERT INTO dog_breeds (name, history, size, coat, characteristics, is_active, updated_at)
-      VALUES ($1,$2,$3,$4,$5,$6,NOW())
-      RETURNING *
-      `,
-      [name, history, size, coat, characteristics, is_active]
-    );
-
-    res.json({ breed: row });
-  } catch (err) {
-    console.error('Erro ao criar breed:', err);
-    res.status(500).json({ error: 'Erro interno ao salvar raça (pode ser nome duplicado).' });
-  }
-});
-
-app.put('/api/breeds/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const name = String(req.body.name || '').trim();
-    const history = String(req.body.history || '').trim();
-    const size = String(req.body.size || '').trim();
-    const coat = String(req.body.coat || '').trim();
-    const characteristics = String(req.body.characteristics || '').trim();
-    const is_active = req.body.is_active === false ? false : true;
-
-    if (!id || !name || !size || !coat) {
-      return res.status(400).json({ error: 'id, name, size e coat são obrigatórios.' });
-    }
-
-    const row = await db.get(
-      `
-      UPDATE dog_breeds
-      SET name=$2, history=$3, size=$4, coat=$5, characteristics=$6, is_active=$7, updated_at=NOW()
-      WHERE id=$1
-      RETURNING *
-      `,
-      [id, name, history, size, coat, characteristics, is_active]
-    );
-
-    res.json({ breed: row });
-  } catch (err) {
-    console.error('Erro ao atualizar breed:', err);
-    res.status(500).json({ error: 'Erro interno ao atualizar raça.' });
-  }
-});
-
-app.delete('/api/breeds/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: 'ID inválido.' });
-
-    await db.run('DELETE FROM dog_breeds WHERE id = $1', [id]);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Erro ao deletar breed:', err);
-    res.status(500).json({ error: 'Erro interno ao excluir raça.' });
-  }
-});
-
-/* =========================
-   MIMOS (prêmios da roleta)
-========================= */
-
-app.get('/api/mimos', async (req, res) => {
-  try {
-    const onlyActive = String(req.query.active || '').trim() === '1';
-    const at = req.query.at ? String(req.query.at) : null; // ISO opcional
-
-    if (onlyActive) {
-      const rows = await db.all(
-        `SELECT id, title, description, value_cents, starts_at, ends_at, is_active, updated_at
-         FROM mimos
-         WHERE is_active = TRUE
-           AND (starts_at IS NULL OR starts_at <= COALESCE($1::timestamptz, NOW()))
-           AND (ends_at   IS NULL OR ends_at   >= COALESCE($1::timestamptz, NOW()))
-         ORDER BY COALESCE(starts_at, NOW()) DESC, id DESC`,
-        [at]
-      );
-      return res.json({ mimos: rows });
-    }
-
-    const rows = await db.all(
-      `SELECT id, title, description, value_cents, starts_at, ends_at, is_active, updated_at
-       FROM mimos
-       ORDER BY id DESC`
-    );
-    res.json({ mimos: rows });
-  } catch (err) {
-    console.error('Erro ao listar mimos:', err);
-    res.status(500).json({ error: 'Erro interno ao buscar mimos.' });
-  }
-});
-
-app.post('/api/mimos', async (req, res) => {
-  try {
-    const title = String(req.body.title || '').trim();
-    const description = String(req.body.description || '').trim();
-    const value_cents = Number(req.body.value_cents ?? 0);
-    const starts_at = req.body.starts_at ? String(req.body.starts_at) : null;
-    const ends_at = req.body.ends_at ? String(req.body.ends_at) : null;
-    const is_active = req.body.is_active === false ? false : true;
-
-    if (!title) return res.status(400).json({ error: 'Informe o título.' });
-    if (!Number.isFinite(value_cents) || value_cents < 0) return res.status(400).json({ error: 'Valor inválido.' });
-
-    const row = await db.get(
-      `INSERT INTO mimos (title, description, value_cents, starts_at, ends_at, is_active, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,NOW())
-       RETURNING id, title, description, value_cents, starts_at, ends_at, is_active, updated_at`,
-      [title, description, Math.round(value_cents), starts_at, ends_at, is_active]
-    );
-    res.json({ mimo: row });
-  } catch (err) {
-    console.error('Erro ao criar mimo:', err);
-    res.status(500).json({ error: 'Erro interno ao criar mimo.' });
-  }
-});
-
-app.put('/api/mimos/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'ID inválido.' });
-
-    const title = String(req.body.title || '').trim();
-    const description = String(req.body.description || '').trim();
-    const value_cents = Number(req.body.value_cents ?? 0);
-    const starts_at = req.body.starts_at ? String(req.body.starts_at) : null;
-    const ends_at = req.body.ends_at ? String(req.body.ends_at) : null;
-    const is_active = req.body.is_active === false ? false : true;
-
-    if (!title) return res.status(400).json({ error: 'Informe o título.' });
-    if (!Number.isFinite(value_cents) || value_cents < 0) return res.status(400).json({ error: 'Valor inválido.' });
-
-    const row = await db.get(
-      `UPDATE mimos
-       SET title=$1, description=$2, value_cents=$3, starts_at=$4, ends_at=$5, is_active=$6, updated_at=NOW()
-       WHERE id=$7
-       RETURNING id, title, description, value_cents, starts_at, ends_at, is_active, updated_at`,
-      [title, description, Math.round(value_cents), starts_at, ends_at, is_active, id]
-    );
-
-    if (!row) return res.status(404).json({ error: 'Mimo não encontrado.' });
-    res.json({ mimo: row });
-  } catch (err) {
-    console.error('Erro ao atualizar mimo:', err);
-    res.status(500).json({ error: 'Erro interno ao atualizar mimo.' });
-  }
-});
-
-app.delete('/api/mimos/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'ID inválido.' });
-
-    await db.run(`DELETE FROM mimos WHERE id=$1`, [id]);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Erro ao excluir mimo:', err);
-    res.status(500).json({ error: 'Erro interno ao excluir mimo.' });
-  }
-});
-
-
-
-/* =========================
-   OPENING HOURS (horário de funcionamento)
-========================= */
-
-app.get('/api/opening-hours', async (req, res) => {
-  try {
-    const rows = await db.all(
-      `SELECT dow, is_closed, open_time, close_time, max_per_half_hour, updated_at
-       FROM opening_hours
-       ORDER BY dow`
-    );
-    res.json({ opening_hours: rows });
-  } catch (err) {
-    console.error('Erro ao listar opening_hours:', err);
-    res.status(500).json({ error: 'Erro interno ao buscar horários de funcionamento.' });
-  }
-});
-
-// Atualização em lote (envia 7 linhas)
-app.put('/api/opening-hours', async (req, res) => {
-  try {
-    const items = Array.isArray(req.body.opening_hours) ? req.body.opening_hours : [];
-    if (!items.length) return res.status(400).json({ error: 'Envie opening_hours como array.' });
-
-    // validação leve
-    const byDow = new Map();
-    for (const it of items) {
-      const dow = Number(it.dow);
-      if (![0,1,2,3,4,5,6].includes(dow)) continue;
-
-      const is_closed = !!it.is_closed;
-      let open_time = it.open_time != null ? String(it.open_time).trim() : null;
-      let close_time = it.close_time != null ? String(it.close_time).trim() : null;
-      let max_per_half_hour = it.max_per_half_hour != null ? Number(it.max_per_half_hour) : 1;
-
-      if (!Number.isFinite(max_per_half_hour) || max_per_half_hour < 0) max_per_half_hour = 0;
-
-      if (is_closed) {
-        open_time = null;
-        close_time = null;
-        if (max_per_half_hour !== 0) max_per_half_hour = 0;
-      } else {
-        // formato HH:MM básico
-        const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
-        if (!hhmm.test(open_time || '')) open_time = '07:30';
-        if (!hhmm.test(close_time || '')) close_time = '17:30';
-        if (max_per_half_hour === 0) max_per_half_hour = 1;
-      }
-
-      byDow.set(dow, { dow, is_closed, open_time, close_time, max_per_half_hour });
-    }
-
-    // garante todos os dias (se vier incompleto, mantém os atuais)
-    const existing = await db.all(`SELECT dow, is_closed, open_time, close_time, max_per_half_hour FROM opening_hours;`);
-    const existingMap = new Map(existing.map(r => [Number(r.dow), r]));
-
-    const finalRows = [];
-    for (const dow of [0,1,2,3,4,5,6]) {
-      const v = byDow.get(dow) || existingMap.get(dow) || { dow, is_closed: true, open_time: null, close_time: null, max_per_half_hour: 0 };
-      finalRows.push(v);
-    }
-
-    for (const r of finalRows) {
-      await db.query(
-        `INSERT INTO opening_hours (dow, is_closed, open_time, close_time, max_per_half_hour, updated_at)
-         VALUES ($1,$2,$3,$4,$5,NOW())
-         ON CONFLICT (dow)
-         DO UPDATE SET
-           is_closed = EXCLUDED.is_closed,
-           open_time = EXCLUDED.open_time,
-           close_time = EXCLUDED.close_time,
-           max_per_half_hour = EXCLUDED.max_per_half_hour,
-           updated_at = NOW();`,
-        [r.dow, r.is_closed, r.open_time, r.close_time, r.max_per_half_hour]
-      );
-    }
-
-    const rows = await db.all(
-      `SELECT dow, is_closed, open_time, close_time, max_per_half_hour, updated_at
-       FROM opening_hours
-       ORDER BY dow`
-    );
-    res.json({ opening_hours: rows });
-  } catch (err) {
-    console.error('Erro ao atualizar opening_hours:', err);
-    res.status(500).json({ error: 'Erro interno ao salvar horários de funcionamento.' });
-  }
-});
-
-/* =========================
-   MIMOS (roleta) - CRUD
-========================= */
-
-app.get('/api/mimos', async (req, res) => {
-  try {
-    const q = String(req.query.q || '').trim().toLowerCase();
-    const rows = await db.all(
-      `SELECT id, title, description, value_cents, starts_at, ends_at, is_active, created_at, updated_at
-       FROM mimos
-       WHERE ($1 = '' OR LOWER(title) LIKE $2 OR LOWER(description) LIKE $2)
-       ORDER BY is_active DESC, COALESCE(starts_at, '1970-01-01') DESC, id DESC`,
-      [q, q ? `%${q}%` : '']
-    );
-    res.json({ mimos: rows });
-  } catch (err) {
-    console.error('Erro ao listar mimos:', err);
-    res.status(500).json({ error: 'Erro interno ao buscar mimos.' });
-  }
-});
-
-app.post('/api/mimos', async (req, res) => {
-  try {
-    const title = String(req.body.title || '').trim();
-    const description = req.body.description != null ? String(req.body.description) : '';
-    const value_cents = Number(req.body.value_cents || 0) || 0;
-    const starts_at = req.body.starts_at ? String(req.body.starts_at) : null;
-    const ends_at = req.body.ends_at ? String(req.body.ends_at) : null;
-    const is_active = req.body.is_active === false ? false : true;
-
-    if (!title) return res.status(400).json({ error: 'title é obrigatório.' });
-    if (ends_at && starts_at && new Date(ends_at) < new Date(starts_at)) {
-      return res.status(400).json({ error: 'ends_at não pode ser menor que starts_at.' });
-    }
-
-    const row = await db.get(
-      `INSERT INTO mimos (title, description, value_cents, starts_at, ends_at, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6)
-       RETURNING *`,
-      [title, description, value_cents, starts_at, ends_at, is_active]
-    );
-    res.json({ mimo: row });
-  } catch (err) {
-    console.error('Erro ao criar mimo:', err);
-    res.status(500).json({ error: 'Erro interno ao criar mimo.' });
-  }
-});
-
-app.put('/api/mimos/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: 'ID inválido.' });
-
-    const title = String(req.body.title || '').trim();
-    const description = req.body.description != null ? String(req.body.description) : '';
-    const value_cents = Number(req.body.value_cents || 0) || 0;
-    const starts_at = req.body.starts_at ? String(req.body.starts_at) : null;
-    const ends_at = req.body.ends_at ? String(req.body.ends_at) : null;
-    const is_active = req.body.is_active === false ? false : true;
-
-    if (!title) return res.status(400).json({ error: 'title é obrigatório.' });
-    if (ends_at && starts_at && new Date(ends_at) < new Date(starts_at)) {
-      return res.status(400).json({ error: 'ends_at não pode ser menor que starts_at.' });
-    }
-
-    const row = await db.get(
-      `UPDATE mimos
-       SET title=$1, description=$2, value_cents=$3, starts_at=$4, ends_at=$5, is_active=$6, updated_at=NOW()
-       WHERE id=$7
-       RETURNING *`,
-      [title, description, value_cents, starts_at, ends_at, is_active, id]
-    );
-
-    if (!row) return res.status(404).json({ error: 'Mimo não encontrado.' });
-    res.json({ mimo: row });
-  } catch (err) {
-    console.error('Erro ao atualizar mimo:', err);
-    res.status(500).json({ error: 'Erro interno ao atualizar mimo.' });
-  }
-});
-
-app.delete('/api/mimos/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: 'ID inválido.' });
-
-    await db.run(`DELETE FROM mimos WHERE id=$1`, [id]);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Erro ao deletar mimo:', err);
-    res.status(500).json({ error: 'Erro interno ao excluir mimo.' });
-  }
-});
-
-
-/* =========================
-   START
-========================= */
-const port = process.env.PORT || 3000;
-
-(async () => {        
+(async () => {
   try {
     await db.initDb();
-    app.listen(port, () => console.log('PetFunny API rodando na porta', port));
-  } catch (e) {
-    console.error('Erro fatal ao inicializar banco:', e);
+    app.listen(PORT, () => console.log('Server running on port', PORT));
+  } catch (err) {
+    console.error('Erro fatal ao inicializar banco:', err);
     process.exit(1);
   }
 })();
