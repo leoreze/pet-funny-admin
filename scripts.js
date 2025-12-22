@@ -162,6 +162,22 @@ const API_BASE_URL = '';
     if (els.formWrap) els.formWrap.style.display = 'none';
   }
 
+  function normalizeTimeForApi(timeStr) {
+  if (!timeStr) return null;
+
+  const m = String(timeStr).match(/^(\d{1,2}):(\d{1,2})/);
+  if (!m) return null;
+
+  const hh = String(parseInt(m[1], 10)).padStart(2, '0');
+  const mm = String(parseInt(m[2], 10)).padStart(2, '0');
+
+  // backend só aceita 00 ou 30
+  if (mm !== '00' && mm !== '30') return null;
+
+  return `${hh}:${mm}`;
+}
+
+
   function clearForm() {
     currentEditId = null;
     if (els.title) els.title.value = '';
@@ -2101,7 +2117,14 @@ async function salvarAgendamento() {
     const servicesLabel = serviceObj ? serviceObj.title : '';
 
     const date = formDate.value;
-    const time = formTime.value;
+const rawTime = formTime.value;
+const time = normalizeTimeForApi(rawTime);
+
+if (!time) {
+  alert('Horário inválido. Use apenas horários cheios (00 ou 30).');
+  return;
+}
+
 
     // Validação de data/horário (mesmas regras do cliente)
     const dtMsg = validarDiaHora(date, time);
@@ -2197,6 +2220,7 @@ async function salvarAgendamento() {
       formError.style.display = 'block';
     }
   }
+  
 
   function exportarCSV() {
     if (!ultimaLista.length) {
