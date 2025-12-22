@@ -56,23 +56,8 @@ function safeJsonParse(str, fallback = null) {
   if (typeof str === 'object') return str;
   try { return JSON.parse(str); } catch { return fallback; }
 }
-function normalizeBreedHistory(b) {
-  const history = safeJsonParse(b.history, []);
-  return { ...b, history };
-}
-function uniqueBreedsByName(rows) {
-  const map = new Map();
-  for (const b of rows) {
-    const key = (b.name || '').trim().toLowerCase();
-    if (!key) continue;
-    if (!map.has(key)) map.set(key, b);
-  }
-  return Array.from(map.values());
-}
 
-/* =========================
-   Init / Migration
-========================= */
+
 async function initDb() {
   /* -------------------------
      Core
@@ -139,8 +124,26 @@ async function initDb() {
     );
   `);
 
-  // IMPORTANTE: lógica de múltiplos serviços removida.
-  // Mantemos apenas bookings.service_id (um serviço por agendamento).
+/* =========================
+     BOOKING_SERVICES (múltiplos serviços por agendamento)
+  ========================= */
+  await run(`
+    CREATE TABLE IF NOT EXISTS booking_services (
+      booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
+      qty INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (booking_id, service_id)
+    );
+  `);
+
+  // Migração automática: converte o serviço legado (bookings.service_id) em linhas em booking_services
+  await run(`
+    INSERT INTO booking_services (booking_id, service_id, qty)
+    SELECT b.id, b.service_id, 1
+    FROM bookings b
+    WHERE b.service_id IS NOT NULL
+    ON CONFLICT (booking_id, service_id) DO NOTHING;
+  `);
 
 
   // índices úteis
@@ -149,130 +152,6 @@ async function initDb() {
   await query(`CREATE INDEX IF NOT EXISTS idx_bookings_service_id ON bookings(service_id);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_bookings_date_time ON bookings(date, time);`);
 
-  /* -------------------------
-     BREEDS (LEGADO) - se existir, mantém
-     (Não derrubar o serviço por seed inválido)
-  ------------------------- */
-  await query(`
-    CREATE TABLE IF NOT EXISTS breeds (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      history TEXT,
-      size TEXT,
-      coat TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  /* -------------------------
-     dog_breeds (CRUD atual do server.js)
-     - Se NÃO existir, cria versão "flexível" (sem NOT NULL/CHECK), para não quebrar seed/migração.
-     - Se JÁ existir com constraints (produção), não altera schema.
-  ------------------------- */
-  await query(`
-    CREATE TABLE IF NOT EXISTS dog_breeds (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
-      history JSONB NOT NULL DEFAULT '[]'::jsonb,
-      size TEXT,
-      coat TEXT,
-      notes TEXT,
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  // índice único por LOWER(name) para ON CONFLICT (LOWER(name))
-  await query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes
-        WHERE schemaname='public' AND tablename='dog_breeds' AND indexname='dog_breeds_name_lower_unique'
-      ) THEN
-        CREATE UNIQUE INDEX dog_breeds_name_lower_unique ON dog_breeds (LOWER(name));
-      END IF;
-    END $$;
-  `);
-
-  /* -------------------------
-     Migração best-effort: breeds -> dog_breeds
-     - Não derruba o servidor por JSON inválido / constraints de produção
-  ------------------------- */
-  try {
-    await query(`
-      DO $$
-      DECLARE
-        r RECORD;
-        j JSONB;
-        size_default TEXT := NULL;
-        coat_default TEXT := NULL;
-        has_size BOOLEAN := FALSE;
-        has_coat BOOLEAN := FALSE;
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.tables
-          WHERE table_schema='public' AND table_name='breeds'
-        ) THEN
-          RETURN;
-        END IF;
-
-        SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='size') INTO has_size;
-        SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='dog_breeds' AND column_name='coat') INTO has_coat;
-
-        IF has_size THEN
-          SELECT size FROM dog_breeds WHERE size IS NOT NULL LIMIT 1 INTO size_default;
-          IF size_default IS NULL THEN size_default := 'pequeno'; END IF;
-        END IF;
-        IF has_coat THEN
-          SELECT coat FROM dog_breeds WHERE coat IS NOT NULL LIMIT 1 INTO coat_default;
-          IF coat_default IS NULL THEN coat_default := 'curta'; END IF;
-        END IF;
-
-        FOR r IN
-          SELECT name, history, size, coat FROM breeds
-        LOOP
-          BEGIN
-            BEGIN
-              j := COALESCE(r.history::jsonb, '[]'::jsonb);
-            EXCEPTION WHEN others THEN
-              j := '[]'::jsonb;
-            END;
-
-            BEGIN
-              INSERT INTO dog_breeds (name, history, size, coat, is_active, updated_at)
-              VALUES (
-                r.name,
-                j,
-                COALESCE(NULLIF(TRIM(r.size), ''), size_default),
-                COALESCE(NULLIF(TRIM(r.coat), ''), coat_default),
-                TRUE,
-                NOW()
-              )
-              ON CONFLICT (LOWER(name)) DO NOTHING;
-            EXCEPTION WHEN check_violation OR not_null_violation THEN
-              BEGIN
-                INSERT INTO dog_breeds (name, history, size, coat, is_active, updated_at)
-                VALUES (r.name, j, size_default, coat_default, TRUE, NOW())
-                ON CONFLICT (LOWER(name)) DO NOTHING;
-              EXCEPTION WHEN others THEN
-                PERFORM 1;
-              END;
-            EXCEPTION WHEN others THEN
-              PERFORM 1;
-            END;
-
-          EXCEPTION WHEN others THEN
-            PERFORM 1;
-          END;
-        END LOOP;
-      END $$;
-    `);
-  } catch (err) {
-    console.warn('⚠️ Migração breeds -> dog_breeds falhou (ignorada):', err?.message || err);
-  }
 
   /* -------------------------
      MIMOS (novo)
@@ -441,6 +320,4 @@ module.exports = {
   normalizePlate,
   normalizeCPF,
   safeJsonParse,
-  normalizeBreedHistory,
-  uniqueBreedsByName,
 };

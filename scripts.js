@@ -474,7 +474,6 @@ const API_BASE_URL = '';
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-      await loadBreeds();
       await loadOpeningHours();
 
       // Garante que o select de mimos no agendamento esteja preenchido,
@@ -908,7 +907,6 @@ function normalizeHHMM(t) {
       tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
 
       if (tabId === 'tab-servicos') loadServices().catch(console.error);
-      if (tabId === 'tab-racas') loadBreeds().catch(console.error);
 
       if (tabId === 'tab-horarios') loadOpeningHours().catch(console.error);
 
@@ -969,13 +967,6 @@ function normalizeHHMM(t) {
   let selectedServiceIds = [];
   const formDate = document.getElementById('formDate');
   const formTime = document.getElementById('formTime');
-
-  // Multi-serviços por agendamento foi desativado. Mantemos os elementos no HTML
-  // apenas para não quebrar markup existente, mas escondemos/neutralizamos a UI.
-  try {
-    if (btnAddService) btnAddService.style.display = 'none';
-    if (selectedServicesWrap) selectedServicesWrap.style.display = 'none';
-  } catch (_) {}
 
   // Regras padrão (mesmas do cliente)
   if (formDate) formDate.min = todayISO;
@@ -1279,9 +1270,23 @@ function normalizeHHMM(t) {
   formDate.value = booking && booking.date ? booking.date : '';
   formTime.value = booking && booking.time ? booking.time : '';
 
-  // Serviço (único) - lógica de múltiplos serviços removida
-  clearSelectedServices(); // no-op
-  formService.value = booking && booking.service_id ? String(booking.service_id) : '';
+  // Serviço(s)
+  clearSelectedServices();
+
+  let servicesJson = booking && booking.services_json ? booking.services_json : null;
+  if (typeof servicesJson === 'string') {
+    try { servicesJson = JSON.parse(servicesJson); } catch (_) { servicesJson = null; }
+  }
+
+  if (Array.isArray(servicesJson) && servicesJson.length) {
+    selectedServiceIds = servicesJson.map(s => String(s.id)).filter(Boolean);
+  } else if (booking && booking.service_id) {
+    selectedServiceIds = [String(booking.service_id)];
+  }
+
+  // Ajusta select para o 1º serviço (para facilitar adicionar/alterar)
+  formService.value = selectedServiceIds[0] || '';
+  refreshSelectedServicesUI();
 
   // Mimo (pode ser nulo)
   const prizeVal = booking && booking.prize ? booking.prize : 'Sem mimo';
@@ -1323,16 +1328,33 @@ function centsToBRL(cents){
 }
 
 function refreshSelectedServicesUI(){
-  // Multi-serviços desativado: mantém função para evitar ReferenceError em trechos antigos.
-  try {
-    if (selectedServicesWrap) selectedServicesWrap.style.display = 'none';
-    if (selectedServicesList) selectedServicesList.innerHTML = '';
-    if (servicesTotalEl) servicesTotalEl.textContent = '';
-  } catch (_) {}
+  if (!selectedServicesList || !selectedServicesWrap || !servicesTotalEl) return;
+
+  selectedServicesList.innerHTML = '';
+  let total = 0;
+
+  const unique = Array.from(new Set(selectedServiceIds.map(String)));
+  selectedServiceIds = unique;
+
+  unique.forEach((sid) => {
+    const svc = getServiceById(sid);
+    const name = svc ? svc.title : `Serviço #${sid}`;
+    const value_cents = svc ? Number(svc.value_cents || 0) : 0;
+    total += value_cents;
+
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)})</small></span>
+      <button type="button" class="btn btn-danger btn-xs" data-remove-sid="${escapeHtml(String(sid))}">Remover</button>
+    `;
+    selectedServicesList.appendChild(li);
+  });
+
+  servicesTotalEl.textContent = centsToBRL(total);
+  selectedServicesWrap.style.display = unique.length ? 'block' : 'none';
 }
 
 function clearSelectedServices(){
-  // Multi-serviços desativado
   selectedServiceIds = [];
   refreshSelectedServicesUI();
 }
@@ -1438,7 +1460,25 @@ function clearSelectedServices(){
     if (current) formService.value = current;
   }
 
-// Multi-serviços desativado: não registrar handlers de adicionar/remover
+// Multi-serviços - adicionar/remover
+if (btnAddService) {
+  btnAddService.addEventListener('click', () => {
+    const sid = formService.value;
+    if (!sid) return;
+    selectedServiceIds.push(String(sid));
+    refreshSelectedServicesUI();
+  });
+}
+
+if (selectedServicesList) {
+  selectedServicesList.addEventListener('click', (ev) => {
+    const btn = ev.target && ev.target.closest ? ev.target.closest('[data-remove-sid]') : null;
+    if (!btn) return;
+    const sid = btn.getAttribute('data-remove-sid');
+    selectedServiceIds = selectedServiceIds.filter(x => String(x) !== String(sid));
+    refreshSelectedServicesUI();
+  });
+}
 
 
   async function loadServices() {
@@ -1525,196 +1565,10 @@ function clearSelectedServices(){
   }
 
 
-  /* ===== Raças de Cães (CRUD) ===== */
-  const btnNovoBreed = document.getElementById('btnNovoBreed');
-  const breedSearch = document.getElementById('breedSearch');
-  const breedFormPanel = document.getElementById('breedFormPanel');
-  const breedId = document.getElementById('breedId');
-  const breedName = document.getElementById('breedName');
-  const breedSize = document.getElementById('breedSize');
-  const breedCoat = document.getElementById('breedCoat');
-  const breedHistory = document.getElementById('breedHistory');
-  const breedError = document.getElementById('breedError');
-  const btnBreedCancel = document.getElementById('btnBreedCancel');
-  const btnBreedSave = document.getElementById('btnBreedSave');
-  const tbodyBreeds = document.getElementById('tbodyBreeds');
-  const breedsEmpty = document.getElementById('breedsEmpty');
-
-  let breedsCache = []; // [{id,name,size,coat,history,created_at,updated_at}]
-
-  function showBreedForm() { breedFormPanel.classList.remove('hidden'); }
-  function hideBreedForm() { breedFormPanel.classList.add('hidden'); }
-
-  function clearBreedForm() {
-    breedId.value = '';
-    breedName.value = '';
-    breedSize.value = 'pequeno';
-    breedCoat.value = 'curta';
-    breedHistory.value = '';
-    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
-  }
-
-  function fillBreedForm(b) {
-    breedId.value = b.id;
-    breedName.value = b.name || '';
-    breedSize.value = (b.size || 'pequeno');
-    breedCoat.value = (b.coat || 'curta');
-    breedHistory.value = b.history || '';
-    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
-  }
-
-  function humanSize(v) {
-    const s = normStr(v);
-    if (s === 'pequeno') return 'Pequeno';
-    if (s === 'medio' || s === 'médio') return 'Médio';
-    if (s === 'grande') return 'Grande';
-    return v || '-';
-  }
-
-  function humanCoat(v) {
-    const s = normStr(v);
-    if (s === 'curta') return 'Curta';
-    if (s === 'media' || s === 'média') return 'Média';
-    if (s === 'longa') return 'Longa';
-    return v || '-';
-  }
-
-  function renderBreeds() {
-    if (!tbodyBreeds) return;
-    tbodyBreeds.innerHTML = '';
-
-    const q = normStr(breedSearch?.value || '');
-    const list = !q ? breedsCache : breedsCache.filter(b =>
-      normStr(b.name).includes(q) ||
-      normStr(b.size).includes(q) ||
-      normStr(b.coat).includes(q) ||
-      normStr(b.history).includes(q)
-    );
-
-    if (breedsEmpty) breedsEmpty.style.display = list.length ? 'none' : 'block';
-
-    list.forEach(b => {
-      const tr = document.createElement('tr');
-
-      const tdId = document.createElement('td'); tdId.textContent = b.id;
-      const tdName = document.createElement('td'); tdName.textContent = b.name || '-';
-      const tdSize = document.createElement('td'); tdSize.textContent = humanSize(b.size);
-      const tdCoat = document.createElement('td'); tdCoat.textContent = humanCoat(b.coat);
-
-      const tdHist = document.createElement('td');
-      const full = (b.history || '').trim();
-      tdHist.textContent = full.length > 140 ? (full.slice(0, 140) + '…') : (full || '-');
-      tdHist.className = 'td-obs';
-      tdHist.title = full;
-
-      const tdCreated = document.createElement('td'); tdCreated.textContent = b.created_at ? formatDateTimeBr(b.created_at) : '-';
-      const tdUpdated = document.createElement('td'); tdUpdated.textContent = b.updated_at ? formatDateTimeBr(b.updated_at) : '-';
-
-      const tdAcoes = document.createElement('td');
-      const divActions = document.createElement('div'); divActions.className = 'actions';
-
-      const btnEdit = document.createElement('button');
-      btnEdit.textContent = 'Editar';
-      btnEdit.className = 'btn btn-small btn-secondary';
-      btnEdit.type = 'button';
-      btnEdit.addEventListener('click', () => {
-        fillBreedForm(b);
-        showBreedForm();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-
-      const btnDel = document.createElement('button');
-      btnDel.textContent = 'Excluir';
-      btnDel.className = 'btn btn-small btn-danger';
-      btnDel.type = 'button';
-      btnDel.addEventListener('click', async () => {
-        if (!confirm('Deseja realmente excluir esta raça?')) return;
-        try {
-          await apiDelete('/api/breeds/' + b.id);
-          await loadBreeds();
-        } catch (e) { alert(e.message); }
-      });
-
-      divActions.appendChild(btnEdit);
-      divActions.appendChild(btnDel);
-      tdAcoes.appendChild(divActions);
-
-      tr.appendChild(tdId);
-      tr.appendChild(tdName);
-      tr.appendChild(tdSize);
-      tr.appendChild(tdCoat);
-      tr.appendChild(tdHist);
-      tr.appendChild(tdCreated);
-      tr.appendChild(tdUpdated);
-      tr.appendChild(tdAcoes);
-
-      tbodyBreeds.appendChild(tr);
-    });
-  }
-
-  async function loadBreeds() {
-    try {
-      const data = await apiGet('/api/breeds');
-      breedsCache = data.breeds || [];
-      renderBreeds();
-    } catch (e) {
-      breedsCache = [];
-      renderBreeds();
-      if (breedsEmpty) {
-        breedsEmpty.style.display = 'block';
-        breedsEmpty.textContent = 'Erro ao carregar raças: ' + e.message;
-      }
-    }
-  }
-
-  async function saveBreed() {
-    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
-
-    const id = breedId.value ? parseInt(breedId.value, 10) : null;
-    const name = (breedName.value || '').trim();
-    const size = breedSize.value;
-    const coat = breedCoat.value;
-    const history = (breedHistory.value || '').trim();
-
-    if (!name) {
-      if (breedError) { breedError.textContent = 'Informe o nome da raça.'; breedError.style.display = 'block'; }
-      return;
-    }
-    if (!size || !coat) {
-      if (breedError) { breedError.textContent = 'Informe porte e pelagem.'; breedError.style.display = 'block'; }
-      return;
-    }
-
-    try {
-      const body = { name, size, coat, history };
-      if (!id) await apiPost('/api/breeds', body);
-      else await apiPut('/api/breeds/' + id, body);
-
-      clearBreedForm();
-      hideBreedForm();
-      await loadBreeds();
-    } catch (e) {
-      if (breedError) { breedError.textContent = e.message; breedError.style.display = 'block'; }
-    }
-  }
-
-  if (btnNovoBreed) {
-    btnNovoBreed.addEventListener('click', () => {
-      clearBreedForm();
-      showBreedForm();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  }
-  if (btnBreedCancel) btnBreedCancel.addEventListener('click', () => { clearBreedForm(); hideBreedForm(); });
-  if (btnBreedSave) btnBreedSave.addEventListener('click', saveBreed);
-
-  if (breedSearch) {
-    breedSearch.addEventListener('input', () => {
-      clearTimeout(window.__breedTimer);
-      window.__breedTimer = setTimeout(() => renderBreeds(), 120);
-    });
-  }
-
+  /* ===== Raças de Cães (CRUD) =====
+     REMOVIDO a pedido do usuário: eliminar tudo referente a CRUD de raças.
+     Observação: mantemos apenas o campo "Raça" do pet (texto), sem catálogo.
+  ===== */
 
   /* ===== NOVO: Agenda - Toggle Lista/Cards ===== */
   const AGENDA_VIEW_KEY = 'pf_admin_agenda_view';
@@ -2014,9 +1868,9 @@ function clearSelectedServices(){
   // Mimo default
   formPrize.value = 'Sem mimo';
 
-  // Serviço (único)
+  // Multi-serviços
   formService.value = '';
-  clearSelectedServices(); // no-op (mantido por compat)
+  clearSelectedServices();
 
   formDate.value = '';
   formTime.value = '';
@@ -2103,14 +1957,12 @@ async function salvarAgendamento() {
       const body = {
         customer_id: customer.id,
         pet_id: petIdNum,
-        date,
-        time,
-        // serviço único (lógica de múltiplos serviços removida)
-        service_id: serviceIdSelected,
+        date, time,
+        // envia multi-serviços (novo) + compatibilidade (service_id/service)
+        service_ids: selectedServices.map(s => s.id),
+        service_id: firstServiceId,
         service: servicesLabel,
-        prize,
-        notes,
-        status
+        prize, notes, status
       };
 
       let precisaWhats = false;
@@ -2584,7 +2436,6 @@ async function salvarAgendamento() {
       limparPetsForm();
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadClientes();
-      await loadBreeds();
       await loadDashboard();
       await renderTabela();
     } catch (e) {
