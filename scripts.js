@@ -213,13 +213,27 @@ const API_BASE_URL = '';
     const prizeSelect = document.getElementById('formPrize');
     if (!prizeSelect) return;
 
-    const now = new Date();
+        // Usa a data do agendamento (formDate) como referência para filtrar os mimos por período.
+    // Isso permite agendar para dias futuros e ainda assim mostrar apenas mimos válidos naquele dia.
+    const ref = (() => {
+      try {
+        const fd = document.getElementById('formDate');
+        const v = (fd && fd.value) ? String(fd.value).trim() : '';
+        if (v) {
+          // meio-dia local para evitar problemas de fuso em datas
+          const d = new Date(v + 'T12:00:00');
+          if (!isNaN(d.getTime())) return d;
+        }
+      } catch (_) {}
+      return new Date();
+    })();
+
     const isInPeriod = (m) => {
       if (!m.is_active) return false;
       const s = m.starts_at ? new Date(m.starts_at) : null;
       const e = m.ends_at ? new Date(m.ends_at) : null;
-      if (s && !isNaN(s.getTime()) && now < s) return false;
-      if (e && !isNaN(e.getTime()) && now > e) return false;
+      if (s && !isNaN(s.getTime()) && ref < s) return false;
+      if (e && !isNaN(e.getTime()) && ref > e) return false;
       return true;
     };
 
@@ -2055,7 +2069,8 @@ function normalizeHHMM(t) {
           ? (formPetSelect.options[formPetSelect.selectedIndex]?.textContent || 'seu pet')
           : 'seu pet';
 
-        const msg = buildStatusMessage(status, nome, petLabel, serviceTitleSelected, dataBR, time, prize);
+                const prizeLabel = prize ? prize : 'Sem mimo';
+        const msg = buildStatusMessage(status, nome, petLabel, serviceTitleSelected, dataBR, time, prizeLabel);
 
         let fullPhone = phone;
         if (!(fullPhone.startsWith('55') && fullPhone.length > 11)) fullPhone = '55' + fullPhone;
