@@ -1,6 +1,6 @@
 const API_BASE_URL = '';
 
-  /* ===== Helpers de normalização (corrige acentos/variações) ===== */
+  /* ===== Helpers de normalizaÃ§Ã£o (corrige acentos/variaÃ§Ãµes) ===== */
   function normStr(s) {
     return String(s || '')
       .toLowerCase()
@@ -10,7 +10,7 @@ const API_BASE_URL = '';
   }
 
   /* =========================================================
-   MIMOS (Admin) - CRUD + Emojis + Valor (cents) + Período
+   MIMOS (Admin) - CRUD + Emojis + Valor (cents) + PerÃ­odo
    Requisitos:
    - HTML ids: tab-mimos, tbodyMimos, mimosEmpty,
               mimoTitle, mimoDesc, emojiPanel,
@@ -21,14 +21,15 @@ const API_BASE_URL = '';
      POST   /api/mimos
      PUT    /api/mimos/:id
      DELETE /api/mimos/:id
-   - Opcional: select existente #formPrize (para roleta/prêmio no agendamento)
+   - Opcional: select existente #formPrize (para roleta/prÃªmio no agendamento)
 ========================================================= */
 (function () {
   'use strict';
 
   const $ = (id) => document.getElementById(id);
+  // Mesmo que a aba de Mimos nÃ£o exista no DOM (variaÃ§Ãµes de layout),
+  // ainda precisamos carregar os mimos para o select do agendamento (#formPrize).
   const elTab = $('tab-mimos');
-  if (!elTab) return;
 
   const els = {
     title: $('mimoTitle'),
@@ -55,6 +56,23 @@ const API_BASE_URL = '';
 
   let currentEditId = null;
   let cacheMimos = [];
+
+  // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
+  // seja populado mesmo sem o usuÃ¡rio abrir a aba "Mimos".
+  async function ensureMimosLoaded(force = false) {
+    if (!force && Array.isArray(cacheMimos) && cacheMimos.length > 0) {
+      syncPrizeSelect();
+      return;
+    }
+    await reloadMimos();
+  }
+
+  // Expor funÃ§Ãµes para o fluxo de agendamento (novo/ediÃ§Ã£o)
+  // sem depender do usuÃ¡rio abrir a aba "Mimos".
+  window.PF_MIMOS = window.PF_MIMOS || {};
+  window.PF_MIMOS.ensureLoaded = ensureMimosLoaded;
+  window.PF_MIMOS.reload = reloadMimos;
+  window.PF_MIMOS.syncSelect = syncPrizeSelect;
 
   function setMsg(text, isError) {
     if (!els.msg) return;
@@ -102,8 +120,8 @@ const API_BASE_URL = '';
   }
 
   const EMOJI_LIST = [
-    '🎁','🎉','✨','⭐','💎','🏆','🥇','🎯','🔥','✅','🧡','💛','💚','💙','💜',
-    '🐶','🐾','🛁','✂️','🧴','🧼','🫧','🦴','🍖','💸','🎟️','📣','📅','🔔','🎡','🎲'
+    'ðŸŽ','ðŸŽ‰','âœ¨','â­','ðŸ’Ž','ðŸ†','ðŸ¥‡','ðŸŽ¯','ðŸ”¥','âœ…','ðŸ§¡','ðŸ’›','ðŸ’š','ðŸ’™','ðŸ’œ',
+    'ðŸ¶','ðŸ¾','ðŸ›','âœ‚ï¸','ðŸ§´','ðŸ§¼','ðŸ«§','ðŸ¦´','ðŸ–','ðŸ’¸','ðŸŽŸï¸','ðŸ“£','ðŸ“…','ðŸ””','ðŸŽ¡','ðŸŽ²'
   ];
 
   function insertAtCursor(textarea, text) {
@@ -192,7 +210,8 @@ const API_BASE_URL = '';
 
   /* ---------- Render ---------- */
   function syncPrizeSelect(mimos) {
-    if (!els.prizeSelect) return;
+    const prizeSelect = document.getElementById('formPrize');
+    if (!prizeSelect) return;
 
     const now = new Date();
     const isInPeriod = (m) => {
@@ -205,23 +224,23 @@ const API_BASE_URL = '';
     };
 
     const active = (mimos || []).filter(isInPeriod);
-    const current = els.prizeSelect.value;
+    const current = prizeSelect.value;
 
-    els.prizeSelect.innerHTML = '';
+    prizeSelect.innerHTML = '';
     const opt0 = document.createElement('option');
     opt0.value = '';
-    opt0.textContent = '— Sem mimo —';
-    els.prizeSelect.appendChild(opt0);
+    opt0.textContent = 'â€” Sem mimo â€”';
+    prizeSelect.appendChild(opt0);
 
     active.forEach((m) => {
       const opt = document.createElement('option');
-      opt.value = m.title; // compat: booking.prize é texto
+      opt.value = m.title; // compat: booking.prize Ã© texto
       opt.textContent = `${m.title} (R$ ${formatCentsToBRL(m.value_cents)})`;
       opt.setAttribute('data-mimo-id', String(m.id));
-      els.prizeSelect.appendChild(opt);
+      prizeSelect.appendChild(opt);
     });
 
-    if (current) els.prizeSelect.value = current;
+    if (current) prizeSelect.value = current;
   }
 
   function renderMimosTable(mimos) {
@@ -241,7 +260,7 @@ const API_BASE_URL = '';
     if (els.empty) els.empty.style.display = 'none';
 
     const fmt = (d) => {
-      if (!d || isNaN(d.getTime())) return '—';
+      if (!d || isNaN(d.getTime())) return 'â€”';
       return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
     };
 
@@ -259,11 +278,11 @@ const API_BASE_URL = '';
       const tdPeriod = document.createElement('td');
       const s = m.starts_at ? new Date(m.starts_at) : null;
       const e = m.ends_at ? new Date(m.ends_at) : null;
-      tdPeriod.textContent = `${fmt(s)} → ${fmt(e)}`;
+      tdPeriod.textContent = `${fmt(s)} â†’ ${fmt(e)}`;
       tr.appendChild(tdPeriod);
 
       const tdActive = document.createElement('td');
-      tdActive.textContent = m.is_active ? 'Sim' : 'Não';
+      tdActive.textContent = m.is_active ? 'Sim' : 'NÃ£o';
       tr.appendChild(tdActive);
 
       const tdActions = document.createElement('td');
@@ -297,7 +316,7 @@ const API_BASE_URL = '';
           setMsg('Excluindo...', false);
           await apiDeleteMimo(m.id);
           await reloadMimos();
-          setMsg('Mimo excluído.', false);
+          setMsg('Mimo excluÃ­do.', false);
         } catch (err) {
           setMsg(err.message || 'Erro ao excluir.', true);
         }
@@ -332,13 +351,13 @@ const API_BASE_URL = '';
       const is_active = !!els.active?.checked;
 
       if (!title) {
-        setMsg('Informe o título.', true);
+        setMsg('Informe o tÃ­tulo.', true);
         els.title?.focus();
         return;
       }
 
       if (ends_at && starts_at && new Date(ends_at) < new Date(starts_at)) {
-        setMsg('A data de término não pode ser menor que a data de início.', true);
+        setMsg('A data de tÃ©rmino nÃ£o pode ser menor que a data de inÃ­cio.', true);
         return;
       }
 
@@ -393,7 +412,7 @@ const API_BASE_URL = '';
   attachEvents();
 })();
 
-  /* ========= CONTROLE DE SESSÃO (30 MIN) ========= */
+  /* ========= CONTROLE DE SESSÃƒO (30 MIN) ========= */
   const SESSION_KEY = 'pf_admin_session';
   const SESSION_DURATION_MS = 30 * 60 * 1000;
   let sessionTimerId = null;
@@ -420,7 +439,7 @@ const API_BASE_URL = '';
     clearSession();
     adminApp.style.display = 'none';
     loginScreen.classList.remove('hidden');
-    alert('Sua sessão expirou. Faça login novamente.');
+    alert('Sua sessÃ£o expirou. FaÃ§a login novamente.');
   }
 
   function startSessionTimer() {
@@ -438,11 +457,18 @@ const API_BASE_URL = '';
     }
     appInitialized = true;
     try {
-      await loadServices();      // garante servicesCache e dropdown de serviços
+      await loadServices();      // garante servicesCache e dropdown de serviÃ§os
       await renderTabela();
       await loadClientes();
       await loadBreeds();
       await loadOpeningHours();
+
+      // Garante que o select de mimos no agendamento esteja preenchido,
+      // mesmo sem navegar na aba "Mimos".
+      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
+        await window.PF_MIMOS.ensureLoaded(true);
+      }
+
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
@@ -615,41 +641,41 @@ const API_BASE_URL = '';
   }
 
   
-  /* ===== Validação de Data/Horário (mesmas regras do index.html) ===== */
+  /* ===== ValidaÃ§Ã£o de Data/HorÃ¡rio (mesmas regras do index.html) ===== */
   const todayISO = new Date().toISOString().split('T')[0];
 
   function validarDiaHora(dateStr, timeStr) {
-    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+    if (!dateStr || !timeStr) return 'Informe a data e o horÃ¡rio.';
 
     const date = new Date(dateStr + 'T' + timeStr + ':00');
-    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
+    if (Number.isNaN(date.getTime())) return 'Data ou horÃ¡rio invÃ¡lidos.';
 
     const diaSemana = date.getDay();
     const parts = String(timeStr).split(':');
     const hh = parseInt(parts[0], 10);
     const mm = parseInt(parts[1] || '0', 10);
 
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'HorÃ¡rio invÃ¡lido.';
 
-    // Admin também deve seguir a regra do cliente: somente 00 ou 30
-    if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
+    // Admin tambÃ©m deve seguir a regra do cliente: somente 00 ou 30
+    if (!(mm === 0 || mm === 30)) return 'Escolha um horÃ¡rio fechado (minutos 00 ou 30).';
 
     const minutos = hh * 60 + mm;
     const inicio = 7 * 60 + 30;
 
-    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+    if (diaSemana === 0) return 'Atendemos apenas de segunda a sÃ¡bado.';
     if (diaSemana >= 1 && diaSemana <= 5) {
       const fim = 17 * 60 + 30;
-      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horÃ¡rios entre 07:30 e 17:30.';
     }
     if (diaSemana === 6) {
       const fim = 13 * 60;
-      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+      if (minutos < inicio || minutos > fim) return 'SÃ¡bado: horÃ¡rios entre 07:30 e 13:00.';
     }
 
-    // Não permite agendar no passado (comparando data/hora local)
+    // NÃ£o permite agendar no passado (comparando data/hora local)
     const now = new Date();
-    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+    if (date.getTime() < now.getTime() - (60 * 1000)) return 'NÃ£o Ã© possÃ­vel agendar no passado.';
 
     return null;
   }
@@ -663,9 +689,9 @@ const API_BASE_URL = '';
     // Using an explicit -03:00 offset avoids the common "weekday shifted" bug.
     const d = new Date(dateStr + 'T00:00:00-03:00');
     if (Number.isNaN(d.getTime())) return null;
-    const dow = d.getUTCDay(); // 0=Sun..6=Sat (São Paulo)
+    const dow = d.getUTCDay(); // 0=Sun..6=Sat (SÃ£o Paulo)
 
-    // Prefer configured Opening Hours (admin menu "Horário de Funcionamento")
+    // Prefer configured Opening Hours (admin menu "HorÃ¡rio de Funcionamento")
     const oh = Array.isArray(openingHoursCache)
       ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
       : null;
@@ -712,23 +738,24 @@ function normalizeHHMM(t) {
 
   function isActiveBookingStatus(status) {
     const s = normStr(status);
-    // status "cancelado" não ocupa slot
+    // status "cancelado" nÃ£o ocupa slot
     return s !== 'cancelado';
   }
 
   async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
     const data = await apiGet('/api/bookings', { date: dateStr });
     const list = data.bookings || [];
-    const set = new Set();
+    const map = new Map();
 
     list.forEach(b => {
       if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
       if (!isActiveBookingStatus(b.status)) return;
       const t = normalizeHHMM(b.time);
-      if (t) set.add(t);
+      if (!t) return;
+      map.set(t, (map.get(t) || 0) + 1);
     });
 
-    return set;
+    return map;
   }
 
   function minutesToHHMM(totalMin) {
@@ -743,13 +770,13 @@ function normalizeHHMM(t) {
     const [hh, mm] = t.split(':').map(n => parseInt(n, 10));
     let total = hh * 60 + mm;
 
-    // arredonda para o slot mais próximo (00/30)
+    // arredonda para o slot mais prÃ³ximo (00/30)
     total = Math.round(total / 30) * 30;
 
     if (total < range.startMin) total = range.startMin;
     if (total > range.endMin) total = range.endMin;
 
-    // garante que não sai do padrão 00/30 depois do clamp
+    // garante que nÃ£o sai do padrÃ£o 00/30 depois do clamp
     total = Math.round(total / 30) * 30;
 
     return minutesToHHMM(total);
@@ -761,8 +788,8 @@ function normalizeHHMM(t) {
     if (s === 'agendado') return 'status-agendado';
     if (s === 'confirmado') return 'status-confirmado';
     if (s === 'recebido') return 'status-recebido';
-    if (s === 'em servico' || s === 'em serviço') return 'status-em-servico';
-    if (s === 'concluido' || s === 'concluído') return 'status-concluido';
+    if (s === 'em servico' || s === 'em serviÃ§o') return 'status-em-servico';
+    if (s === 'concluido' || s === 'concluÃ­do') return 'status-concluido';
     if (s === 'entregue') return 'status-entregue';
     if (s === 'cancelado') return 'status-cancelado';
     return 'status-agendado';
@@ -770,38 +797,38 @@ function normalizeHHMM(t) {
 
   function buildStatusMessage(status, nome, petLabel, service, dataBR, time, prize) {
     const s = normStr(status);
-    const cabecalho = `Oi ${nome}! Aqui é do Pet Funny!\n\n`;
+    const cabecalho = `Oi ${nome}! Aqui Ã© do Pet Funny!\n\n`;
     let corpo = '';
 
     switch (s) {
       case 'agendado':
-        corpo = `Acabamos de registrar o agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQuando estiver próximo do dia, te avisamos por aqui.`;
+        corpo = `Acabamos de registrar o agendamento de *${petLabel}* para *${service}* em *${dataBR} Ã s ${time}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQuando estiver prÃ³ximo do dia, te avisamos por aqui.`;
         break;
       case 'confirmado':
-        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CONFIRMADO* \n\nMimo garantido: *${prize}*.\n\nQualquer alteração é só avisar a gente aqui no WhatsApp.`;
+        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} Ã s ${time}* foi *CONFIRMADO* \n\nMimo garantido: *${prize}*.\n\nQualquer alteraÃ§Ã£o Ã© sÃ³ avisar a gente aqui no WhatsApp.`;
         break;
       case 'recebido':
-        corpo = `*${petLabel}* já está aqui com a gente para *${service}* \n\nEstamos cuidando com muito carinho.\n\nMimo da vez: *${prize}*.\n\nAssim que estiver tudo pronto, te avisamos por aqui.`;
+        corpo = `*${petLabel}* jÃ¡ estÃ¡ aqui com a gente para *${service}* \n\nEstamos cuidando com muito carinho.\n\nMimo da vez: *${prize}*.\n\nAssim que estiver tudo pronto, te avisamos por aqui.`;
         break;
       case 'em servico':
-        corpo = `Estamos cuidando de *${petLabel}* agora mesmo no *${service}* \n\nMimo aplicado: *${prize}*.\n\nDaqui a pouco estará pronto(a) para ser buscado(a).`;
+        corpo = `Estamos cuidando de *${petLabel}* agora mesmo no *${service}* \n\nMimo aplicado: *${prize}*.\n\nDaqui a pouco estarÃ¡ pronto(a) para ser buscado(a).`;
         break;
       case 'concluido':
-        corpo = `O serviço de *${petLabel}* (*${service}*) foi *CONCLUÍDO* \n\nMimo aplicado: *${prize}*.\n\nQuando quiser, já pode vir buscar.`;
+        corpo = `O serviÃ§o de *${petLabel}* (*${service}*) foi *CONCLUÃDO* \n\nMimo aplicado: *${prize}*.\n\nQuando quiser, jÃ¡ pode vir buscar.`;
         break;
       case 'entregue':
-        corpo = `Tudo entregue, e esperamos que você tenha gostado do resultado! \n\nReferência: *${petLabel}*\nServiço: *${service}*\nMimo da Roleta: *${prize}*.\n\nObrigada por confiar no Pet Funny!`;
+        corpo = `Tudo entregue, e esperamos que vocÃª tenha gostado do resultado! \n\nReferÃªncia: *${petLabel}*\nServiÃ§o: *${service}*\nMimo da Roleta: *${prize}*.\n\nObrigada por confiar no Pet Funny!`;
         break;
       case 'cancelado':
-        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CANCELADO* \n\nSe quiser remarcar, é só mandar mensagem por aqui que encontramos um novo horário.`;
+        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} Ã s ${time}* foi *CANCELADO* \n\nSe quiser remarcar, Ã© sÃ³ mandar mensagem por aqui que encontramos um novo horÃ¡rio.`;
         break;
       default:
-        corpo = `O status do agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi atualizado para: *${String(status || '').toUpperCase()}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQualquer dúvida, é só chamar aqui no WhatsApp!`;
+        corpo = `O status do agendamento de *${petLabel}* para *${service}* em *${dataBR} Ã s ${time}* foi atualizado para: *${String(status || '').toUpperCase()}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQualquer dÃºvida, Ã© sÃ³ chamar aqui no WhatsApp!`;
     }
     return cabecalho + corpo;
   }
 
-  /* ===== MOEDA: máscara e conversões (value_cents) ===== */
+  /* ===== MOEDA: mÃ¡scara e conversÃµes (value_cents) ===== */
   function formatCentsToBRL(cents) {
     const n = Number(cents || 0) / 100;
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -811,7 +838,7 @@ function normalizeHHMM(t) {
     if (!input) return;
     let raw = String(input.value || '').replace(/\D/g, '');
 
-    // se usuário apagou tudo, ok
+    // se usuÃ¡rio apagou tudo, ok
     if (raw === '') {
       input.value = '';
       input.dataset.cents = '';
@@ -829,7 +856,7 @@ function normalizeHHMM(t) {
   function getCentsFromCurrencyInput(input) {
     if (!input) return null;
 
-    // 1) tenta via dataset (máscara)
+    // 1) tenta via dataset (mÃ¡scara)
     let raw = String(input.dataset?.cents || '').replace(/\D/g, '');
     if (raw) {
       const cents = parseInt(raw, 10);
@@ -841,7 +868,7 @@ function normalizeHHMM(t) {
     if (!txt) return null;
 
     const digits = txt.replace(/\s/g, '').replace(/[R$r$]/g, '');
-    // se tiver vírgula, assume centavos; se não tiver, assume reais inteiros
+    // se tiver vÃ­rgula, assume centavos; se nÃ£o tiver, assume reais inteiros
     if (digits.includes(',')) {
       const cleaned = digits.replace(/\./g, '').replace(',', '.');
       const n = Number(cleaned);
@@ -924,19 +951,19 @@ function normalizeHHMM(t) {
   const formDate = document.getElementById('formDate');
   const formTime = document.getElementById('formTime');
 
-  // Regras padrão (mesmas do cliente)
+  // Regras padrÃ£o (mesmas do cliente)
   if (formDate) formDate.min = todayISO;
   if (formTime) formTime.step = 1800; // 30 minutos
 
 
-  // Revalida e aplica limites quando a data/horário mudam
+  // Revalida e aplica limites quando a data/horÃ¡rio mudam
   if (formDate) {
     const onDateChanged = async () => {
       const excludeId = bookingId && bookingId.value ? Number(bookingId.value) : null;
       await refreshBookingDateTimeState(excludeId);
 
-      // Hardening: se a data é válida e o dia não é "fechado", o campo de horário deve estar habilitado.
-      // Isso evita casos em que o evento "change" não chega a disparar como esperado.
+      // Hardening: se a data Ã© vÃ¡lida e o dia nÃ£o Ã© "fechado", o campo de horÃ¡rio deve estar habilitado.
+      // Isso evita casos em que o evento "change" nÃ£o chega a disparar como esperado.
       try {
         const dateStr = formDate.value;
         const range = buildRangeForDate(dateStr);
@@ -1000,7 +1027,7 @@ function normalizeHHMM(t) {
   let petEditIdLocal = null;
 
   function setEditMode(isEdit) {
-    // Em edição: mantém Tutor/Telefone travados, mas permite editar Pet e Mimo
+    // Em ediÃ§Ã£o: mantÃ©m Tutor/Telefone travados, mas permite editar Pet e Mimo
     formPhone.disabled = isEdit;
     formNome.disabled = isEdit;
     formPetSelect.disabled = false;
@@ -1008,7 +1035,7 @@ function normalizeHHMM(t) {
   }
 
   /* ===== Estado de disponibilidade (Admin) ===== */
-  let occupiedTimesSet = new Set();
+  let occupiedTimesMap = new Map();
 
   async function refreshBookingDateTimeState(excludeBookingId) {
     if (!formDate || !formTime) return;
@@ -1020,7 +1047,7 @@ function normalizeHHMM(t) {
     if (!range || range.closed) {
       formTime.disabled = true;
       formTime.value = '';
-      occupiedTimesSet = new Set();
+      occupiedTimesMap = new Map();
       return;
     }
 
@@ -1030,12 +1057,12 @@ function normalizeHHMM(t) {
     formTime.min = minutesToHHMM(range.startMin);
     formTime.max = minutesToHHMM(range.endMin);
 
-    // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
+    // carrega horÃ¡rios ocupados do dia (exclui o prÃ³prio agendamento em ediÃ§Ã£o)
     try {
-      occupiedTimesSet = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+      occupiedTimesMap = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
     } catch (e) {
-      console.warn('Falha ao carregar horários ocupados:', e);
-      occupiedTimesSet = new Set();
+      console.warn('Falha ao carregar horÃ¡rios ocupados:', e);
+      occupiedTimesMap = new Map();
     }
 
     // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
@@ -1045,9 +1072,26 @@ function normalizeHHMM(t) {
     }
   }
 
+  function getCapacityForDate(dateStr) {
+    const cache = (window.__pf_openingHoursCache || []);
+    if (!dateStr) return 1;
+    const d = new Date(dateStr + "T12:00:00");
+    if (Number.isNaN(d.getTime())) return 1;
+    const dow = d.getDay();
+    const row = cache.find(r => Number(r.dow) === Number(dow));
+    if (!row) return 1;
+    if (row.is_closed) return 0;
+    const cap = Number(row.max_per_half_hour);
+    return Number.isFinite(cap) ? cap : 1;
+  }
+
   function isTimeOccupied(timeStr) {
     const t = normalizeHHMM(timeStr);
-    return !!t && occupiedTimesSet.has(t);
+    if (!t) return false;
+    const cap = getCapacityForDate(formDate ? formDate.value : "");
+    if (cap <= 0) return true;
+    const used = occupiedTimesMap.get(t) || 0;
+    return used >= cap;
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
@@ -1067,10 +1111,10 @@ function normalizeHHMM(t) {
 
     lista.forEach(a => {
       switch (a.prize) {
-        case 'Tosa Higiênica': tosa++; break;
-        case 'Hidratação': hidratacao++; break;
-        case 'Foto e Vídeo Profissional': fotoVideo++; break;
-        case 'Patinhas impecáveis': patinhas++; break;
+        case 'Tosa HigiÃªnica': tosa++; break;
+        case 'HidrataÃ§Ã£o': hidratacao++; break;
+        case 'Foto e VÃ­deo Profissional': fotoVideo++; break;
+        case 'Patinhas impecÃ¡veis': patinhas++; break;
       }
     });
 
@@ -1081,13 +1125,13 @@ function normalizeHHMM(t) {
     statPatinhas.textContent = patinhas;
   }
 
-  // ===== GRÁFICOS =====
+  // ===== GRÃFICOS =====
   let statusChart = null;
   let prizeChart = null;
 
   function renderCharts(bookings) {
     const statusCounts = { agendado:0, confirmado:0, recebido:0, em_servico:0, concluido:0, entregue:0, cancelado:0 };
-    const prizeCounts = { 'Tosa Higiênica':0, 'Hidratação':0, 'Foto e Vídeo Profissional':0, 'Patinhas impecáveis':0 };
+    const prizeCounts = { 'Tosa HigiÃªnica':0, 'HidrataÃ§Ã£o':0, 'Foto e VÃ­deo Profissional':0, 'Patinhas impecÃ¡veis':0 };
 
     bookings.forEach(b => {
       const s = normStr(b.status);
@@ -1116,7 +1160,7 @@ function normalizeHHMM(t) {
     statusChart = new Chart(ctxStatus, {
       type: 'bar',
       data: {
-        labels: ['Agendado','Confirmado','Recebido','Em serviço','Concluído','Entregue','Cancelado'],
+        labels: ['Agendado','Confirmado','Recebido','Em serviÃ§o','ConcluÃ­do','Entregue','Cancelado'],
         datasets: [{
           label: 'Agendamentos',
           data: [
@@ -1173,9 +1217,9 @@ function normalizeHHMM(t) {
 
     formPhone.value = booking.phone || '';
     formNome.value = booking.customer_name || '';
-    formPrize.value = booking.prize || 'Tosa Higiênica';
+    formPrize.value = booking.prize || 'Tosa HigiÃªnica';
 
-    // serviço (preferência: service_id)
+    // serviÃ§o (preferÃªncia: service_id)
     const sid = booking.service_id ?? booking.serviceId ?? '';
     if (sid && String(sid) !== 'null') formService.value = String(sid);
     else {
@@ -1184,7 +1228,7 @@ function normalizeHHMM(t) {
       const match = servicesCache.find(s => normStr(s.title) === normStr(txt));
       formService.value = match ? String(match.id) : '';
       
-    // Atualiza limites e disponibilidade para a data (exclui o próprio agendamento)
+    // Atualiza limites e disponibilidade para a data (exclui o prÃ³prio agendamento)
     refreshBookingDateTimeState(booking.id);
   }
 
@@ -1208,7 +1252,7 @@ function normalizeHHMM(t) {
           if (bookingPetId != null) formPetSelect.value = String(bookingPetId);
           else formPetSelect.value = '';
           if (bookingPetId == null && bookingPetName) {
-            // mantém sem pet selecionado; mensagem WhatsApp usa fallback "seu pet"
+            // mantÃ©m sem pet selecionado; mensagem WhatsApp usa fallback "seu pet"
           }
         })
         .catch(() => {});
@@ -1219,7 +1263,7 @@ function normalizeHHMM(t) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  /* ===== Serviços (cache, dropdown e CRUD) ===== */
+  /* ===== ServiÃ§os (cache, dropdown e CRUD) ===== */
   const btnNovoServico = document.getElementById('btnNovoServico');
   const serviceFormPanel = document.getElementById('serviceFormPanel');
   const serviceId = document.getElementById('serviceId');
@@ -1232,7 +1276,7 @@ function normalizeHHMM(t) {
   const tbodyServices = document.getElementById('tbodyServices');
   const servicesEmpty = document.getElementById('servicesEmpty');
 
-  // Filtro de busca (Serviços)
+  // Filtro de busca (ServiÃ§os)
   const filtroServicos = document.getElementById('filtroServicos');
   const btnLimparServicos = document.getElementById('btnLimparServicos');
   let filtroServicosTxt = '';
@@ -1303,7 +1347,7 @@ function normalizeHHMM(t) {
       btnDel.className = 'btn btn-small btn-danger';
       btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
-        if (!confirm('Deseja realmente excluir este serviço?')) return;
+        if (!confirm('Deseja realmente excluir este serviÃ§o?')) return;
         try {
           await apiDelete('/api/services/' + svc.id);
           await loadServices();
@@ -1328,7 +1372,7 @@ function normalizeHHMM(t) {
   }
 
   function refreshServiceOptionsInAgenda() {
-    // mantém seleção atual se possível
+    // mantÃ©m seleÃ§Ã£o atual se possÃ­vel
     const current = formService.value || '';
     formService.innerHTML = '<option value="">Selecione...</option>';
     servicesCache.forEach(s => {
@@ -1351,7 +1395,7 @@ function normalizeHHMM(t) {
       renderServices();
       refreshServiceOptionsInAgenda();
       servicesEmpty.style.display = 'block';
-      servicesEmpty.textContent = 'Erro ao carregar serviços: ' + e.message;
+      servicesEmpty.textContent = 'Erro ao carregar serviÃ§os: ' + e.message;
     }
   }
 
@@ -1368,12 +1412,12 @@ function normalizeHHMM(t) {
     const value_cents = getCentsFromCurrencyInput(servicePrice);
 
     if (!date || !title) {
-      serviceError.textContent = 'Preencha data e título do serviço.';
+      serviceError.textContent = 'Preencha data e tÃ­tulo do serviÃ§o.';
       serviceError.style.display = 'block';
       return;
     }
     if (value_cents == null || value_cents < 0) {
-      serviceError.textContent = 'Valor inválido. Digite no formato moeda (ex: 85,00).';
+      serviceError.textContent = 'Valor invÃ¡lido. Digite no formato moeda (ex: 85,00).';
       serviceError.style.display = 'block';
       return;
     }
@@ -1403,7 +1447,7 @@ function normalizeHHMM(t) {
   if (btnServiceCancel) btnServiceCancel.addEventListener('click', () => { clearServiceForm(); hideServiceForm(); });
   if (btnServiceSave) btnServiceSave.addEventListener('click', saveService);
 
-  // Máscara do valor de serviço
+  // MÃ¡scara do valor de serviÃ§o
   if (servicePrice) {
     servicePrice.addEventListener('input', () => applyCurrencyMask(servicePrice));
   }
@@ -1424,7 +1468,7 @@ function normalizeHHMM(t) {
   }
 
 
-  /* ===== Raças de Cães (CRUD) ===== */
+  /* ===== RaÃ§as de CÃ£es (CRUD) ===== */
   const btnNovoBreed = document.getElementById('btnNovoBreed');
   const breedSearch = document.getElementById('breedSearch');
   const breedFormPanel = document.getElementById('breedFormPanel');
@@ -1465,7 +1509,7 @@ function normalizeHHMM(t) {
   function humanSize(v) {
     const s = normStr(v);
     if (s === 'pequeno') return 'Pequeno';
-    if (s === 'medio' || s === 'médio') return 'Médio';
+    if (s === 'medio' || s === 'mÃ©dio') return 'MÃ©dio';
     if (s === 'grande') return 'Grande';
     return v || '-';
   }
@@ -1473,7 +1517,7 @@ function normalizeHHMM(t) {
   function humanCoat(v) {
     const s = normStr(v);
     if (s === 'curta') return 'Curta';
-    if (s === 'media' || s === 'média') return 'Média';
+    if (s === 'media' || s === 'mÃ©dia') return 'MÃ©dia';
     if (s === 'longa') return 'Longa';
     return v || '-';
   }
@@ -1502,7 +1546,7 @@ function normalizeHHMM(t) {
 
       const tdHist = document.createElement('td');
       const full = (b.history || '').trim();
-      tdHist.textContent = full.length > 140 ? (full.slice(0, 140) + '…') : (full || '-');
+      tdHist.textContent = full.length > 140 ? (full.slice(0, 140) + 'â€¦') : (full || '-');
       tdHist.className = 'td-obs';
       tdHist.title = full;
 
@@ -1527,7 +1571,7 @@ function normalizeHHMM(t) {
       btnDel.className = 'btn btn-small btn-danger';
       btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
-        if (!confirm('Deseja realmente excluir esta raça?')) return;
+        if (!confirm('Deseja realmente excluir esta raÃ§a?')) return;
         try {
           await apiDelete('/api/breeds/' + b.id);
           await loadBreeds();
@@ -1561,7 +1605,7 @@ function normalizeHHMM(t) {
       renderBreeds();
       if (breedsEmpty) {
         breedsEmpty.style.display = 'block';
-        breedsEmpty.textContent = 'Erro ao carregar raças: ' + e.message;
+        breedsEmpty.textContent = 'Erro ao carregar raÃ§as: ' + e.message;
       }
     }
   }
@@ -1576,7 +1620,7 @@ function normalizeHHMM(t) {
     const history = (breedHistory.value || '').trim();
 
     if (!name) {
-      if (breedError) { breedError.textContent = 'Informe o nome da raça.'; breedError.style.display = 'block'; }
+      if (breedError) { breedError.textContent = 'Informe o nome da raÃ§a.'; breedError.style.display = 'block'; }
       return;
     }
     if (!size || !coat) {
@@ -1665,7 +1709,7 @@ function normalizeHHMM(t) {
   }
 
   function renderAgendaByView(lista) {
-    // vazio: atualiza ambos estados para evitar inconsistências
+    // vazio: atualiza ambos estados para evitar inconsistÃªncias
     const isEmpty = !lista || !lista.length;
 
     if (agendaView === 'cards') {
@@ -1772,11 +1816,11 @@ function normalizeHHMM(t) {
       const left = document.createElement('div');
       const timeWrap = document.createElement('div');
       timeWrap.className = 'agenda-card-time';
-      timeWrap.textContent = `⏰ ${a.time || '-'}`;
+      timeWrap.textContent = `â° ${a.time || '-'}`;
 
       const dateWrap = document.createElement('div');
       dateWrap.className = 'agenda-card-date';
-      dateWrap.textContent = `📅 ${formatDataBr(a.date)}`;
+      dateWrap.textContent = `ðŸ“… ${formatDataBr(a.date)}`;
 
       left.appendChild(timeWrap);
       left.appendChild(dateWrap);
@@ -1810,7 +1854,7 @@ function normalizeHHMM(t) {
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
-      l4.innerHTML = `<span class="agenda-key">Serviço:</span> <span class="agenda-val">${serviceLabel}</span>`;
+      l4.innerHTML = `<span class="agenda-key">ServiÃ§o:</span> <span class="agenda-val">${serviceLabel}</span>`;
 
       const l5 = document.createElement('div');
       l5.className = 'agenda-line';
@@ -1829,7 +1873,7 @@ function normalizeHHMM(t) {
 
       const notes = document.createElement('div');
       notes.className = 'agenda-card-notes';
-      notes.textContent = (a.notes || '').trim() ? a.notes : 'Sem observações.';
+      notes.textContent = (a.notes || '').trim() ? a.notes : 'Sem observaÃ§Ãµes.';
 
       const bottom = document.createElement('div');
       bottom.className = 'agenda-card-bottom';
@@ -1935,7 +1979,7 @@ function normalizeHHMM(t) {
 
     const prize = formPrize.value;
 
-    // serviço selecionado do banco (id)
+    // serviÃ§o selecionado do banco (id)
     const serviceIdSelected = formService.value ? parseInt(formService.value, 10) : null;
     const serviceObj = serviceIdSelected ? servicesCache.find(s => String(s.id) === String(serviceIdSelected)) : null;
     const serviceTitleSelected = serviceObj ? serviceObj.title : '';
@@ -1943,7 +1987,7 @@ function normalizeHHMM(t) {
     const date = formDate.value;
     const time = formTime.value;
 
-    // Validação de data/horário (mesmas regras do cliente)
+    // ValidaÃ§Ã£o de data/horÃ¡rio (mesmas regras do cliente)
     const dtMsg = validarDiaHora(date, time);
     if (dtMsg) {
       formError.textContent = dtMsg;
@@ -1951,10 +1995,10 @@ function normalizeHHMM(t) {
       return;
     }
 
-    // Carrega horários ocupados do dia e bloqueia conflito
+    // Carrega horÃ¡rios ocupados do dia e bloqueia conflito
     await refreshBookingDateTimeState(id);
     if (isTimeOccupied(time)) {
-      formError.textContent = 'Horário indisponível para esta data. Selecione outro horário.';
+      formError.textContent = 'HorÃ¡rio indisponÃ­vel para esta data. Selecione outro horÃ¡rio.';
       formError.style.display = 'block';
       return;
     }
@@ -1963,16 +2007,11 @@ function normalizeHHMM(t) {
     const notes = formNotes.value.trim();
 
     if (!date || !time || !serviceIdSelected) {
-      formError.textContent = 'Data, horário e serviço são obrigatórios.';
+      formError.textContent = 'Data, horÃ¡rio e serviÃ§o sÃ£o obrigatÃ³rios.';
       formError.style.display = 'block';
       return;
     }
-    if (!prize) {
-      formError.textContent = 'Selecione um mimo (Roleta).';
-      formError.style.display = 'block';
-      return;
-    }
-    // Novo agendamento: Pet obrigatório
+    // Novo agendamento: Pet obrigatÃ³rio
     if (!id && !petIdNum) {
       formError.textContent = 'Para NOVO agendamento, selecione um pet.';
       formError.style.display = 'block';
@@ -1992,7 +2031,7 @@ function normalizeHHMM(t) {
       } catch (_) {}
 
       if (!customer) {
-        formError.textContent = 'Cliente não cadastrado. Cadastre o tutor e os pets na aba "Clientes & Pets" antes de criar o agendamento.';
+        formError.textContent = 'Cliente nÃ£o cadastrado. Cadastre o tutor e os pets na aba "Clientes & Pets" antes de criar o agendamento.';
         formError.style.display = 'block';
         return;
       }
@@ -2001,7 +2040,7 @@ function normalizeHHMM(t) {
         customer_id: customer.id,
         pet_id: petIdNum,
         date, time,
-        // envia os dois: id (correto) + título (compatibilidade)
+        // envia os dois: id (correto) + tÃ­tulo (compatibilidade)
         service_id: serviceIdSelected,
         service: serviceTitleSelected,
         prize, notes, status
@@ -2044,12 +2083,12 @@ function normalizeHHMM(t) {
 
   function exportarCSV() {
     if (!ultimaLista.length) {
-      alert('Não há agendamentos para exportar no filtro atual.');
+      alert('NÃ£o hÃ¡ agendamentos para exportar no filtro atual.');
       return;
     }
 
     const linhas = [];
-    linhas.push(['ID','Data','Hora','Tutor','Pet','Telefone','Serviço','Mimo','Status','Última Notificação','Observações'].join(';'));
+    linhas.push(['ID','Data','Hora','Tutor','Pet','Telefone','ServiÃ§o','Mimo','Status','Ãšltima NotificaÃ§Ã£o','ObservaÃ§Ãµes'].join(';'));
 
     ultimaLista.forEach(a => {
       const serviceLabel = getServiceLabelFromBooking(a);
@@ -2124,18 +2163,29 @@ function normalizeHHMM(t) {
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', () => {
+  btnNovoAgendamento.addEventListener('click', async () => {
     limparForm();
     formDate.value = toISODateOnly(new Date());
-    // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
+    // dispara change porque set programático não dispara evento
+    try { formDate.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+    // Para novo agendamento, o pet Ã© obrigatÃ³rio e sÃ³ pode ser escolhido apÃ³s carregar os pets do cliente
     formPetSelect.disabled = true;
     formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
+    // Carrega mimos antes de abrir o formulÃ¡rio (evita select vazio no primeiro uso).
+    try {
+      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
+        await window.PF_MIMOS.ensureLoaded(true);
+      }
+    } catch (e) {
+      console.warn('Falha ao carregar mimos:', e);
+    }
+
     mostrarFormAgenda();
-    // Garante que o estado do horário seja recalculado após o form ficar visível.
-    // (Alguns browsers podem não aplicar corretamente enable/disable quando o elemento ainda está oculto.)
+    // Garante que o estado do horÃ¡rio seja recalculado apÃ³s o form ficar visÃ­vel.
+    // (Alguns browsers podem nÃ£o aplicar corretamente enable/disable quando o elemento ainda estÃ¡ oculto.)
     setTimeout(() => {
       refreshBookingDateTimeState(null);
-      // Caso a data esteja preenchida e não seja dia fechado, não deixe o campo de horário travado.
+      // Caso a data esteja preenchida e nÃ£o seja dia fechado, nÃ£o deixe o campo de horÃ¡rio travado.
       try {
         const range = buildRangeForDate(formDate.value);
         if (range && !range.closed) formTime.disabled = false;
@@ -2154,12 +2204,12 @@ function normalizeHHMM(t) {
       const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
 
       if (lookup.exists && lookup.customer) {
-        // Cliente existe: preenche nome e carrega pets para seleção
+        // Cliente existe: preenche nome e carrega pets para seleÃ§Ã£o
         formNome.value = lookup.customer.name || '';
         formPetSelect.disabled = false;
         await loadPetsForCustomer(lookup.customer.id);
 
-        // Se o cliente não tem pets, força cadastro antes de agendar
+        // Se o cliente nÃ£o tem pets, forÃ§a cadastro antes de agendar
         if (formPetSelect.options.length <= 1) {
           formPetSelect.disabled = true;
           formPetSelect.innerHTML = '<option value="">(Cadastre ao menos 1 pet para este cliente)</option>';
@@ -2170,16 +2220,16 @@ function normalizeHHMM(t) {
           formError.textContent = '';
         }
       } else {
-        // Cliente não existe: avisa e orienta cadastro
+        // Cliente nÃ£o existe: avisa e orienta cadastro
         formNome.value = '';
         formPetSelect.disabled = true;
         formPetSelect.innerHTML = '<option value="">(Cadastre o cliente e os pets primeiro)</option>';
 
-        formError.textContent = 'Cliente não cadastrado. Vá na aba "Clientes & Pets" para cadastrar o tutor e os pets antes de criar o agendamento.';
+        formError.textContent = 'Cliente nÃ£o cadastrado. VÃ¡ na aba "Clientes & Pets" para cadastrar o tutor e os pets antes de criar o agendamento.';
         formError.style.display = 'block';
       }
     } catch (e) {
-      // Em caso de erro na API, mantém o fluxo mas informa
+      // Em caso de erro na API, mantÃ©m o fluxo mas informa
       formPetSelect.disabled = true;
       formPetSelect.innerHTML = '<option value="">(Erro ao buscar cliente)</option>';
       formError.textContent = 'Erro ao buscar cliente pelo telefone. Tente novamente. Detalhe: ' + (e.message || e);
@@ -2216,10 +2266,10 @@ function normalizeHHMM(t) {
   const petsCard = document.getElementById('petsCard');
 
   const racas = [
-    'SRD (Sem Raça Definida)','Poodle','Shih Tzu','Lhasa Apso','Labrador Retriever','Golden Retriever',
-    'Yorkshire Terrier','Bulldog Francês','Bulldog Inglês','Spitz Alemão (Lulu da Pomerânia)','Beagle',
-    'Border Collie','Boxer','Dachshund (Salsicha)','Maltês','Pinscher','Pastor Alemão','Rottweiler',
-    'Pitbull','Pug','Cocker Spaniel','Schnauzer','Husky Siberiano','Akita','Chihuahua','Outro (informar nas observações)'
+    'SRD (Sem RaÃ§a Definida)','Poodle','Shih Tzu','Lhasa Apso','Labrador Retriever','Golden Retriever',
+    'Yorkshire Terrier','Bulldog FrancÃªs','Bulldog InglÃªs','Spitz AlemÃ£o (Lulu da PomerÃ¢nia)','Beagle',
+    'Border Collie','Boxer','Dachshund (Salsicha)','MaltÃªs','Pinscher','Pastor AlemÃ£o','Rottweiler',
+    'Pitbull','Pug','Cocker Spaniel','Schnauzer','Husky Siberiano','Akita','Chihuahua','Outro (informar nas observaÃ§Ãµes)'
   ];
 
   cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
@@ -2295,7 +2345,7 @@ function normalizeHHMM(t) {
       btnDel.className = 'btn btn-small btn-danger';
       btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
-        if (!confirm('Excluir este cliente? (Os pets relacionados também poderão ser afetados)')) return;
+        if (!confirm('Excluir este cliente? (Os pets relacionados tambÃ©m poderÃ£o ser afetados)')) return;
         try {
           await apiDelete('/api/customers/' + c.id);
           if (clienteSelecionadoId === c.id) {
@@ -2394,7 +2444,7 @@ function normalizeHHMM(t) {
       btnEdit.addEventListener('click', () => {
         petEditIdLocal = p.id;
         petName.value = p.name;
-        petBreed.value = p.breed || 'SRD (Sem Raça Definida)';
+        petBreed.value = p.breed || 'SRD (Sem RaÃ§a Definida)';
         petInfo.value = p.info || '';
       });
 
@@ -2430,7 +2480,7 @@ function normalizeHHMM(t) {
   function limparPetsForm() {
     petEditIdLocal = null;
     petName.value = '';
-    petBreed.value = 'SRD (Sem Raça Definida)';
+    petBreed.value = 'SRD (Sem RaÃ§a Definida)';
     petInfo.value = '';
     petError.style.display = 'none';
   }
@@ -2448,7 +2498,7 @@ function normalizeHHMM(t) {
     const info = petInfo.value.trim();
 
     if (!name || !breed) {
-      petError.textContent = 'Informe nome e raça do pet.';
+      petError.textContent = 'Informe nome e raÃ§a do pet.';
       petError.style.display = 'block';
       return;
     }
@@ -2495,7 +2545,7 @@ function normalizeHHMM(t) {
 
   if (dashPeriod && dashPeriod.value === 'custom') dashCustomRange.classList.remove('hidden');
 
-  /* ===== DASHBOARD: inclui financeiro por serviço ===== */
+  /* ===== DASHBOARD: inclui financeiro por serviÃ§o ===== */
   async function loadDashboard() {
     let period = dashPeriod ? dashPeriod.value : 'today';
     let { start, end } = getPeriodRange(period);
@@ -2547,7 +2597,7 @@ function normalizeHHMM(t) {
     dashTotalCustomers.textContent = totalCustomers;
 
     const statusCounts = { agendado:0, confirmado:0, recebido:0, em_servico:0, concluido:0, entregue:0, cancelado:0 };
-    const prizeCounts = { 'Tosa Higiênica':0, 'Hidratação':0, 'Foto e Vídeo Profissional':0, 'Patinhas impecáveis':0 };
+    const prizeCounts = { 'Tosa HigiÃªnica':0, 'HidrataÃ§Ã£o':0, 'Foto e VÃ­deo Profissional':0, 'Patinhas impecÃ¡veis':0 };
 
     bookings.forEach(b => {
       const s = normStr(b.status);
@@ -2571,12 +2621,12 @@ function normalizeHHMM(t) {
     dashStatusEntregue.textContent = statusCounts.entregue;
     dashStatusCancelado.textContent = statusCounts.cancelado;
 
-    dashPrizeTosa.textContent = prizeCounts['Tosa Higiênica'];
-    dashPrizeHidratacao.textContent = prizeCounts['Hidratação'];
-    dashPrizeFotoVideo.textContent = prizeCounts['Foto e Vídeo Profissional'];
-    dashPrizePatinhas.textContent = prizeCounts['Patinhas impecáveis'];
+    dashPrizeTosa.textContent = prizeCounts['Tosa HigiÃªnica'];
+    dashPrizeHidratacao.textContent = prizeCounts['HidrataÃ§Ã£o'];
+    dashPrizeFotoVideo.textContent = prizeCounts['Foto e VÃ­deo Profissional'];
+    dashPrizePatinhas.textContent = prizeCounts['Patinhas impecÃ¡veis'];
 
-    // financeiro por serviço
+    // financeiro por serviÃ§o
     const usage = new Map(); // serviceId -> {title, qty, value_cents}
     let revenueCents = 0;
 
@@ -2631,7 +2681,7 @@ function normalizeHHMM(t) {
 
   
   /* =========================
-     HORÁRIO DE FUNCIONAMENTO (Admin)
+     HORÃRIO DE FUNCIONAMENTO (Admin)
   ========================= */
   const tbodyHours = document.getElementById('tbodyHours');
   const hoursEmpty = document.getElementById('hoursEmpty');
@@ -2643,11 +2693,11 @@ function normalizeHHMM(t) {
   const DOW_LABEL = {
     0: 'Domingo',
     1: 'Segunda',
-    2: 'Terça',
+    2: 'TerÃ§a',
     3: 'Quarta',
     4: 'Quinta',
     5: 'Sexta',
-    6: 'Sábado'
+    6: 'SÃ¡bado'
   };
 
   let openingHoursCache = []; // [{dow,is_closed,open_time,close_time,max_per_half_hour,updated_at}]
@@ -2755,6 +2805,7 @@ function normalizeHHMM(t) {
     try {
       const data = await apiGet('/api/opening-hours');
       openingHoursCache = data.opening_hours || [];
+      window.__pf_openingHoursCache = openingHoursCache;
       renderOpeningHoursTable();
     } catch (e) {
       console.error(e);
@@ -2802,8 +2853,9 @@ function normalizeHHMM(t) {
       const payload = { opening_hours: rows };
       const data = await apiPut('/api/opening-hours', payload);
       openingHoursCache = data.opening_hours || [];
+      window.__pf_openingHoursCache = openingHoursCache;
       renderOpeningHoursTable();
-      if (hoursMsg) hoursMsg.textContent = 'Horários salvos com sucesso.';
+      if (hoursMsg) hoursMsg.textContent = 'HorÃ¡rios salvos com sucesso.';
     } catch (e) {
       alert(e.message);
       if (hoursMsg) hoursMsg.textContent = 'Erro ao salvar: ' + e.message;
@@ -2815,10 +2867,10 @@ function normalizeHHMM(t) {
   if (btnHoursResetDefault) btnHoursResetDefault.addEventListener('click', () => {
     openingHoursCache = getDefaultOpeningHours().map(r => ({...r, updated_at: null}));
     renderOpeningHoursTable();
-    if (hoursMsg) hoursMsg.textContent = 'Padrão carregado (clique em Salvar para gravar).';
+    if (hoursMsg) hoursMsg.textContent = 'PadrÃ£o carregado (clique em Salvar para gravar).';
   });
 
-// ===== Início =====
+// ===== InÃ­cio =====
   tryAutoLogin();
 
   /* =========================
@@ -2883,9 +2935,9 @@ function normalizeHHMM(t) {
     // Using an explicit -03:00 offset avoids the common "weekday shifted" bug.
     const d = new Date(dateStr + 'T00:00:00-03:00');
     if (Number.isNaN(d.getTime())) return null;
-    const dow = d.getUTCDay(); // 0=Sun..6=Sat (São Paulo)
+    const dow = d.getUTCDay(); // 0=Sun..6=Sat (SÃ£o Paulo)
 
-    // Prefer configured Opening Hours (admin menu "Horário de Funcionamento")
+    // Prefer configured Opening Hours (admin menu "HorÃ¡rio de Funcionamento")
     const oh = Array.isArray(openingHoursCache)
       ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
       : null;
