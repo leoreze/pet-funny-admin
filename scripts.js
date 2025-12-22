@@ -55,9 +55,7 @@ const API_BASE_URL = '';
   };
 
   let currentEditId = null;
-  // Garantir cache global (evita ReferenceError em outras rotinas do admin)
-  var cacheMimos = (window.cacheMimos ? window.cacheMimos : []);
-  window.cacheMimos = cacheMimos;
+  let cacheMimos = [];
 
   // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
   // seja populado mesmo sem o usuário abrir a aba "Mimos".
@@ -1120,12 +1118,8 @@ function normalizeHHMM(t) {
 
   async function fetchBookings() {
     const params = {};
-    // Backend atual usa: q, date_from, date_to. Mantemos compatibilidade.
-    if (filtroData.value) {
-      params.date_from = filtroData.value;
-      params.date_to = filtroData.value;
-    }
-    if (filtroBusca.value.trim()) params.q = filtroBusca.value.trim();
+    if (filtroData.value) params.date = filtroData.value;
+    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
     const data = await apiGet('/api/bookings', params);
     return data.bookings || [];
   }
@@ -1266,45 +1260,48 @@ function normalizeHHMM(t) {
   }
 
   function preencherFormEdicao(booking) {
-    const id = booking && booking.id ? String(booking.id) : '';
-    bookingId.value = id;
-    bookingOriginalStatus.value = (booking && booking.status) ? String(booking.status) : 'agendado';
+  // ID do agendamento em edição
+  const id = booking && booking.id ? String(booking.id) : '';
+  bookingId.value = id;
 
-    // Cliente/Telefone
-    formPhone.value = booking ? (booking.customer_phone || booking.phone || '') : '';
-    applyPhoneMask(formPhone);
+  // Status original (para detecção de mudança)
+  bookingOriginalStatus.value = (booking && booking.status) ? String(booking.status) : 'agendado';
 
-    // Nome (quando disponível)
-    formNome.value = booking && booking.customer_name ? booking.customer_name : '';
+  // Cliente/Telefone + Nome
+  formPhone.value = (booking && (booking.customer_phone || booking.phone)) ? String(booking.customer_phone || booking.phone) : '';
+  applyPhoneMask(formPhone); // garante máscara também ao carregar
+  formNome.value = (booking && (booking.customer_name || booking.name)) ? String(booking.customer_name || booking.name) : '';
 
-    // Pet
-    // (mantém seleção posterior via loadPetsForCustomer quando usuário troca telefone)
-    if (booking && booking.pet_id != null) {
-      try {
-        formPetSelect.disabled = false;
-      } catch (_) {}
-    }
+  // Data / Horário
+  formDate.value = booking && booking.date ? booking.date : '';
+  formTime.value = booking && booking.time ? booking.time : '';
 
-    // Data / Horário
-    formDate.value = booking && booking.date ? booking.date : '';
-    formTime.value = booking && booking.time ? booking.time : '';
-
-    // Serviço único
-    formService.value = (booking && (booking.service_id || booking.serviceId)) ? String(booking.service_id || booking.serviceId) : '';
-
-    // Mimo
-    formPrize.value = booking && booking.prize ? booking.prize : 'Sem mimo';
-
-    // Status/Notas
-    formStatus.value = booking && booking.status ? booking.status : 'agendado';
-    formNotes.value = booking && booking.notes ? booking.notes : '';
-
-    setEditMode(true);
-    mostrarFormAgenda();
-
-    // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
-    refreshBookingDateTimeState(id ? Number(id) : null);
+  // Pet (opcional) — precisa carregar pets do tutor antes de selecionar
+  const customerId = booking && booking.customer_id ? Number(booking.customer_id) : null;
+  const petId = booking && booking.pet_id ? String(booking.pet_id) : '';
+  if (customerId) {
+    loadPetsForCustomer(customerId)
+      .then(() => { formPetSelect.value = petId; })
+      .catch(() => { formPetSelect.value = petId; });
+  } else {
+    // fallback (mantém opção atual)
+    formPetSelect.value = petId;
   }
+
+  // Serviço (único)
+  const serviceId = booking && booking.service_id ? String(booking.service_id) : '';
+  formService.value = serviceId;
+
+  // Mimo (pode ser nulo)
+  const prizeVal = booking && booking.prize ? booking.prize : 'Sem mimo';
+  formPrize.value = prizeVal;
+
+  // Modo edição: trava Tutor/Telefone e permite Pet/Mimo
+  setEditMode(true);
+
+  // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
+  refreshBookingDateTimeState(id ? Number(id) : null);
+}
 
 
 
@@ -1841,7 +1838,7 @@ if (selectedServicesList) {
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone || a.phone);
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
 
       const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
 
@@ -1957,7 +1954,7 @@ if (selectedServicesList) {
 
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
-      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone || a.phone)}</span>`;
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.phone)}</span>`;
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
@@ -2064,8 +2061,9 @@ if (selectedServicesList) {
   // Mimo default
   formPrize.value = 'Sem mimo';
 
-  // Serviço único
+  // Multi-serviços
   formService.value = '';
+  clearSelectedServices();
 
   formDate.value = '';
   formTime.value = '';
@@ -2153,8 +2151,9 @@ async function salvarAgendamento() {
         customer_id: customer.id,
         pet_id: petIdNum,
         date, time,
-        // Serviço único (multi-serviços removido)
-        service_id: serviceIdSelected,
+        // envia multi-serviços (novo) + compatibilidade (service_id/service)
+        service_ids: selectedServices.map(s => s.id),
+        service_id: firstServiceId,
         service: servicesLabel,
         prize, notes, status
       };
