@@ -55,7 +55,8 @@ const API_BASE_URL = '';
   };
 
   let currentEditId = null;
-  let cacheMimos = [];
+  var cacheMimos = (typeof window !== 'undefined' && window.cacheMimos) ? window.cacheMimos : [];
+  if (typeof window !== 'undefined') window.cacheMimos = cacheMimos;
 
   // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
   // seja populado mesmo sem o usuário abrir a aba "Mimos".
