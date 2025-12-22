@@ -16,6 +16,16 @@ app.get(['/admin', '/admin/'], (req, res) => {
 });
 
 
+
+// Converte YYYY-MM-DD para weekday local (evita bug de timezone do Date('YYYY-MM-DD') que é interpretado como UTC)
+function weekdayFromISO(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
+  const [y, m, d] = parts;
+  const dt = new Date(y, m - 1, d); // local time
+  return dt.getDay();
+}
 /* =========================
    HELPERS
 ========================= */
