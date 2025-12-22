@@ -2090,7 +2090,10 @@ async function salvarAgendamento() {
     const petIdRaw = formPetSelect.value;
     const petIdNum = petIdRaw ? parseInt(petIdRaw, 10) : null;
 
-    const prize = formPrize.value;
+ const prize = (formPrize && formPrize.value && formPrize.value.trim())
+  ? formPrize.value.trim()
+  : 'Sem mimo';
+
 
     // serviço selecionado do banco (id)
     const serviceIdSelected = formService.value ? parseInt(formService.value, 10) : null;
