@@ -1,13 +1,3 @@
-
-// Converte YYYY-MM-DD para weekday local (evita bug de timezone do Date('YYYY-MM-DD') que é interpretado como UTC)
-function weekdayFromISO(dateStr) {
-  if (!dateStr || typeof dateStr !== 'string') return null;
-  const parts = dateStr.split('-').map(Number);
-  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
-  const [y, m, d] = parts;
-  const dt = new Date(y, m - 1, d); // local time
-  return dt.getDay();
-}
 const API_BASE_URL = '';
 
   /* ===== Helpers de normalização (corrige acentos/variações) ===== */
@@ -66,29 +56,6 @@ const API_BASE_URL = '';
   let currentEditId = null;
   let cacheMimos = [];
 
-  // Disponibiliza o carregamento de mimos para outras áreas (ex: Agendamentos)
-  async function ensureMimosLoaded(force = false) {
-    try {
-      if (!force && Array.isArray(cacheMimos) && cacheMimos.length) {
-        syncPrizeSelect(cacheMimos);
-        return cacheMimos;
-      }
-      const mimos = await apiGetMimos();
-      cacheMimos = Array.isArray(mimos) ? mimos : [];
-      syncPrizeSelect(cacheMimos);
-      return cacheMimos;
-    } catch (e) {
-      // Não bloqueia o admin por falha em mimos; mantém o select com “Sem mimo”
-      console.warn('Falha ao carregar mimos:', e?.message || e);
-      try { syncPrizeSelect([]); } catch (_) {}
-      return [];
-    }
-  }
-
-  // Exponha para o restante do scripts.js (Agendamentos, etc.)
-  window.ensureMimosLoaded = ensureMimosLoaded;
-
-
   function setMsg(text, isError) {
     if (!els.msg) return;
     els.msg.textContent = text || '';
@@ -96,18 +63,6 @@ const API_BASE_URL = '';
   }
 
   function pad2(n) { return String(n).padStart(2, '0'); }
-
-
-function asBool(v) {
-  if (v === true || v === false) return v;
-  if (v === 1 || v === 0) return v === 1;
-  if (typeof v === 'string') {
-    const s = v.trim().toLowerCase();
-    if (['true','t','1','yes','y','sim'].includes(s)) return true;
-    if (['false','f','0','no','n','nao','não'].includes(s)) return false;
-  }
-  return !!v;
-}
 
   function toDatetimeLocalValue(isoOrTs) {
     if (!isoOrTs) return '';
@@ -486,8 +441,6 @@ function asBool(v) {
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-      wireAgendaDateTimeListeners();
-      try { if (window.ensureMimosLoaded) await window.ensureMimosLoaded(false); } catch (_) {}
       await loadBreeds();
       await loadOpeningHours();
       await loadDashboard();
@@ -703,60 +656,71 @@ function asBool(v) {
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
+  function parseISODateToLocal(dateStr) {
+    if (!dateStr) return null;
+    const parts = String(dateStr).split('-').map(n => parseInt(n, 10));
+    if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
+    const [y, m, d] = parts;
+    return new Date(y, m - 1, d, 0, 0, 0, 0); // sempre LOCAL (evita bug UTC)
+  }
+
   function hhmmToMinutes(hhmm) {
-  const t = normalizeHHMM(hhmm);
-  if (!t) return null;
-  const [hh, mm] = t.split(':').map(n => parseInt(n, 10));
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-  return hh * 60 + mm;
-}
-
-function getOpeningConfigForDow(dow) {
-  // Tenta usar configuração salva em "Horário de Funcionamento"
-  if (Array.isArray(openingHoursCache) && openingHoursCache.length) {
-    const row = openingHoursCache.find(r => Number(r.dow) === Number(dow));
-    if (row) return row;
+    const t = normalizeHHMM(hhmm);
+    if (!t) return null;
+    const [hh, mm] = t.split(':').map(n => parseInt(n, 10));
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    return hh * 60 + mm;
   }
 
-  // Fallback: regras padrão
-  if (dow === 0) return { dow, is_closed: true, open_time: null, close_time: null, max_per_half_hour: 0 };
-  if (dow === 6) return { dow, is_closed: false, open_time: '07:30', close_time: '13:00', max_per_half_hour: 1 };
-  return { dow, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 };
-}
-
-function buildRangeForDate(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr + 'T00:00:00');
-  if (Number.isNaN(d.getTime())) return null;
-
-  const dow = d.getDay();
-  const cfg = getOpeningConfigForDow(dow);
-
-  if (cfg && cfg.is_closed) return { closed: true, cap: 0 };
-
-  const startMin = hhmmToMinutes(cfg?.open_time || '07:30');
-  const endMin = hhmmToMinutes(cfg?.close_time || (dow === 6 ? '13:00' : '17:30'));
-
-  if (startMin == null || endMin == null) return { closed: true, cap: 0 };
-
-  let cap = Number(cfg?.max_per_half_hour);
-  if (!Number.isFinite(cap) || cap < 1) cap = 1;
-
-  return { closed: false, startMin, endMin, cap };
-}
-
-
-async function ensureOpeningHoursLoadedForBooking() {
-  // Garante que o cache de "Horário de funcionamento" esteja carregado antes de gerar horários / capacidade.
-  if (Array.isArray(openingHoursCache) && openingHoursCache.length) return;
-  try {
-    const data = await apiGet('/api/opening-hours');
-    openingHoursCache = data.opening_hours || [];
-  } catch (e) {
-    console.warn('Falha ao carregar horário de funcionamento. Usando padrão (capacidade=1).', e);
-    openingHoursCache = [];
+  function getOpeningConfigForDow(dow) {
+    // openingHoursCache vem do menu "Horário de funcionamento" (API /api/opening-hours)
+    const row = (openingHoursCache || []).find(r => Number(r.dow) === Number(dow));
+    if (!row) return null;
+    return {
+      is_closed: !!row.is_closed,
+      open_time: row.open_time ? String(row.open_time).slice(0, 5) : null,
+      close_time: row.close_time ? String(row.close_time).slice(0, 5) : null,
+      max_per_half_hour: Number(row.max_per_half_hour || 0)
+    };
   }
-}
+
+  function buildRangeForDate(dateStr) {
+    if (!dateStr) return null;
+
+    const d = parseISODateToLocal(dateStr);
+    if (!d || Number.isNaN(d.getTime())) return null;
+
+    const dow = d.getDay();
+
+    // Preferência: configuração dinâmica do menu Horário de funcionamento
+    const cfg = getOpeningConfigForDow(dow);
+
+    if (cfg) {
+      if (cfg.is_closed) return { closed: true, dow, capacity: 0 };
+
+      const startMin = hhmmToMinutes(cfg.open_time);
+      const endMin = hhmmToMinutes(cfg.close_time);
+
+      if (startMin == null || endMin == null || endMin < startMin) {
+        // fallback seguro (não quebra UI)
+        return { closed: false, dow, startMin: 7 * 60 + 30, endMin: (dow === 6) ? (13 * 60) : (17 * 60 + 30), capacity: Math.max(1, cfg.max_per_half_hour || 1) };
+      }
+
+      return {
+        closed: false,
+        dow,
+        startMin,
+        endMin,
+        capacity: Math.max(1, cfg.max_per_half_hour || 1)
+      };
+    }
+
+    // Fallback: regra antiga fixa (caso API ainda não esteja carregada)
+    if (dow === 0) return { closed: true, dow, capacity: 0 };
+    const startMin = 7 * 60 + 30;
+    const endMin = (dow === 6) ? (13 * 60) : (17 * 60 + 30);
+    return { closed: false, dow, startMin, endMin, capacity: 1 };
+  }
 
   function normalizeHHMM(t) {
     const s = String(t || '').trim();
@@ -773,20 +737,23 @@ async function ensureOpeningHoursLoadedForBooking() {
     return s !== 'cancelado';
   }
 
-  async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
+  async function loadOccupiedCountsForDate(dateStr, excludeBookingId) {
     const data = await apiGet('/api/bookings', { date: dateStr });
     const list = data.bookings || [];
-    const map = new Map(); // HH:MM -> count
+    const counts = new Map();
 
     list.forEach(b => {
       if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
       if (!isActiveBookingStatus(b.status)) return;
+
       const t = normalizeHHMM(b.time);
       if (!t) return;
-      map.set(t, (map.get(t) || 0) + 1);
+
+      const prev = counts.get(t) || 0;
+      counts.set(t, prev + 1);
     });
 
-    return map;
+    return counts;
   }
 
   function minutesToHHMM(totalMin) {
@@ -982,38 +949,31 @@ async function ensureOpeningHoursLoadedForBooking() {
   const formDate = document.getElementById('formDate');
   const formTime = document.getElementById('formTime');
 
-  
-  /* ===== Robust date/time wiring (fix: horário fica desabilitado ao trocar data) ===== */
-  function wireAgendaDateTimeListeners() {
-    const fd = document.getElementById('formDate');
-    const ft = document.getElementById('formTime');
-    if (!fd || !ft) return;
-
-    // Avoid duplicate listeners
-    if (fd.dataset._wiredDateTime === '1') return;
-    fd.dataset._wiredDateTime = '1';
-
-    const handler = async () => {
-      const idEl = document.getElementById('bookingId');
-      const excludeId = (idEl && idEl.value) ? Number(idEl.value) : null;
-      try { await refreshBookingDateTimeState(excludeId); } catch (e) { console.warn(e); }
-    };
-
-    fd.addEventListener('change', handler);
-    fd.addEventListener('input', handler); // more reliable on some browsers
-  }
-
-// Regras padrão (mesmas do cliente)
+  // Regras padrão (mesmas do cliente)
   if (formDate) formDate.min = todayISO;
   if (formTime) formTime.step = 1800; // 30 minutos
 
 
   // Revalida e aplica limites quando a data/horário mudam
   if (formDate) {
-    formDate.addEventListener('change', async () => {
+    const onDateChanged = async () => {
       const excludeId = bookingId && bookingId.value ? Number(bookingId.value) : null;
       await refreshBookingDateTimeState(excludeId);
-    });
+
+      // Hardening: se a data é válida e o dia não é "fechado", o campo de horário deve estar habilitado.
+      // Isso evita casos em que o evento "change" não chega a disparar como esperado.
+      try {
+        const dateStr = formDate.value;
+        const range = buildRangeForDate(dateStr);
+        if (dateStr && range && !range.closed && formTime) {
+          formTime.disabled = false;
+        }
+      } catch (_) {}
+    };
+
+    formDate.addEventListener('change', onDateChanged);
+    formDate.addEventListener('input', onDateChanged);
+    formDate.addEventListener('input', onDateChanged);
   }
 
   if (formTime) {
@@ -1060,8 +1020,6 @@ async function ensureOpeningHoursLoadedForBooking() {
   const dashAvgTicket = document.getElementById('dashAvgTicket');
 
   let ultimaLista = [];
-  let openingHoursCache = []; // cache global de horários de funcionamento (carregado via /api/opening-hours)
-
   let clientesCache = [];
   let clienteSelecionadoId = null;
   let petsCache = [];
@@ -1076,15 +1034,11 @@ async function ensureOpeningHoursLoadedForBooking() {
   }
 
   /* ===== Estado de disponibilidade (Admin) ===== */
-  let occupiedTimesCount = new Map(); // HH:MM -> count
-  let currentSlotCap = 1; // capacidade por slot (30 min) conforme Horário de Funcionamento
+  let occupiedCountsByTime = new Map();
+let currentSlotCapacity = 1;
 
   async function refreshBookingDateTimeState(excludeBookingId) {
-    const formDate = document.getElementById('formDate');
-    const formTime = document.getElementById('formTime');
     if (!formDate || !formTime) return;
-
-    await ensureOpeningHoursLoadedForBooking();
 
     const dateStr = formDate.value;
     if (!dateStr) return;
@@ -1093,8 +1047,8 @@ async function ensureOpeningHoursLoadedForBooking() {
     if (!range || range.closed) {
       formTime.disabled = true;
       formTime.value = '';
-      occupiedTimesCount = new Map();
-      currentSlotCap = 1;
+      occupiedCountsByTime = new Map();
+      currentSlotCapacity = 1;
       return;
     }
 
@@ -1106,14 +1060,13 @@ async function ensureOpeningHoursLoadedForBooking() {
 
     // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
     try {
-      occupiedTimesCount = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
-      currentSlotCap = Number(range.cap || 1);
-      if (!Number.isFinite(currentSlotCap) || currentSlotCap < 1) currentSlotCap = 1;
-    } catch (e) {
+      occupiedCountsByTime = await loadOccupiedCountsForDate(dateStr, excludeBookingId);
+      currentSlotCapacity = Math.max(1, Number(range.capacity || 1));
+      } catch (e) {
       console.warn('Falha ao carregar horários ocupados:', e);
-      occupiedTimesCount = new Map();
-      currentSlotCap = 1;
-    }
+      occupiedCountsByTime = new Map();
+      currentSlotCapacity = 1;
+      }
 
     // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
     if (formTime.value) {
@@ -1125,8 +1078,8 @@ async function ensureOpeningHoursLoadedForBooking() {
   function isTimeOccupied(timeStr) {
     const t = normalizeHHMM(timeStr);
     if (!t) return false;
-    const cnt = occupiedTimesCount.get(t) || 0;
-    return cnt >= currentSlotCap;
+    const c = occupiedCountsByTime.get(t) || 0;
+    return c >= Math.max(1, Number(currentSlotCapacity || 1));
   }
 
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
@@ -1251,7 +1204,6 @@ async function ensureOpeningHoursLoadedForBooking() {
     bookingOriginalStatus.value = booking.status || 'agendado';
 
     formPhone.value = booking.phone || '';
-    try { applyPhoneMask(formPhone); } catch (_) {}
     formNome.value = booking.customer_name || '';
     formPrize.value = booking.prize || 'Tosa Higiênica';
 
@@ -2204,16 +2156,23 @@ async function ensureOpeningHoursLoadedForBooking() {
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', async () => {
-    wireAgendaDateTimeListeners();
-    try { await (window.ensureMimosLoaded ? window.ensureMimosLoaded(false) : Promise.resolve()); } catch (e) { console.warn(e); }
+  btnNovoAgendamento.addEventListener('click', () => {
     limparForm();
     formDate.value = toISODateOnly(new Date());
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
     formPetSelect.disabled = true;
     formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
     mostrarFormAgenda();
-    refreshBookingDateTimeState(null);
+    // Garante que o estado do horário seja recalculado após o form ficar visível.
+    // (Alguns browsers podem não aplicar corretamente enable/disable quando o elemento ainda está oculto.)
+    setTimeout(() => {
+      refreshBookingDateTimeState(null);
+      // Caso a data esteja preenchida e não seja dia fechado, não deixe o campo de horário travado.
+      try {
+        const range = buildRangeForDate(formDate.value);
+        if (range && !range.closed) formTime.disabled = false;
+      } catch (_) {}
+    }, 0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
@@ -2723,7 +2682,7 @@ async function ensureOpeningHoursLoadedForBooking() {
     6: 'Sábado'
   };
 
-  openingHoursCache = []; // [{dow,is_closed,open_time,close_time,max_per_half_hour,updated_at}]
+  let openingHoursCache = []; // [{dow,is_closed,open_time,close_time,max_per_half_hour,updated_at}]
 
   function normalizeHHMM(v, fallback) {
     const s = String(v || '').trim();
