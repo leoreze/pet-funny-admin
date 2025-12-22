@@ -27,8 +27,9 @@ const API_BASE_URL = '';
   'use strict';
 
   const $ = (id) => document.getElementById(id);
+  // Mesmo que a aba de Mimos não exista no DOM (variações de layout),
+  // ainda precisamos carregar os mimos para o select do agendamento (#formPrize).
   const elTab = $('tab-mimos');
-  if (!elTab) return;
 
   const els = {
     title: $('mimoTitle'),
@@ -55,6 +56,23 @@ const API_BASE_URL = '';
 
   let currentEditId = null;
   let cacheMimos = [];
+
+  // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
+  // seja populado mesmo sem o usuário abrir a aba "Mimos".
+  async function ensureMimosLoaded(force = false) {
+    if (!force && Array.isArray(cacheMimos) && cacheMimos.length > 0) {
+      syncPrizeSelect();
+      return;
+    }
+    await reloadMimos();
+  }
+
+  // Expor funções para o fluxo de agendamento (novo/edição)
+  // sem depender do usuário abrir a aba "Mimos".
+  window.PF_MIMOS = window.PF_MIMOS || {};
+  window.PF_MIMOS.ensureLoaded = ensureMimosLoaded;
+  window.PF_MIMOS.reload = reloadMimos;
+  window.PF_MIMOS.syncSelect = syncPrizeSelect;
 
   function setMsg(text, isError) {
     if (!els.msg) return;
@@ -443,6 +461,13 @@ const API_BASE_URL = '';
       await loadClientes();
       await loadBreeds();
       await loadOpeningHours();
+
+      // Garante que o select de mimos no agendamento esteja preenchido,
+      // mesmo sem navegar na aba "Mimos".
+      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
+        await window.PF_MIMOS.ensureLoaded(false);
+      }
+
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
@@ -2124,12 +2149,21 @@ function normalizeHHMM(t) {
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
 
-  btnNovoAgendamento.addEventListener('click', () => {
+  btnNovoAgendamento.addEventListener('click', async () => {
     limparForm();
     formDate.value = toISODateOnly(new Date());
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
     formPetSelect.disabled = true;
     formPetSelect.innerHTML = '<option value="">(Digite o telefone para carregar os pets)</option>';
+    // Carrega mimos antes de abrir o formulário (evita select vazio no primeiro uso).
+    try {
+      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
+        await window.PF_MIMOS.ensureLoaded(false);
+      }
+    } catch (e) {
+      console.warn('Falha ao carregar mimos:', e);
+    }
+
     mostrarFormAgenda();
     // Garante que o estado do horário seja recalculado após o form ficar visível.
     // (Alguns browsers podem não aplicar corretamente enable/disable quando o elemento ainda está oculto.)
