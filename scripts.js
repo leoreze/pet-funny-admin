@@ -1754,10 +1754,14 @@ function normalizeHHMM(t) {
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone ?? a.phone);
 
       const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
 
+
+      const tdTotal = document.createElement('td');
+      const totalCents = (a.services_total_cents ?? a.service_value_cents ?? 0);
+      tdTotal.textContent = formatCentsToBRL(totalCents);
       const tdMimo = document.createElement('td');
       tdMimo.textContent = a.prize || '-';
       tdMimo.className = 'td-mimo';
@@ -1809,6 +1813,7 @@ function normalizeHHMM(t) {
       tr.appendChild(tdPet);
       tr.appendChild(tdTel);
       tr.appendChild(tdServ);
+      tr.appendChild(tdTotal);
       tr.appendChild(tdMimo);
       tr.appendChild(tdStatus);
       tr.appendChild(tdNotif);
@@ -1870,7 +1875,7 @@ function normalizeHHMM(t) {
 
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
-      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.phone)}</span>`;
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone ?? a.phone)}</span>`;
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
