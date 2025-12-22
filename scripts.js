@@ -1260,7 +1260,7 @@ function normalizeHHMM(t) {
   bookingId.value = id;
 
   // Cliente/Telefone
-  formPhone.value = booking && booking.phone ? booking.phone : '';
+  formPhone.value = booking && (booking.customer_phone || booking.phone || booking.customerPhone) ? (booking.customer_phone || booking.phone || booking.customerPhone) : '';
   applyPhoneMask(formPhone); // garante máscara também ao carregar
 
   // Data / Horário
@@ -1728,6 +1728,21 @@ function normalizeHHMM(t) {
     return serviceLabel;
   }
 
+  function getServiceValueCentsFromBooking(a) {
+    // Prefer campos que vêm da API
+    const direct = (a && (a.service_value_cents ?? a.services_total_cents ?? a.total_cents ?? null));
+    if (direct != null && Number.isFinite(Number(direct))) return Number(direct);
+
+    // Tenta inferir via service_id no cache
+    const sid = a ? (a.service_id ?? a.serviceId ?? null) : null;
+    if (sid != null) {
+      const svc = servicesCache.find(s => String(s.id) === String(sid));
+      if (svc && svc.value_cents != null) return Number(svc.value_cents);
+    }
+
+    return 0;
+  }
+
   function renderAgendaByView(lista) {
     // vazio: atualiza ambos estados para evitar inconsistências
     const isEmpty = !lista || !lista.length;
@@ -1754,14 +1769,14 @@ function normalizeHHMM(t) {
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone ?? a.phone);
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone || a.phone || a.customerPhone);
 
-      const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
+      const tdServ = document.createElement('td');
+      tdServ.textContent = getServiceLabelFromBooking(a);
 
+      const tdValor = document.createElement('td');
+      tdValor.textContent = formatCentsToBRL(getServiceValueCentsFromBooking(a));
 
-      const tdTotal = document.createElement('td');
-      const totalCents = (a.services_total_cents ?? a.service_value_cents ?? 0);
-      tdTotal.textContent = formatCentsToBRL(totalCents);
       const tdMimo = document.createElement('td');
       tdMimo.textContent = a.prize || '-';
       tdMimo.className = 'td-mimo';
@@ -1813,7 +1828,7 @@ function normalizeHHMM(t) {
       tr.appendChild(tdPet);
       tr.appendChild(tdTel);
       tr.appendChild(tdServ);
-      tr.appendChild(tdTotal);
+      tr.appendChild(tdValor);
       tr.appendChild(tdMimo);
       tr.appendChild(tdStatus);
       tr.appendChild(tdNotif);
@@ -1875,11 +1890,15 @@ function normalizeHHMM(t) {
 
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
-      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone ?? a.phone)}</span>`;
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone || a.phone || a.customerPhone)}</span>`;
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
       l4.innerHTML = `<span class="agenda-key">Serviço:</span> <span class="agenda-val">${serviceLabel}</span>`;
+
+      const l4v = document.createElement('div');
+      l4v.className = 'agenda-line';
+      l4v.innerHTML = `<span class="agenda-key">Valor:</span> <span class="agenda-muted">${formatCentsToBRL(getServiceValueCentsFromBooking(a))}</span>`;
 
       const l5 = document.createElement('div');
       l5.className = 'agenda-line';
@@ -1893,6 +1912,7 @@ function normalizeHHMM(t) {
       main.appendChild(l2);
       main.appendChild(l3);
       main.appendChild(l4);
+      main.appendChild(l4v);
       main.appendChild(l5);
       main.appendChild(l6);
 
@@ -2131,7 +2151,7 @@ async function salvarAgendamento() {
         a.time || '',
         (a.customer_name || '').replace(/;/g, ','),
         (a.pet_name || '').replace(/;/g, ','),
-        formatTelefone(a.phone),
+        formatTelefone(a.customer_phone || a.phone || a.customerPhone),
         (serviceLabel || '').replace(/;/g, ','),
         (a.prize || '').replace(/;/g, ','),
         (a.status || 'agendado'),
