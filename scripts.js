@@ -1135,7 +1135,7 @@ function normalizeHHMM(t) {
 
     statTotal.textContent = total;
     statTosa.textContent = contTosa;
-    statHidra.textContent = contHidra;
+    statHidratacao.textContent = contHidra;
     statFoto.textContent = contFoto;
     statPatinhas.textContent = contPatinhas;
 
