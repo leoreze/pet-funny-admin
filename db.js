@@ -160,10 +160,7 @@ async function initDb() {
     );
   `);
 
-  
-  // Ensure new columns exist on older deployments
-  await run(`ALTER TABLE booking_services ADD COLUMN IF NOT EXISTS qty INTEGER NOT NULL DEFAULT 1;`);
-// Compat: se a tabela booking_services já existia sem a coluna qty, adiciona agora
+  // Compat: se a tabela booking_services já existia sem a coluna qty, adiciona agora
   await run(`ALTER TABLE booking_services ADD COLUMN IF NOT EXISTS qty INTEGER NOT NULL DEFAULT 1;`);
 
   // Migração: traz agendamentos antigos (bookings.service_id / bookings.service) para booking_services
@@ -182,6 +179,7 @@ async function initDb() {
     INSERT INTO booking_services (booking_id, service_id, qty)
     SELECT b.id, s.id, 1
     FROM bookings b
+    -- services usa a coluna "title" (não "name")
     JOIN services s ON LOWER(TRIM(s.title)) = LOWER(TRIM(b.service))
     WHERE (b.service_id IS NULL OR b.service_id = 0)
       AND b.service IS NOT NULL AND TRIM(b.service) <> ''

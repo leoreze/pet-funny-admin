@@ -338,341 +338,169 @@ app.delete('/api/services/:id', async (req, res) => {
 
 app.get('/api/bookings', async (req, res) => {
   try {
-    const {
-      date,
-      date_from,
-      date_to,
-      customer_id,
-      pet_id,
-      status,
-      q
-    } = req.query;
+		// Filtros
+		const date = String(req.query.date || '').slice(0, 10);
+		const search = String(req.query.search || '').trim();
+		const status = String(req.query.status || '').trim();
+		const service_id = req.query.service_id != null && String(req.query.service_id).trim() !== ''
+			? Number(req.query.service_id)
+			: null;
+		const prize = String(req.query.prize || '').trim();
 
-    const where = [];
-    const params = [];
+		// Listagem consolidada (compatível com multi-serviços via booking_services)
+		let sql = `
+		  SELECT
+			b.*,
+			c.name AS customer_name,
+			c.phone AS phone,
+			p.name AS pet_name,
+			COALESCE(
+			  json_agg(
+				json_build_object(
+				  'service_id', s.id,
+				  'title', s.title,
+				  'value_cents', s.value_cents,
+				  'qty', bs.qty
+				)
+			  ) FILTER (WHERE s.id IS NOT NULL),
+			  '[]'::json
+			) AS services,
+			COALESCE(SUM(s.value_cents * bs.qty), 0) AS services_total_cents
+		  FROM bookings b
+		  JOIN customers c ON c.id = b.customer_id
+		  LEFT JOIN pets p ON p.id = b.pet_id
+		  LEFT JOIN booking_services bs ON bs.booking_id = b.id
+		  LEFT JOIN services s ON s.id = bs.service_id
+		  WHERE 1=1
+		`;
+		const params = [];
 
-    // Datas (um dia específico ou intervalo)
-    if (date) {
-      params.push(date);
-      where.push(`b.date = $${params.length}`);
-    } else {
-      if (date_from) {
-        params.push(date_from);
-        where.push(`b.date >= $${params.length}`);
-      }
-      if (date_to) {
-        params.push(date_to);
-        where.push(`b.date <= $${params.length}`);
-      }
-    }
+		if (date) {
+			params.push(date);
+			sql += ` AND b.date = $${params.length}`;
+		}
 
-    if (customer_id) {
-      params.push(Number(customer_id));
-      where.push(`b.customer_id = $${params.length}`);
-    }
+		if (status) {
+			params.push(status);
+			sql += ` AND b.status = $${params.length}`;
+		}
 
-    if (pet_id) {
-      params.push(Number(pet_id));
-      where.push(`b.pet_id = $${params.length}`);
-    }
+		if (prize) {
+			params.push(prize);
+			sql += ` AND COALESCE(b.prize,'') = $${params.length}`;
+		}
 
-    if (status) {
-      params.push(status);
-      where.push(`b.status = $${params.length}`);
-    }
+		if (service_id && !Number.isNaN(service_id)) {
+			params.push(service_id);
+			sql += `
+			  AND (
+				b.service_id = $${params.length}
+				OR EXISTS (
+				  SELECT 1
+				  FROM booking_services bs2
+				  WHERE bs2.booking_id = b.id
+					AND bs2.service_id = $${params.length}
+				)
+			  )
+			`;
+		}
 
-    if (q) {
-      // Busca livre (cliente, pet, telefone)
-      params.push(`%${q}%`);
-      const p = `$${params.length}`;
-      where.push(`(
-        c.name ILIKE ${p}
-        OR c.phone ILIKE ${p}
-        OR p.name ILIKE ${p}
-      )`);
-    }
+		if (search) {
+			params.push(`%${search.toLowerCase()}%`);
+			sql += `
+			  AND (
+				LOWER(c.name) LIKE $${params.length}
+				OR c.phone LIKE $${params.length}
+				OR LOWER(COALESCE(p.name,'')) LIKE $${params.length}
+				OR LOWER(COALESCE(b.service,'')) LIKE $${params.length}
+				OR LOWER(COALESCE(b.notes,'')) LIKE $${params.length}
+			  )
+			`;
+		}
 
-    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+		sql += `
+		  GROUP BY b.id, c.id, p.id
+		  ORDER BY b.date DESC, b.time ASC, b.id DESC
+		`;
 
-    const sql = `
-      SELECT
-        b.*,
-        c.name AS customer_name,
-        c.phone AS customer_phone,
-        p.name AS pet_name,
-
-        COALESCE(
-          json_agg(
-            DISTINCT jsonb_build_object(
-              'service_id', s.id,
-              'name', s.name,
-              'value_cents', s.value_cents,
-              'qty', bs.qty
-            )
-          ) FILTER (WHERE s.id IS NOT NULL),
-          '[]'::json
-        ) AS services,
-
-        COALESCE(
-          SUM( (COALESCE(s.value_cents, 0) * COALESCE(bs.qty, 1)) ) FILTER (WHERE s.id IS NOT NULL),
-          0
-        ) AS services_total_cents
-
-      FROM bookings b
-      LEFT JOIN customers c ON c.id = b.customer_id
-      LEFT JOIN pets p ON p.id = b.pet_id
-
-      LEFT JOIN booking_services bs ON bs.booking_id = b.id
-      LEFT JOIN services s ON s.id = bs.service_id
-
-      ${whereSql}
-      GROUP BY b.id, c.id, p.id
-      ORDER BY b.date DESC, b.time DESC, b.id DESC
-    `;
-
-    const rows = await db.all(sql, params);
-
-    // compat: se algum agendamento ainda não migrou para booking_services, tentamos expor "service" legado como services[0]
-    const normalized = rows.map(r => {
-      const services = Array.isArray(r.services) ? r.services : [];
-      let total = Number(r.services_total_cents || 0);
-
-      if (services.length === 0 && r.service_id) {
-        services.push({ service_id: r.service_id, name: r.service || null, value_cents: null, qty: 1 });
-      }
-
-      // Se não veio total, tenta valor legado (value_cents na própria booking, se existir)
-      if (!total && r.value_cents) total = Number(r.value_cents);
-
-      return {
-        ...r,
-        services,
-        services_total_cents: total
-      };
-    });
-
-    res.json({ bookings: normalized });
+		const rows = await db.all(sql, params);
+		res.json({ bookings: rows });
   } catch (err) {
     console.error('Erro ao listar bookings:', err);
-    res.status(500).json({ error: 'Erro interno ao listar agendamentos.' });
+    res.status(500).json({ error: 'Erro interno ao buscar agendamentos.' });
   }
 });
 
 app.post('/api/bookings', async (req, res) => {
   try {
-    // Compatibilidade:
-    // - antigo: service_id (único)
-    // - novo: service_ids[] (múltiplos)
-    const {
-      date,
-      time,
-      customer_id,
-      pet_id,
-      status = 'scheduled',
-      notes = null,
-      mimo_id = null
-    } = req.body;
+    const customer_id = Number(req.body.customer_id);
+    const pet_id = req.body.pet_id != null ? Number(req.body.pet_id) : null;
+    const service_id = req.body.service_id != null ? Number(req.body.service_id) : null;
 
-    const rawServiceIds =
-      req.body.service_ids ??
-      req.body.serviceIds ??
-      req.body.services ??
-      (req.body.service_id ? [req.body.service_id] : []);
+    const service = req.body.service ? String(req.body.service).trim() : null;
+    const date = String(req.body.date || '').slice(0, 10);
+    const time = String(req.body.time || '').slice(0, 5);
+    const prize = String(req.body.prize || '').trim();
+    const notes = req.body.notes ? String(req.body.notes).trim() : null;
+    const status = req.body.status ? String(req.body.status).trim() : 'agendado';
+    const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
-    const serviceIds = Array.isArray(rawServiceIds)
-      ? rawServiceIds.map(v => Number(v)).filter(v => Number.isFinite(v))
-      : [];
-
-    if (!date || !time) {
-      return res.status(400).json({ error: 'Data e horário são obrigatórios.' });
+    if (!customer_id || !date || !time ) {
+      return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
     }
 
-    if (!customer_id || !pet_id) {
-      return res.status(400).json({ error: 'Cliente e pet são obrigatórios.' });
-    }
+    // Horário de funcionamento + capacidade por meia hora (evita overbooking)
+    const v = await validateBookingSlot({ date, time });
+    if (!v.ok) return res.status(409).json({ error: v.error });
 
-    // Regra de capacidade: pega o max por dia (opening_hours.max_per_slot)
-    // Se não houver cadastro, assume 1 para evitar overbooking.
-    const weekday = (() => {
-      // date no formato YYYY-MM-DD
-      const [y, m, d] = String(date).split('-').map(Number);
-      const dt = new Date(Date.UTC(y, m - 1, d));
-      return dt.getUTCDay(); // 0=domingo ... 6=sábado
-    })();
-
-    const oh = await db.get(
-      `SELECT is_closed, max_per_slot
-       FROM opening_hours
-       WHERE weekday = $1`,
-      [weekday]
-    );
-
-    if (oh && oh.is_closed) {
-      return res.status(400).json({ error: 'Dia fechado.' });
-    }
-
-    const maxPerSlot = oh?.max_per_slot ? Number(oh.max_per_slot) : 1;
-
-    const occupied = await db.get(
-      `SELECT COUNT(*)::int AS cnt
-       FROM bookings
-       WHERE date = $1 AND time = $2 AND status <> 'cancelled'`,
-      [date, time]
-    );
-
-    if (occupied && occupied.cnt >= maxPerSlot) {
-      return res.status(400).json({ error: 'Horário lotado.' });
-    }
-
-    // Compat legado: salvamos service_id/service com o 1º item, mas a fonte de verdade é booking_services.
-    const legacyServiceId = serviceIds[0] ?? null;
-
-    const insertBookingSql = `
-      INSERT INTO bookings (date, time, customer_id, pet_id, service_id, status, notes, mimo_id)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    const row = await db.get(
+      `
+      INSERT INTO bookings (customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       RETURNING *
-    `;
-
-    const booking = await db.get(insertBookingSql, [
-      date,
-      time,
-      Number(customer_id),
-      Number(pet_id),
-      legacyServiceId,
-      status,
-      notes,
-      mimo_id || null
-    ]);
-
-    // Vincula serviços (se nenhum foi enviado, mantém vazio — o admin pode salvar "sem serviço" se quiser)
-    for (const sid of serviceIds) {
-      await db.run(
-        `INSERT INTO booking_services (booking_id, service_id, qty)
-         VALUES ($1,$2,1)
-         ON CONFLICT (booking_id, service_id) DO UPDATE SET qty = booking_services.qty + 1`,
-        [booking.id, sid]
-      );
-    }
-
-    res.json({ booking });
+      `,
+      [customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at]
+    );
+    res.json({ booking: row });
   } catch (err) {
     console.error('Erro ao criar booking:', err);
-    // Mantém mensagem antiga em alguns fluxos do admin
-    if (String(err?.message || '').toLowerCase().includes('horário')) {
-      return res.status(400).json({ error: 'Horário inválido.' });
-    }
-    res.status(500).json({ error: 'Erro interno ao criar agendamento.' });
+    res.status(500).json({ error: 'Erro interno ao salvar agendamento.' });
   }
 });
 
 app.put('/api/bookings/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
-    if (!Number.isFinite(id)) {
-      return res.status(400).json({ error: 'ID inválido.' });
+    const customer_id = Number(req.body.customer_id);
+    const pet_id = req.body.pet_id != null ? Number(req.body.pet_id) : null;
+    const service_id = req.body.service_id != null ? Number(req.body.service_id) : null;
+
+    const service = req.body.service ? String(req.body.service).trim() : null;
+    const date = String(req.body.date || '').slice(0, 10);
+    const time = String(req.body.time || '').slice(0, 5);
+    const prize = String(req.body.prize || '').trim();
+    const notes = req.body.notes ? String(req.body.notes).trim() : null;
+    const status = req.body.status ? String(req.body.status).trim() : 'agendado';
+    const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
+
+    if (!id || !customer_id || !date || !time || !prize) {
+      return res.status(400).json({ error: 'id, customer_id, date, time e prize são obrigatórios.' });
     }
 
-    const {
-      date,
-      time,
-      customer_id,
-      pet_id,
-      status,
-      notes,
-      mimo_id
-    } = req.body;
+    // Horário de funcionamento + capacidade por meia hora (exclui o próprio agendamento)
+    const v = await validateBookingSlot({ date, time, excludeBookingId: id });
+    if (!v.ok) return res.status(409).json({ error: v.error });
 
-    const rawServiceIds =
-      req.body.service_ids ??
-      req.body.serviceIds ??
-      req.body.services ??
-      (req.body.service_id ? [req.body.service_id] : null);
-
-    const serviceIds = Array.isArray(rawServiceIds)
-      ? rawServiceIds.map(v => Number(v)).filter(v => Number.isFinite(v))
-      : null;
-
-    const current = await db.get(`SELECT * FROM bookings WHERE id = $1`, [id]);
-    if (!current) return res.status(404).json({ error: 'Agendamento não encontrado.' });
-
-    const newDate = date ?? current.date;
-    const newTime = time ?? current.time;
-
-    // Se mudar data/horário, revalida capacidade
-    if (newDate !== current.date || newTime !== current.time) {
-      const weekday = (() => {
-        const [y, m, d] = String(newDate).split('-').map(Number);
-        const dt = new Date(Date.UTC(y, m - 1, d));
-        return dt.getUTCDay();
-      })();
-
-      const oh = await db.get(
-        `SELECT is_closed, max_per_slot
-         FROM opening_hours
-         WHERE weekday = $1`,
-        [weekday]
-      );
-
-      if (oh && oh.is_closed) {
-        return res.status(400).json({ error: 'Dia fechado.' });
-      }
-
-      const maxPerSlot = oh?.max_per_slot ? Number(oh.max_per_slot) : 1;
-
-      const occupied = await db.get(
-        `SELECT COUNT(*)::int AS cnt
-         FROM bookings
-         WHERE date = $1 AND time = $2 AND status <> 'cancelled' AND id <> $3`,
-        [newDate, newTime, id]
-      );
-
-      if (occupied && occupied.cnt >= maxPerSlot) {
-        return res.status(400).json({ error: 'Horário lotado.' });
-      }
-    }
-
-    const legacyServiceId =
-      serviceIds && serviceIds.length ? serviceIds[0] : (req.body.service_id ?? current.service_id);
-
-    const upd = await db.get(
-      `UPDATE bookings
-       SET date = $1,
-           time = $2,
-           customer_id = $3,
-           pet_id = $4,
-           service_id = $5,
-           status = $6,
-           notes = $7,
-           mimo_id = $8
-       WHERE id = $9
-       RETURNING *`,
-      [
-        newDate,
-        newTime,
-        Number(customer_id ?? current.customer_id),
-        Number(pet_id ?? current.pet_id),
-        legacyServiceId ?? null,
-        status ?? current.status,
-        notes ?? current.notes,
-        (mimo_id === 0 ? null : (mimo_id ?? current.mimo_id)),
-        id
-      ]
+    const row = await db.get(
+      `
+      UPDATE bookings
+      SET customer_id=$2, pet_id=$3, service_id=$4, service=$5, date=$6, time=$7, prize=$8, notes=$9, status=$10, last_notification_at=$11
+      WHERE id=$1
+      RETURNING *
+      `,
+      [id, customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at]
     );
-
-    // Se veio array de serviços, substitui os vínculos
-    if (serviceIds) {
-      await db.run(`DELETE FROM booking_services WHERE booking_id = $1`, [id]);
-      for (const sid of serviceIds) {
-        await db.run(
-          `INSERT INTO booking_services (booking_id, service_id, qty)
-           VALUES ($1,$2,1)
-           ON CONFLICT (booking_id, service_id) DO UPDATE SET qty = booking_services.qty + 1`,
-          [id, sid]
-        );
-      }
-    }
-
-    res.json({ booking: upd });
+    res.json({ booking: row });
   } catch (err) {
     console.error('Erro ao atualizar booking:', err);
     res.status(500).json({ error: 'Erro interno ao atualizar agendamento.' });
