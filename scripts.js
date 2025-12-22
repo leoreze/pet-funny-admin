@@ -432,13 +432,10 @@ const API_BASE_URL = '';
   let sessionTimerId = null;
   let appInitialized = false;
 
-  function setSession(session) {
-    // session: { user, token, expiresAt }
-    const expiresAt = Number(session && session.expiresAt) || (Date.now() + SESSION_DURATION_MS);
-    const user = String((session && session.user) || 'adminpetfunny');
-    const token = session && session.token ? String(session.token) : null;
-    const payload = { user, token, expiresAt };
-    try { localStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch (_) {}
+  function setSession() {
+    const expiresAt = Date.now() + SESSION_DURATION_MS;
+    const session = { user: 'adminpetfunny', expiresAt };
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (_) {}
   }
   function clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch (_) {} }
   function getSession() {
@@ -477,7 +474,6 @@ const API_BASE_URL = '';
       await loadServices();      // garante servicesCache e dropdown de serviços
       await renderTabela();
       await loadClientes();
-      await loadBreeds();
       await loadOpeningHours();
 
       // Garante que o select de mimos no agendamento esteja preenchido,
@@ -491,11 +487,11 @@ const API_BASE_URL = '';
     } catch (e) { console.error(e); }
   }
 
-  function enterAdminMode(session) {
+  function enterAdminMode() {
     loginError.classList.add('hidden');
     loginScreen.classList.add('hidden');
     adminApp.style.display = 'block';
-    setSession(session);
+    setSession();
     startSessionTimer();
     initApp();
   }
@@ -512,13 +508,12 @@ const API_BASE_URL = '';
 
   function tryAutoLogin() {
     const s = getSession();
-    if (s && s.token) {
+    if (s) {
       adminApp.style.display = 'block';
       loginScreen.classList.add('hidden');
       startSessionTimer();
       initApp();
     } else {
-      if (s && !s.token) clearSession();
       loginScreen.classList.remove('hidden');
       adminApp.style.display = 'none';
     }
@@ -533,24 +528,11 @@ const API_BASE_URL = '';
   const loginError = document.getElementById('loginError');
   const btnLogout = document.getElementById('btnLogout');
 
-  btnLogin.addEventListener('click', async () => {
+  btnLogin.addEventListener('click', () => {
     const u = loginUser.value.trim();
     const p = loginPass.value.trim();
-
-    loginError.classList.add('hidden');
-    btnLogin.disabled = true;
-    try {
-      // Autenticação via API (server.js exige Bearer token nas rotas admin)
-      const data = await apiPost('/api/admin/login', { username: u, password: p });
-      if (!data || !data.token || !data.expires_at) throw new Error('Falha ao autenticar.');
-
-      enterAdminMode({ user: u || 'admin', token: data.token, expiresAt: Number(data.expires_at) });
-    } catch (e) {
-      console.error(e);
-      loginError.classList.remove('hidden');
-    } finally {
-      btnLogin.disabled = false;
-    }
+    if (u === 'adminpetfunny' && p === 'admin2605') enterAdminMode();
+    else loginError.classList.remove('hidden');
   });
 
   [loginUser, loginPass].forEach(el => {
@@ -562,13 +544,6 @@ const API_BASE_URL = '';
   });
 
   // ===== API HELPERS =====
-  function getAuthHeaders(extra) {
-    const s = getSession();
-    const headers = Object.assign({}, extra || {});
-    if (s && s.token) headers['Authorization'] = `Bearer ${s.token}`;
-    return headers;
-  }
-
   async function apiGet(path, params) {
     const url = new URL(API_BASE_URL + path, window.location.origin);
     if (params) {
@@ -577,9 +552,7 @@ const API_BASE_URL = '';
         if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
       });
     }
-    const resp = await fetch(url.toString(), {
-      headers: getAuthHeaders()
-    });
+    const resp = await fetch(url.toString());
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
     return data;
@@ -588,7 +561,7 @@ const API_BASE_URL = '';
   async function apiPost(path, body) {
     const resp = await fetch(API_BASE_URL + path, {
       method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     const data = await resp.json().catch(() => ({}));
@@ -599,7 +572,7 @@ const API_BASE_URL = '';
   async function apiPut(path, body) {
     const resp = await fetch(API_BASE_URL + path, {
       method: 'PUT',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     const data = await resp.json().catch(() => ({}));
@@ -608,7 +581,7 @@ const API_BASE_URL = '';
   }
 
   async function apiDelete(path) {
-    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE', headers: getAuthHeaders() });
+    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.error || 'Erro ao apagar.');
     return data;
@@ -934,7 +907,6 @@ function normalizeHHMM(t) {
       tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
 
       if (tabId === 'tab-servicos') loadServices().catch(console.error);
-      if (tabId === 'tab-racas') loadBreeds().catch(console.error);
 
       if (tabId === 'tab-horarios') loadOpeningHours().catch(console.error);
 
@@ -1593,196 +1565,10 @@ if (selectedServicesList) {
   }
 
 
-  /* ===== Raças de Cães (CRUD) ===== */
-  const btnNovoBreed = document.getElementById('btnNovoBreed');
-  const breedSearch = document.getElementById('breedSearch');
-  const breedFormPanel = document.getElementById('breedFormPanel');
-  const breedId = document.getElementById('breedId');
-  const breedName = document.getElementById('breedName');
-  const breedSize = document.getElementById('breedSize');
-  const breedCoat = document.getElementById('breedCoat');
-  const breedHistory = document.getElementById('breedHistory');
-  const breedError = document.getElementById('breedError');
-  const btnBreedCancel = document.getElementById('btnBreedCancel');
-  const btnBreedSave = document.getElementById('btnBreedSave');
-  const tbodyBreeds = document.getElementById('tbodyBreeds');
-  const breedsEmpty = document.getElementById('breedsEmpty');
-
-  let breedsCache = []; // [{id,name,size,coat,history,created_at,updated_at}]
-
-  function showBreedForm() { breedFormPanel.classList.remove('hidden'); }
-  function hideBreedForm() { breedFormPanel.classList.add('hidden'); }
-
-  function clearBreedForm() {
-    breedId.value = '';
-    breedName.value = '';
-    breedSize.value = 'pequeno';
-    breedCoat.value = 'curta';
-    breedHistory.value = '';
-    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
-  }
-
-  function fillBreedForm(b) {
-    breedId.value = b.id;
-    breedName.value = b.name || '';
-    breedSize.value = (b.size || 'pequeno');
-    breedCoat.value = (b.coat || 'curta');
-    breedHistory.value = b.history || '';
-    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
-  }
-
-  function humanSize(v) {
-    const s = normStr(v);
-    if (s === 'pequeno') return 'Pequeno';
-    if (s === 'medio' || s === 'médio') return 'Médio';
-    if (s === 'grande') return 'Grande';
-    return v || '-';
-  }
-
-  function humanCoat(v) {
-    const s = normStr(v);
-    if (s === 'curta') return 'Curta';
-    if (s === 'media' || s === 'média') return 'Média';
-    if (s === 'longa') return 'Longa';
-    return v || '-';
-  }
-
-  function renderBreeds() {
-    if (!tbodyBreeds) return;
-    tbodyBreeds.innerHTML = '';
-
-    const q = normStr(breedSearch?.value || '');
-    const list = !q ? breedsCache : breedsCache.filter(b =>
-      normStr(b.name).includes(q) ||
-      normStr(b.size).includes(q) ||
-      normStr(b.coat).includes(q) ||
-      normStr(b.history).includes(q)
-    );
-
-    if (breedsEmpty) breedsEmpty.style.display = list.length ? 'none' : 'block';
-
-    list.forEach(b => {
-      const tr = document.createElement('tr');
-
-      const tdId = document.createElement('td'); tdId.textContent = b.id;
-      const tdName = document.createElement('td'); tdName.textContent = b.name || '-';
-      const tdSize = document.createElement('td'); tdSize.textContent = humanSize(b.size);
-      const tdCoat = document.createElement('td'); tdCoat.textContent = humanCoat(b.coat);
-
-      const tdHist = document.createElement('td');
-      const full = (b.history || '').trim();
-      tdHist.textContent = full.length > 140 ? (full.slice(0, 140) + '…') : (full || '-');
-      tdHist.className = 'td-obs';
-      tdHist.title = full;
-
-      const tdCreated = document.createElement('td'); tdCreated.textContent = b.created_at ? formatDateTimeBr(b.created_at) : '-';
-      const tdUpdated = document.createElement('td'); tdUpdated.textContent = b.updated_at ? formatDateTimeBr(b.updated_at) : '-';
-
-      const tdAcoes = document.createElement('td');
-      const divActions = document.createElement('div'); divActions.className = 'actions';
-
-      const btnEdit = document.createElement('button');
-      btnEdit.textContent = 'Editar';
-      btnEdit.className = 'btn btn-small btn-secondary';
-      btnEdit.type = 'button';
-      btnEdit.addEventListener('click', () => {
-        fillBreedForm(b);
-        showBreedForm();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
-
-      const btnDel = document.createElement('button');
-      btnDel.textContent = 'Excluir';
-      btnDel.className = 'btn btn-small btn-danger';
-      btnDel.type = 'button';
-      btnDel.addEventListener('click', async () => {
-        if (!confirm('Deseja realmente excluir esta raça?')) return;
-        try {
-          await apiDelete('/api/breeds/' + b.id);
-          await loadBreeds();
-        } catch (e) { alert(e.message); }
-      });
-
-      divActions.appendChild(btnEdit);
-      divActions.appendChild(btnDel);
-      tdAcoes.appendChild(divActions);
-
-      tr.appendChild(tdId);
-      tr.appendChild(tdName);
-      tr.appendChild(tdSize);
-      tr.appendChild(tdCoat);
-      tr.appendChild(tdHist);
-      tr.appendChild(tdCreated);
-      tr.appendChild(tdUpdated);
-      tr.appendChild(tdAcoes);
-
-      tbodyBreeds.appendChild(tr);
-    });
-  }
-
-  async function loadBreeds() {
-    try {
-      const data = await apiGet('/api/breeds');
-      breedsCache = data.breeds || [];
-      renderBreeds();
-    } catch (e) {
-      breedsCache = [];
-      renderBreeds();
-      if (breedsEmpty) {
-        breedsEmpty.style.display = 'block';
-        breedsEmpty.textContent = 'Erro ao carregar raças: ' + e.message;
-      }
-    }
-  }
-
-  async function saveBreed() {
-    if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
-
-    const id = breedId.value ? parseInt(breedId.value, 10) : null;
-    const name = (breedName.value || '').trim();
-    const size = breedSize.value;
-    const coat = breedCoat.value;
-    const history = (breedHistory.value || '').trim();
-
-    if (!name) {
-      if (breedError) { breedError.textContent = 'Informe o nome da raça.'; breedError.style.display = 'block'; }
-      return;
-    }
-    if (!size || !coat) {
-      if (breedError) { breedError.textContent = 'Informe porte e pelagem.'; breedError.style.display = 'block'; }
-      return;
-    }
-
-    try {
-      const body = { name, size, coat, history };
-      if (!id) await apiPost('/api/breeds', body);
-      else await apiPut('/api/breeds/' + id, body);
-
-      clearBreedForm();
-      hideBreedForm();
-      await loadBreeds();
-    } catch (e) {
-      if (breedError) { breedError.textContent = e.message; breedError.style.display = 'block'; }
-    }
-  }
-
-  if (btnNovoBreed) {
-    btnNovoBreed.addEventListener('click', () => {
-      clearBreedForm();
-      showBreedForm();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  }
-  if (btnBreedCancel) btnBreedCancel.addEventListener('click', () => { clearBreedForm(); hideBreedForm(); });
-  if (btnBreedSave) btnBreedSave.addEventListener('click', saveBreed);
-
-  if (breedSearch) {
-    breedSearch.addEventListener('input', () => {
-      clearTimeout(window.__breedTimer);
-      window.__breedTimer = setTimeout(() => renderBreeds(), 120);
-    });
-  }
-
+  /* ===== Raças de Cães (CRUD) =====
+     REMOVIDO a pedido do usuário: eliminar tudo referente a CRUD de raças.
+     Observação: mantemos apenas o campo "Raça" do pet (texto), sem catálogo.
+  ===== */
 
   /* ===== NOVO: Agenda - Toggle Lista/Cards ===== */
   const AGENDA_VIEW_KEY = 'pf_admin_agenda_view';
@@ -2650,7 +2436,6 @@ async function salvarAgendamento() {
       limparPetsForm();
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadClientes();
-      await loadBreeds();
       await loadDashboard();
       await renderTabela();
     } catch (e) {
