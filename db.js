@@ -160,6 +160,9 @@ async function initDb() {
     );
   `);
 
+  // Compat: se a tabela booking_services já existia sem a coluna qty, adiciona agora
+  await run(`ALTER TABLE booking_services ADD COLUMN IF NOT EXISTS qty INTEGER NOT NULL DEFAULT 1;`);
+
   // Migração: traz agendamentos antigos (bookings.service_id / bookings.service) para booking_services
   await run(`
     INSERT INTO booking_services (booking_id, service_id, qty)
