@@ -79,64 +79,93 @@ async function validateBookingSlot({ date, time, excludeBookingId = null }) {
     return { ok: false, error: 'Capacidade do horário está zerada.' };
   }
 
+  // 2) Checa ocupação do slot (30 min) respeitando capacidade configurada no dia da semana
   const params = [date, String(time).slice(0, 5)];
-let sql = `
-  SELECT
-    b.*,
-    c.name AS customer_name,
-    c.phone AS phone,
-    p.name AS pet_name,
-    COALESCE(bs.services_json,
-      CASE WHEN s1.id IS NOT NULL
-        THEN json_build_array(json_build_object('id', s1.id, 'name', s1.name, 'value_cents', s1.value_cents))
-        ELSE NULL
-      END
-    ) AS services_json,
-    COALESCE(bs.total_value_cents, s1.value_cents, 0)::int AS total_value_cents,
-    COALESCE(bs.services_label, b.service, s1.name, '') AS services_label
-  FROM bookings b
-  JOIN customers c ON c.id = b.customer_id
-  LEFT JOIN pets p ON p.id = b.pet_id
-  LEFT JOIN services s1 ON s1.id = b.service_id
-  LEFT JOIN LATERAL (
-    SELECT
-      json_agg(
-        json_build_object('id', s.id, 'name', s.name, 'value_cents', s.value_cents)
-        ORDER BY s.name
-      ) AS services_json,
-      COALESCE(SUM(s.value_cents), 0)::int AS total_value_cents,
-      string_agg(s.name, ' + ' ORDER BY s.name) AS services_label
-    FROM booking_services bsv
-    JOIN services s ON s.id = bsv.service_id
-    WHERE bsv.booking_id = b.id
-  ) bs ON TRUE
-  WHERE 1=1
-`;
-const params = [];
+  let countSql = `
+    SELECT COUNT(*)::int AS cnt
+    FROM bookings
+    WHERE date = $1
+      AND to_char(time, 'HH24:MI') = $2
+  `;
+  if (excludeBookingId) {
+    params.push(excludeBookingId);
+    countSql += ` AND id <> $3`;
+  }
 
-if (date) {
+  const row = await db.get(countSql, params);
+  const occupied = row?.cnt ?? 0;
+
+  if (occupied >= cap) {
+    return { ok: false, error: 'Capacidade máxima atingida para este horário.' };
+  }
+
+  return { ok: true, dow, cap, occupied };
+}
+
+/* =========================
+   AGENDAMENTOS
+========================= */
+
+// Listar agendamentos (com filtros simples)
+app.get('/api/bookings', async (req, res) => {
+  try {
+    const { date, search } = req.query;
+
+    const params = [];
+    let where = 'WHERE 1=1';
+
+    if (date) {
       params.push(date);
-      sql += ` AND b.date = $${params.length}`;
+      where += ` AND b.date = $${params.length}`;
     }
 
-    if (search) {
-      params.push(`%${search.toLowerCase()}%`);
-      sql += `
-        AND (
-          LOWER(c.name) LIKE $${params.length}
-          OR c.phone LIKE $${params.length}
-          OR LOWER(COALESCE(p.name,'')) LIKE $${params.length}
-          OR LOWER(COALESCE(b.service,'')) LIKE $${params.length}
-        )
-      `;
+    if (search && String(search).trim()) {
+      const q = `%${String(search).trim()}%`;
+      params.push(q);
+      where += ` AND (
+        c.name ILIKE $${params.length}
+        OR c.phone ILIKE $${params.length}
+        OR p.name ILIKE $${params.length}
+        OR COALESCE(b.notes, '') ILIKE $${params.length}
+      )`;
     }
 
-    sql += ` ORDER BY b.date DESC, b.time ASC, b.id DESC`;
+    const sql = `
+      WITH services_agg AS (
+        SELECT
+          bs.booking_id,
+          json_agg(
+            json_build_object('id', s.id, 'name', s.name, 'value_cents', s.value_cents)
+            ORDER BY s.name
+          ) AS services_json,
+          COALESCE(SUM(s.value_cents),0)::int AS total_services_cents,
+          string_agg(s.name, ', ' ORDER BY s.name) AS services_names
+        FROM booking_services bs
+        JOIN services s ON s.id = bs.service_id
+        GROUP BY bs.booking_id
+      )
+      SELECT
+        b.*,
+        c.name AS customer_name,
+        c.phone AS phone,
+        p.name AS pet_name,
+        COALESCE(sa.services_json, '[]'::json) AS services,
+        COALESCE(sa.total_services_cents, 0) AS total_services_cents,
+        COALESCE(sa.services_names, '') AS services_names,
+        m.name AS mimo_name
+      FROM bookings b
+      JOIN customers c ON c.id = b.customer_id
+      JOIN pets p ON p.id = b.pet_id
+      LEFT JOIN services_agg sa ON sa.booking_id = b.id
+      LEFT JOIN mimos m ON m.id = b.mimo_id
+      ${where}
+      ORDER BY b.date DESC, b.time ASC, b.id DESC
+    `;
 
     const rows = await db.all(sql, params);
     res.json({ bookings: rows });
   } catch (err) {
-    console.error('Erro ao listar bookings:', err);
+    console.error('Erro ao buscar agendamentos:', err);
     res.status(500).json({ error: 'Erro interno ao buscar agendamentos.' });
   }
 });
