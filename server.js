@@ -387,9 +387,8 @@ app.post('/api/bookings', async (req, res) => {
     const status = req.body.status ? String(req.body.status).trim() : 'agendado';
     const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
-    // "prize" (mimo) pode ser vazio (sem mimo).
-    if (!customer_id || !date || !time) {
-      return res.status(400).json({ error: 'customer_id, date e time são obrigatórios.' });
+    if (!customer_id || !date || !time || !prize) {
+      return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
     }
 
     // Horário de funcionamento + capacidade por meia hora (evita overbooking)
@@ -426,9 +425,8 @@ app.put('/api/bookings/:id', async (req, res) => {
     const status = req.body.status ? String(req.body.status).trim() : 'agendado';
     const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
-    // "prize" (mimo) pode ser vazio (sem mimo).
-    if (!id || !customer_id || !date || !time) {
-      return res.status(400).json({ error: 'id, customer_id, date e time são obrigatórios.' });
+    if (!id || !customer_id || !date || !time || !prize) {
+      return res.status(400).json({ error: 'id, customer_id, date, time e prize são obrigatórios.' });
     }
 
     // Horário de funcionamento + capacidade por meia hora (exclui o próprio agendamento)
