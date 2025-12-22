@@ -734,3 +734,50 @@
 .hours-capacity{
   max-width: 120px;
 }
+
+
+/* ===== Multi-serviços no agendamento (Admin) ===== */
+.service-picker{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+.service-picker select{ flex:1; }
+.selected-services{
+  margin-top:10px;
+  padding:10px;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  background:#fafafa;
+}
+.selected-services-title{
+  font-weight:600;
+  margin-bottom:6px;
+}
+#selectedServicesList{
+  list-style:none;
+  padding-left:0;
+  margin:0;
+}
+#selectedServicesList li{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:6px 0;
+  border-bottom:1px dashed #e5e7eb;
+}
+#selectedServicesList li:last-child{ border-bottom:none; }
+.selected-services-total{
+  margin-top:8px;
+  font-weight:600;
+}
+.selected-services-total span{ font-weight:700; }
+
+/* ===== Stats - Mimos dinâmicos ===== */
+.stats-mimos-list{
+  margin-top:6px;
+  font-size:13px;
+  line-height:1.35;
+  white-space:pre-line;
+}

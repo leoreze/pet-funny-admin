@@ -962,6 +962,11 @@ function normalizeHHMM(t) {
   const formPetSelect = document.getElementById('formPetSelect');
   const formPrize = document.getElementById('formPrize');
   const formService = document.getElementById('formService');
+  const btnAddService = document.getElementById('btnAddService');
+  const selectedServicesWrap = document.getElementById('selectedServicesWrap');
+  const selectedServicesList = document.getElementById('selectedServicesList');
+  const servicesTotalEl = document.getElementById('servicesTotal');
+  let selectedServiceIds = [];
   const formDate = document.getElementById('formDate');
   const formTime = document.getElementById('formTime');
 
@@ -1121,22 +1126,51 @@ function normalizeHHMM(t) {
 
   function atualizaEstatisticas(lista) {
     const total = lista.length;
-    let tosa = 0, hidratacao = 0, fotoVideo = 0, patinhas = 0;
 
-    lista.forEach(a => {
-      switch (a.prize) {
-        case 'Tosa Higiênica': tosa++; break;
-        case 'Hidratação': hidratacao++; break;
-        case 'Foto e Vídeo Profissional': fotoVideo++; break;
-        case 'Patinhas impecáveis': patinhas++; break;
-      }
-    });
+    // Mantém contadores existentes (por serviço) para compatibilidade do painel
+    const contTosa = lista.filter(a => (a.service || '').toLowerCase().includes('tosa higiênica')).length;
+    const contHidra = lista.filter(a => (a.service || '').toLowerCase().includes('hidrata')).length;
+    const contFoto = lista.filter(a => (a.service || '').toLowerCase().includes('foto')).length;
+    const contPatinhas = lista.filter(a => (a.service || '').toLowerCase().includes('patinhas')).length;
 
     statTotal.textContent = total;
-    statTosa.textContent = tosa;
-    statHidratacao.textContent = hidratacao;
-    statFotoVideo.textContent = fotoVideo;
-    statPatinhas.textContent = patinhas;
+    statTosa.textContent = contTosa;
+    statHidra.textContent = contHidra;
+    statFoto.textContent = contFoto;
+    statPatinhas.textContent = contPatinhas;
+
+    // ===== Mimos (dinâmico, respeita período do mimo X data do agendamento) =====
+    const mimosEl = document.getElementById('statMimosList');
+    if (mimosEl) {
+      const counts = {};
+
+      const isActiveOnDate = (mimo, dateStr) => {
+        if (!mimo || !dateStr) return false;
+        const d = dateStr;
+        const start = (mimo.start_date || '').slice(0,10);
+        const end = (mimo.end_date || '').slice(0,10);
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        return true;
+      };
+
+      lista.forEach((a) => {
+        const prize = (a.prize || '').trim();
+        if (!prize || prize.toLowerCase() === 'sem mimo') return;
+
+        const mimo = (cacheMimos || []).find(m => String(m.name || '').trim() === prize);
+        if (!mimo) return;
+
+        if (!isActiveOnDate(mimo, a.date)) return;
+        counts[prize] = (counts[prize] || 0) + 1;
+      });
+
+      const lines = Object.entries(counts)
+        .sort((a,b) => (b[1]-a[1]) || a[0].localeCompare(b[0]))
+        .map(([name, count]) => `${name}: ${count}`);
+
+      mimosEl.textContent = lines.length ? lines.join('\n') : '—';
+    }
   }
 
   // ===== GRÁFICOS =====
@@ -1226,56 +1260,45 @@ function normalizeHHMM(t) {
   }
 
   function preencherFormEdicao(booking) {
-    bookingId.value = booking.id;
-    bookingOriginalStatus.value = booking.status || 'agendado';
+  // ID do agendamento em edição
+  const id = booking && booking.id ? String(booking.id) : '';
+  bookingIdInput.value = id;
 
-    formPhone.value = booking.phone || '';
-    formNome.value = booking.customer_name || '';
-    formPrize.value = booking.prize || 'Tosa Higiênica';
+  // Cliente/Telefone
+  formPhone.value = booking && booking.phone ? booking.phone : '';
+  applyPhoneMask(formPhone); // garante máscara também ao carregar
 
-    // serviço (preferência: service_id)
-    const sid = booking.service_id ?? booking.serviceId ?? '';
-    if (sid && String(sid) !== 'null') formService.value = String(sid);
-    else {
-      // fallback: tenta casar pelo texto
-      const txt = booking.service || booking.service_title || '';
-      const match = servicesCache.find(s => normStr(s.title) === normStr(txt));
-      formService.value = match ? String(match.id) : '';
-      
-    // Atualiza limites e disponibilidade para a data (exclui o próprio agendamento)
-    refreshBookingDateTimeState(booking.id);
+  // Data / Horário
+  formDate.value = booking && booking.date ? booking.date : '';
+  formTime.value = booking && booking.time ? booking.time : '';
+
+  // Serviço(s)
+  clearSelectedServices();
+
+  let servicesJson = booking && booking.services_json ? booking.services_json : null;
+  if (typeof servicesJson === 'string') {
+    try { servicesJson = JSON.parse(servicesJson); } catch (_) { servicesJson = null; }
   }
 
-    formDate.value = booking.date || '';
-    formTime.value = booking.time || '';
-    formStatus.value = booking.status || 'agendado';
-    formNotes.value = booking.notes || '';
-    formError.style.display = 'none';
-
-    setEditMode(true);
-
-    const customerId = booking.customer_id || booking.customerId;
-    const bookingPetId = booking.pet_id ?? booking.petId;
-    const bookingPetName = booking.pet_name || booking.petName;
-
-    formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
-
-    if (customerId) {
-      loadPetsForCustomer(customerId)
-        .then(() => {
-          if (bookingPetId != null) formPetSelect.value = String(bookingPetId);
-          else formPetSelect.value = '';
-          if (bookingPetId == null && bookingPetName) {
-            // mantém sem pet selecionado; mensagem WhatsApp usa fallback "seu pet"
-          }
-        })
-        .catch(() => {});
-    }
-
-    mostrarFormAgenda();
-    refreshBookingDateTimeState(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (Array.isArray(servicesJson) && servicesJson.length) {
+    selectedServiceIds = servicesJson.map(s => String(s.id)).filter(Boolean);
+  } else if (booking && booking.service_id) {
+    selectedServiceIds = [String(booking.service_id)];
   }
+
+  // Ajusta select para o 1º serviço (para facilitar adicionar/alterar)
+  formService.value = selectedServiceIds[0] || '';
+  refreshSelectedServicesUI();
+
+  // Mimo (pode ser nulo)
+  const prizeVal = booking && booking.prize ? booking.prize : 'Sem mimo';
+  formPrize.value = prizeVal;
+
+  // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
+  refreshBookingDateTimeState(id ? Number(id) : null);
+}
+
+
 
   /* ===== Serviços (cache, dropdown e CRUD) ===== */
   const btnNovoServico = document.getElementById('btnNovoServico');
@@ -1296,7 +1319,48 @@ function normalizeHHMM(t) {
   let filtroServicosTxt = '';
 
 
-  let servicesCache = []; // [{id,title,value_cents,...}]
+  let servicesCache = [];
+function getServiceById(id){
+  return servicesCache.find(s => String(s.id) === String(id));
+}
+
+function centsToBRL(cents){
+  const v = Number(cents || 0) / 100;
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function refreshSelectedServicesUI(){
+  if (!selectedServicesList || !selectedServicesWrap || !servicesTotalEl) return;
+
+  selectedServicesList.innerHTML = '';
+  let total = 0;
+
+  const unique = Array.from(new Set(selectedServiceIds.map(String)));
+  selectedServiceIds = unique;
+
+  unique.forEach((sid) => {
+    const svc = getServiceById(sid);
+    const name = svc ? svc.title : `Serviço #${sid}`;
+    const value_cents = svc ? Number(svc.value_cents || 0) : 0;
+    total += value_cents;
+
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)})</small></span>
+      <button type="button" class="btn btn-danger btn-xs" data-remove-sid="${escapeHtml(String(sid))}">Remover</button>
+    `;
+    selectedServicesList.appendChild(li);
+  });
+
+  servicesTotalEl.textContent = centsToBRL(total);
+  selectedServicesWrap.style.display = unique.length ? 'block' : 'none';
+}
+
+function clearSelectedServices(){
+  selectedServiceIds = [];
+  refreshSelectedServicesUI();
+}
+ // [{id,title,value_cents,...}]
 
   function showServiceForm() { serviceFormPanel.classList.remove('hidden'); }
   function hideServiceForm() { serviceFormPanel.classList.add('hidden'); }
@@ -1397,6 +1461,27 @@ function normalizeHHMM(t) {
     });
     if (current) formService.value = current;
   }
+
+// Multi-serviços - adicionar/remover
+if (btnAddService) {
+  btnAddService.addEventListener('click', () => {
+    const sid = formService.value;
+    if (!sid) return;
+    selectedServiceIds.push(String(sid));
+    refreshSelectedServicesUI();
+  });
+}
+
+if (selectedServicesList) {
+  selectedServicesList.addEventListener('click', (ev) => {
+    const btn = ev.target && ev.target.closest ? ev.target.closest('[data-remove-sid]') : null;
+    if (!btn) return;
+    const sid = btn.getAttribute('data-remove-sid');
+    selectedServiceIds = selectedServiceIds.filter(x => String(x) !== String(sid));
+    refreshSelectedServicesUI();
+  });
+}
+
 
   async function loadServices() {
     try {
@@ -1961,23 +2046,30 @@ function normalizeHHMM(t) {
   }
 
   function limparForm() {
-    bookingId.value = '';
-    bookingOriginalStatus.value = 'agendado';
-    formPhone.value = '';
-    formNome.value = '';
-    formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
-    formPrize.value = '';
-    formService.value = '';
-    formDate.value = '';
-    formTime.value = '';
-    formStatus.value = 'agendado';
-    formNotes.value = '';
-    formError.style.display = 'none';
-    formError.textContent = '';
-    setEditMode(false);
-  }
+  bookingId.value = '';
+  bookingOriginalStatus.value = 'agendado';
+  formPhone.value = '';
+  applyPhoneMask(formPhone);
+  formNome.value = '';
+  formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
 
-  async function salvarAgendamento() {
+  // Mimo default
+  formPrize.value = 'Sem mimo';
+
+  // Multi-serviços
+  formService.value = '';
+  clearSelectedServices();
+
+  formDate.value = '';
+  formTime.value = '';
+  formStatus.value = 'agendado';
+  formNotes.value = '';
+  formError.style.display = 'none';
+  formError.textContent = '';
+  setEditMode(false);
+}
+
+async function salvarAgendamento() {
     formError.style.display = 'none';
     formError.textContent = '';
 
@@ -1996,7 +2088,7 @@ function normalizeHHMM(t) {
     // serviço selecionado do banco (id)
     const serviceIdSelected = formService.value ? parseInt(formService.value, 10) : null;
     const serviceObj = serviceIdSelected ? servicesCache.find(s => String(s.id) === String(serviceIdSelected)) : null;
-    const serviceTitleSelected = serviceObj ? serviceObj.title : '';
+    const servicesLabel = serviceObj ? serviceObj.title : '';
 
     const date = formDate.value;
     const time = formTime.value;
@@ -2054,9 +2146,10 @@ function normalizeHHMM(t) {
         customer_id: customer.id,
         pet_id: petIdNum,
         date, time,
-        // envia os dois: id (correto) + título (compatibilidade)
-        service_id: serviceIdSelected,
-        service: serviceTitleSelected,
+        // envia multi-serviços (novo) + compatibilidade (service_id/service)
+        service_ids: selectedServices.map(s => s.id),
+        service_id: firstServiceId,
+        service: servicesLabel,
         prize, notes, status
       };
 
@@ -2070,7 +2163,7 @@ function normalizeHHMM(t) {
           : 'seu pet';
 
                 const prizeLabel = prize ? prize : 'Sem mimo';
-        const msg = buildStatusMessage(status, nome, petLabel, serviceTitleSelected, dataBR, time, prizeLabel);
+        const msg = buildStatusMessage(status, nome, petLabel, servicesLabel, dataBR, time, prizeLabel);
 
         let fullPhone = phone;
         if (!(fullPhone.startsWith('55') && fullPhone.length > 11)) fullPhone = '55' + fullPhone;

@@ -143,6 +143,19 @@ async function initDb() {
     );
   `);
 
+
+// booking_services (multi-serviços por agendamento)
+await query(`
+  CREATE TABLE IF NOT EXISTS booking_services (
+    booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
+    PRIMARY KEY (booking_id, service_id)
+  );
+`);
+
+await query(`CREATE INDEX IF NOT EXISTS idx_booking_services_booking_id ON booking_services(booking_id);`);
+await query(`CREATE INDEX IF NOT EXISTS idx_booking_services_service_id ON booking_services(service_id);`);
+
   // índices úteis
   await query(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);`);

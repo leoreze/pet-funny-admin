@@ -170,10 +170,18 @@
 
         <div class="form-row-2">
           <div class="form-group">
-            <label for="formService">Serviço (do banco)</label>
-            <select id="formService">
-              <option value="">Carregando serviços...</option>
-            </select>
+            <label for="formService">Serviços (pode adicionar mais de 1)</label>
+            <div class="service-picker">
+              <select id="formService">
+                <option value="">Carregando serviços...</option>
+              </select>
+              <button type="button" class="btn btn-secondary" id="btnAddService">Adicionar</button>
+            </div>
+            <div class="selected-services" id="selectedServicesWrap" style="display:none;">
+              <div class="selected-services-title">Serviços selecionados</div>
+              <ul id="selectedServicesList"></ul>
+              <div class="selected-services-total">Total serviços: <span id="servicesTotal">R$ 0,00</span></div>
+            </div>
           </div>
           <div class="form-group">
             <label for="formDate">Data</label>
@@ -219,7 +227,11 @@
         <div class="stats-item"><span class="stats-label">Hidratação:</span> <span class="stats-value" id="statHidratacao">0</span></div>
         <div class="stats-item"><span class="stats-label">Foto/Vídeo:</span> <span class="stats-value" id="statFotoVideo">0</span></div>
         <div class="stats-item"><span class="stats-label">Patinhas impecáveis:</span> <span class="stats-value" id="statPatinhas">0</span></div>
+      <div class="stats-block stats-block--mimos">
+        <div class="stats-label">Mimos (ativos no período)</div>
+        <div id="statMimosList" class="stats-mimos-list">—</div>
       </div>
+</div>
 
       <!-- NOVO: Wrapper Lista -->
       <div id="agendaListWrapper" class="table-wrapper">
@@ -231,7 +243,8 @@
             <th>Tutor(a)</th>
             <th>Pet</th>
             <th>Telefone</th>
-            <th>Serviço</th>
+            <th>Serviço(s)</th>
+            <th>Total serviços</th>
             <th>Mimo</th>
             <th>Status</th>
             <th>Última notificação</th>
