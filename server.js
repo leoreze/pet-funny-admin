@@ -16,6 +16,16 @@ app.get(['/admin', '/admin/'], (req, res) => {
 });
 
 
+
+// Converte YYYY-MM-DD para weekday local (evita bug de timezone do Date('YYYY-MM-DD') que é interpretado como UTC)
+function weekdayFromISO(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
+  const [y, m, d] = parts;
+  const dt = new Date(y, m - 1, d); // local time
+  return dt.getDay();
+}
 /* =========================
    HELPERS
 ========================= */
@@ -31,11 +41,10 @@ function timeToMinutes(hhmm) {
 }
 
 function getDowFromISODate(dateStr) {
-  // dateStr: YYYY-MM-DD interpretado em America/Sao_Paulo.
-  // Render/Node geralmente roda em UTC; usar offset fixo evita "virar o dia".
-  const d = new Date(`${dateStr}T00:00:00-03:00`);
-  if (Number.isNaN(d.getTime())) return 0;
-  return d.getUTCDay(); // 0=Dom..6=Sáb (São Paulo)
+  // dateStr: YYYY-MM-DD (interpreta como meia-noite local)
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.getDay(); // 0=Dom..6=Sáb
 }
 
 async function validateBookingSlot({ date, time, excludeBookingId = null }) {
@@ -387,7 +396,7 @@ app.post('/api/bookings', async (req, res) => {
     const status = req.body.status ? String(req.body.status).trim() : 'agendado';
     const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
-    if (!customer_id || !date || !time || !prize) {
+    if (!customer_id || !date || !time ) {
       return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
     }
 
