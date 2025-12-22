@@ -55,9 +55,7 @@ const API_BASE_URL = '';
   };
 
   let currentEditId = null;
-  // Garantir cache global (evita ReferenceError em outras rotinas do admin)
-  var cacheMimos = (window.cacheMimos ? window.cacheMimos : []);
-  window.cacheMimos = cacheMimos;
+  let cacheMimos = [];
 
   // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
   // seja populado mesmo sem o usuário abrir a aba "Mimos".
@@ -1120,12 +1118,8 @@ function normalizeHHMM(t) {
 
   async function fetchBookings() {
     const params = {};
-    // Backend atual usa: q, date_from, date_to. Mantemos compatibilidade.
-    if (filtroData.value) {
-      params.date_from = filtroData.value;
-      params.date_to = filtroData.value;
-    }
-    if (filtroBusca.value.trim()) params.q = filtroBusca.value.trim();
+    if (filtroData.value) params.date = filtroData.value;
+    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
     const data = await apiGet('/api/bookings', params);
     return data.bookings || [];
   }
@@ -1265,46 +1259,77 @@ function normalizeHHMM(t) {
     return pets;
   }
 
-  function preencherFormEdicao(booking) {
-    const id = booking && booking.id ? String(booking.id) : '';
-    bookingId.value = id;
-    bookingOriginalStatus.value = (booking && booking.status) ? String(booking.status) : 'agendado';
+  async function preencherFormEdicao(booking) {
+  // ID do agendamento em edição
+  const id = booking && booking.id ? String(booking.id) : '';
+  bookingId.value = id;
 
-    // Cliente/Telefone
-    formPhone.value = booking ? (booking.customer_phone || booking.phone || '') : '';
-    applyPhoneMask(formPhone);
+  // Cliente/Telefone
+  formPhone.value = booking && (booking.phone || booking.customer_phone) ? (booking.phone || booking.customer_phone) : '';
+  applyPhoneMask(formPhone); // garante máscara também ao carregar
 
-    // Nome (quando disponível)
-    formNome.value = booking && booking.customer_name ? booking.customer_name : '';
+  // Nome (se existir no payload)
+  if (formNome) {
+    formNome.value = (booking && (booking.customer_name || booking.name)) ? (booking.customer_name || booking.name) : '';
+  }
 
-    // Pet
-    // (mantém seleção posterior via loadPetsForCustomer quando usuário troca telefone)
-    if (booking && booking.pet_id != null) {
+  // Data / Horário
+  formDate.value = booking && booking.date ? booking.date : '';
+  formTime.value = booking && booking.time ? booking.time : '';
+
+  // Serviço(s)
+  clearSelectedServices();
+
+  let servicesJson = booking && booking.services_json ? booking.services_json : null;
+  if (typeof servicesJson === 'string') {
+    try { servicesJson = JSON.parse(servicesJson); } catch (_) { servicesJson = null; }
+  }
+
+  if (Array.isArray(servicesJson) && servicesJson.length) {
+    selectedServiceIds = servicesJson.map(s => String(s.id)).filter(Boolean);
+  } else if (booking && booking.service_id) {
+    selectedServiceIds = [String(booking.service_id)];
+  }
+
+  // Ajusta select para o 1º serviço (para facilitar adicionar/alterar)
+  formService.value = selectedServiceIds[0] || '';
+  refreshSelectedServicesUI();
+
+  // Mimo (pode ser nulo)
+  const prizeVal = booking && booking.prize ? booking.prize : 'Sem mimo';
+  formPrize.value = prizeVal;
+
+  // Pet (opcional no editar): carregar pets do tutor e pré-selecionar
+  try {
+    const petId = booking && booking.pet_id != null ? String(booking.pet_id) : '';
+    let customerId = booking && booking.customer_id != null ? Number(booking.customer_id) : null;
+
+    // fallback: tenta descobrir o customer_id pelo telefone se não veio no payload
+    if (!customerId && formPhone && sanitizePhone(formPhone.value)) {
       try {
-        formPetSelect.disabled = false;
+        const lookup = await apiPost('/api/customers/lookup', { phone: sanitizePhone(formPhone.value) });
+        if (lookup && lookup.exists && lookup.customer && lookup.customer.id) customerId = Number(lookup.customer.id);
       } catch (_) {}
     }
 
-    // Data / Horário
-    formDate.value = booking && booking.date ? booking.date : '';
-    formTime.value = booking && booking.time ? booking.time : '';
-
-    // Serviço único
-    formService.value = (booking && (booking.service_id || booking.serviceId)) ? String(booking.service_id || booking.serviceId) : '';
-
-    // Mimo
-    formPrize.value = booking && booking.prize ? booking.prize : 'Sem mimo';
-
-    // Status/Notas
-    formStatus.value = booking && booking.status ? booking.status : 'agendado';
-    formNotes.value = booking && booking.notes ? booking.notes : '';
-
-    setEditMode(true);
-    mostrarFormAgenda();
-
-    // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
-    refreshBookingDateTimeState(id ? Number(id) : null);
+    if (customerId) {
+      await loadPetsForCustomer(customerId);
+      formPetSelect.disabled = false;
+      formPetSelect.value = petId;
+    } else {
+      // sem customer_id, mantém select com opção vazia
+      formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
+      formPetSelect.value = '';
+      formPetSelect.disabled = true;
+    }
+  } catch (e) {
+    // não derruba o formulário por falha de prefill
+    console.warn('Falha ao pré-preencher pet no editar:', e);
   }
+
+  // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
+  refreshBookingDateTimeState(id ? Number(id) : null);
+}
 
 
 
@@ -1841,7 +1866,7 @@ if (selectedServicesList) {
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone || a.phone);
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
 
       const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
 
@@ -1871,7 +1896,9 @@ if (selectedServicesList) {
       btnEditar.textContent = 'Editar';
       btnEditar.className = 'btn btn-small btn-secondary';
       btnEditar.type = 'button';
-      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
+      btnEditar.addEventListener('click', async () => {
+        await preencherFormEdicao(a);
+      });
 
       const btnExcluir = document.createElement('button');
       btnExcluir.textContent = 'Excluir';
@@ -1957,7 +1984,7 @@ if (selectedServicesList) {
 
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
-      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone || a.phone)}</span>`;
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.phone)}</span>`;
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
@@ -1992,7 +2019,9 @@ if (selectedServicesList) {
       btnEditar.textContent = 'Editar';
       btnEditar.className = 'btn btn-small btn-secondary';
       btnEditar.type = 'button';
-      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
+      btnEditar.addEventListener('click', async () => {
+        await preencherFormEdicao(a);
+      });
 
       const btnExcluir = document.createElement('button');
       btnExcluir.textContent = 'Excluir';
@@ -2064,8 +2093,9 @@ if (selectedServicesList) {
   // Mimo default
   formPrize.value = 'Sem mimo';
 
-  // Serviço único
+  // Multi-serviços
   formService.value = '';
+  clearSelectedServices();
 
   formDate.value = '';
   formTime.value = '';
@@ -2153,8 +2183,9 @@ async function salvarAgendamento() {
         customer_id: customer.id,
         pet_id: petIdNum,
         date, time,
-        // Serviço único (multi-serviços removido)
-        service_id: serviceIdSelected,
+        // envia multi-serviços (novo) + compatibilidade (service_id/service)
+        service_ids: selectedServices.map(s => s.id),
+        service_id: firstServiceId,
         service: servicesLabel,
         prize, notes, status
       };
