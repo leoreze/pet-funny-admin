@@ -9,19 +9,7 @@ const API_BASE_URL = '';
       .trim();
   }
 
-  
-
-  // Escapa HTML para evitar XSS ao renderizar strings vindas do usuário/banco
-  function escapeHtml(str) {
-    return String(str ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-/* =========================================================
+  /* =========================================================
    MIMOS (Admin) - CRUD + Emojis + Valor (cents) + Período
    Requisitos:
    - HTML ids: tab-mimos, tbodyMimos, mimosEmpty,
@@ -67,7 +55,9 @@ const API_BASE_URL = '';
   };
 
   let currentEditId = null;
-  let cacheMimos = [];
+  // Garantir cache global (evita ReferenceError em outras rotinas do admin)
+  var cacheMimos = (window.cacheMimos ? window.cacheMimos : []);
+  window.cacheMimos = cacheMimos;
 
   // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
   // seja populado mesmo sem o usuário abrir a aba "Mimos".
@@ -171,6 +161,22 @@ const API_BASE_URL = '';
   function closeForm() {
     if (els.formWrap) els.formWrap.style.display = 'none';
   }
+
+  function normalizeTimeForApi(timeStr) {
+  if (!timeStr) return null;
+
+  const m = String(timeStr).match(/^(\d{1,2}):(\d{1,2})/);
+  if (!m) return null;
+
+  const hh = String(parseInt(m[1], 10)).padStart(2, '0');
+  const mm = String(parseInt(m[2], 10)).padStart(2, '0');
+
+  // backend só aceita 00 ou 30
+  if (mm !== '00' && mm !== '30') return null;
+
+  return `${hh}:${mm}`;
+}
+
 
   function clearForm() {
     currentEditId = null;
@@ -808,6 +814,25 @@ function normalizeHHMM(t) {
     return minutesToHHMM(total);
   }
 
+  // ===============================
+// Normalização de horário (API)
+// ===============================
+function normalizeTimeForApi(timeStr) {
+  if (!timeStr) return null;
+
+  const m = String(timeStr).match(/^(\d{1,2}):(\d{1,2})/);
+  if (!m) return null;
+
+  const hh = String(parseInt(m[1], 10)).padStart(2, '0');
+  const mm = String(parseInt(m[2], 10)).padStart(2, '0');
+
+  // Backend só aceita 00 ou 30
+  if (mm !== '00' && mm !== '30') return null;
+
+  return `${hh}:${mm}`;
+}
+
+
 
   function classStatus(status) {
     const s = normStr(status);
@@ -974,6 +999,11 @@ function normalizeHHMM(t) {
   const formPetSelect = document.getElementById('formPetSelect');
   const formPrize = document.getElementById('formPrize');
   const formService = document.getElementById('formService');
+  const btnAddService = document.getElementById('btnAddService');
+  const selectedServicesWrap = document.getElementById('selectedServicesWrap');
+  const selectedServicesList = document.getElementById('selectedServicesList');
+  const servicesTotalEl = document.getElementById('servicesTotal');
+  let selectedServiceIds = [];
   const formDate = document.getElementById('formDate');
   const formTime = document.getElementById('formTime');
 
@@ -1125,8 +1155,12 @@ function normalizeHHMM(t) {
 
   async function fetchBookings() {
     const params = {};
-    if (filtroData.value) params.date = filtroData.value;
-    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
+    // Backend atual usa: q, date_from, date_to. Mantemos compatibilidade.
+    if (filtroData.value) {
+      params.date_from = filtroData.value;
+      params.date_to = filtroData.value;
+    }
+    if (filtroBusca.value.trim()) params.q = filtroBusca.value.trim();
     const data = await apiGet('/api/bookings', params);
     return data.bookings || [];
   }
@@ -1267,28 +1301,45 @@ function normalizeHHMM(t) {
   }
 
   function preencherFormEdicao(booking) {
-  // ID do agendamento em edição
-  const id = booking && booking.id ? String(booking.id) : '';
-  bookingId.value = id;
+    const id = booking && booking.id ? String(booking.id) : '';
+    bookingId.value = id;
+    bookingOriginalStatus.value = (booking && booking.status) ? String(booking.status) : 'agendado';
 
-  // Cliente/Telefone
-  formPhone.value = booking && booking.phone ? booking.phone : '';
-  applyPhoneMask(formPhone); // garante máscara também ao carregar
+    // Cliente/Telefone
+    formPhone.value = booking ? (booking.customer_phone || booking.phone || '') : '';
+    applyPhoneMask(formPhone);
 
-  // Data / Horário
-  formDate.value = booking && booking.date ? booking.date : '';
-  formTime.value = booking && booking.time ? booking.time : '';
+    // Nome (quando disponível)
+    formNome.value = booking && booking.customer_name ? booking.customer_name : '';
 
-  // Serviço (único)
-  formService.value = booking && booking.service_id ? String(booking.service_id) : '';
+    // Pet
+    // (mantém seleção posterior via loadPetsForCustomer quando usuário troca telefone)
+    if (booking && booking.pet_id != null) {
+      try {
+        formPetSelect.disabled = false;
+      } catch (_) {}
+    }
 
-  // Mimo (pode ser nulo)
-  const prizeVal = booking && booking.prize ? booking.prize : 'Sem mimo';
-  formPrize.value = prizeVal;
+    // Data / Horário
+    formDate.value = booking && booking.date ? booking.date : '';
+    formTime.value = booking && booking.time ? booking.time : '';
 
-  // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
-  refreshBookingDateTimeState(id ? Number(id) : null);
-}
+    // Serviço único
+    formService.value = (booking && (booking.service_id || booking.serviceId)) ? String(booking.service_id || booking.serviceId) : '';
+
+    // Mimo
+    formPrize.value = booking && booking.prize ? booking.prize : 'Sem mimo';
+
+    // Status/Notas
+    formStatus.value = booking && booking.status ? booking.status : 'agendado';
+    formNotes.value = booking && booking.notes ? booking.notes : '';
+
+    setEditMode(true);
+    mostrarFormAgenda();
+
+    // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
+    refreshBookingDateTimeState(id ? Number(id) : null);
+  }
 
 
 
@@ -1312,6 +1363,46 @@ function normalizeHHMM(t) {
 
 
   let servicesCache = [];
+function getServiceById(id){
+  return servicesCache.find(s => String(s.id) === String(id));
+}
+
+function centsToBRL(cents){
+  const v = Number(cents || 0) / 100;
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function refreshSelectedServicesUI(){
+  if (!selectedServicesList || !selectedServicesWrap || !servicesTotalEl) return;
+
+  selectedServicesList.innerHTML = '';
+  let total = 0;
+
+  const unique = Array.from(new Set(selectedServiceIds.map(String)));
+  selectedServiceIds = unique;
+
+  unique.forEach((sid) => {
+    const svc = getServiceById(sid);
+    const name = svc ? svc.title : `Serviço #${sid}`;
+    const value_cents = svc ? Number(svc.value_cents || 0) : 0;
+    total += value_cents;
+
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)})</small></span>
+      <button type="button" class="btn btn-danger btn-xs" data-remove-sid="${escapeHtml(String(sid))}">Remover</button>
+    `;
+    selectedServicesList.appendChild(li);
+  });
+
+  servicesTotalEl.textContent = centsToBRL(total);
+  selectedServicesWrap.style.display = unique.length ? 'block' : 'none';
+}
+
+function clearSelectedServices(){
+  selectedServiceIds = [];
+  refreshSelectedServicesUI();
+}
  // [{id,title,value_cents,...}]
 
   function showServiceForm() { serviceFormPanel.classList.remove('hidden'); }
@@ -1414,6 +1505,25 @@ function normalizeHHMM(t) {
     if (current) formService.value = current;
   }
 
+// Multi-serviços - adicionar/remover
+if (btnAddService) {
+  btnAddService.addEventListener('click', () => {
+    const sid = formService.value;
+    if (!sid) return;
+    selectedServiceIds.push(String(sid));
+    refreshSelectedServicesUI();
+  });
+}
+
+if (selectedServicesList) {
+  selectedServicesList.addEventListener('click', (ev) => {
+    const btn = ev.target && ev.target.closest ? ev.target.closest('[data-remove-sid]') : null;
+    if (!btn) return;
+    const sid = btn.getAttribute('data-remove-sid');
+    selectedServiceIds = selectedServiceIds.filter(x => String(x) !== String(sid));
+    refreshSelectedServicesUI();
+  });
+}
 
 
   async function loadServices() {
@@ -1766,7 +1876,7 @@ function normalizeHHMM(t) {
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone || a.phone);
 
       const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
 
@@ -1882,7 +1992,7 @@ function normalizeHHMM(t) {
 
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
-      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.phone)}</span>`;
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone || a.phone)}</span>`;
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
@@ -1989,7 +2099,7 @@ function normalizeHHMM(t) {
   // Mimo default
   formPrize.value = 'Sem mimo';
 
-  // Serviço (único)
+  // Serviço único
   formService.value = '';
 
   formDate.value = '';
@@ -2015,7 +2125,10 @@ async function salvarAgendamento() {
     const petIdRaw = formPetSelect.value;
     const petIdNum = petIdRaw ? parseInt(petIdRaw, 10) : null;
 
-    const prize = formPrize.value;
+ const prize = (formPrize && formPrize.value && formPrize.value.trim())
+  ? formPrize.value.trim()
+  : 'Sem mimo';
+
 
     // serviço selecionado do banco (id)
     const serviceIdSelected = formService.value ? parseInt(formService.value, 10) : null;
@@ -2023,7 +2136,14 @@ async function salvarAgendamento() {
     const servicesLabel = serviceObj ? serviceObj.title : '';
 
     const date = formDate.value;
-    const time = formTime.value;
+const rawTime = formTime.value;
+const time = normalizeTimeForApi(rawTime);
+
+if (!time) {
+  alert('Horário inválido. Use apenas horários cheios (00 ou 30).');
+  return;
+}
+
 
     // Validação de data/horário (mesmas regras do cliente)
     const dtMsg = validarDiaHora(date, time);
@@ -2078,7 +2198,7 @@ async function salvarAgendamento() {
         customer_id: customer.id,
         pet_id: petIdNum,
         date, time,
-        // serviço único
+        // Serviço único (multi-serviços removido)
         service_id: serviceIdSelected,
         service: servicesLabel,
         prize, notes, status
@@ -2119,6 +2239,7 @@ async function salvarAgendamento() {
       formError.style.display = 'block';
     }
   }
+  
 
   function exportarCSV() {
     if (!ultimaLista.length) {
@@ -2961,4 +3082,59 @@ async function salvarAgendamento() {
     const btn = e.target.closest('.tab-btn');
     if (btn) closeMenu();
   });
-})();
+})();function hhmmToMinutes(hhmm) {
+    const m = String(hhmm || '').match(/^(\d{2}):(\d{2})$/);
+    if (!m) return NaN;
+    const h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    if (!Number.isFinite(h) || !Number.isFinite(min)) return NaN;
+    if (h < 0 || h > 23 || min < 0 || min > 59) return NaN;
+    return h * 60 + min;
+  }
+
+  function buildRangeForDate(dateStr) {
+    if (!dateStr) return null;
+
+    // IMPORTANT: interpret the selected date in America/Sao_Paulo regardless of server/browser timezone.
+    // Using an explicit -03:00 offset avoids the common "weekday shifted" bug.
+    const d = new Date(dateStr + 'T00:00:00-03:00');
+    if (Number.isNaN(d.getTime())) return null;
+    const dow = d.getUTCDay(); // 0=Sun..6=Sat (São Paulo)
+
+    // Prefer configured Opening Hours (admin menu "Horário de Funcionamento")
+    const oh = Array.isArray(openingHoursCache)
+      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
+      : null;
+
+    if (oh) {
+      if (oh.is_closed) return { closed: true };
+      const openMin = hhmmToMinutes(normalizeHHMM(String(oh.open_time || '')));
+      const closeMin = hhmmToMinutes(normalizeHHMM(String(oh.close_time || '')));
+      if (!Number.isFinite(openMin) || !Number.isFinite(closeMin) || closeMin <= openMin) return { closed: true };
+      return { closed: false, startMin: openMin, endMin: closeMin };
+    }
+
+    // Fallback (if Opening Hours were not loaded)
+    if (dow === 0) return { closed: true };
+    const startMin = 7 * 60 + 30;
+    const endMin = (dow === 6) ? (12 * 60) : (17 * 60 + 30);
+    return { closed: false, startMin, endMin };
+  }
+
+  function getMaxPerHalfHourForDate(dateStr) {
+    if (!dateStr) return 1;
+    const d = new Date(dateStr + 'T00:00:00-03:00');
+    if (Number.isNaN(d.getTime())) return 1;
+    const dow = d.getUTCDay();
+
+    const oh = Array.isArray(openingHoursCache)
+      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
+      : null;
+
+    if (!oh) return 1;
+    if (oh.is_closed) return 0;
+    const cap = parseInt(oh.max_per_half_hour, 10);
+    return Number.isFinite(cap) && cap > 0 ? cap : 1;
+  }
+
+
