@@ -329,18 +329,29 @@ app.get('/api/bookings', async (req, res) => {
   try {
     const {
       q,
+      search,
       status,
+      date,
       date_from,
       date_to,
       customer_id,
       pet_id
     } = req.query;
 
+    // Compatibilidade: front antigo usa `search` e `date`
+    const qFinal = (q && String(q).trim())
+      ? String(q).trim()
+      : ((search && String(search).trim()) ? String(search).trim() : '');
+
+    const dateFinal = (date && String(date).trim()) ? String(date).trim().slice(0, 10) : '';
+    const dateFromFinal = (date_from && String(date_from).trim()) ? String(date_from).trim().slice(0, 10) : (dateFinal || '');
+    const dateToFinal = (date_to && String(date_to).trim()) ? String(date_to).trim().slice(0, 10) : (dateFinal || '');
+
     const where = [];
     const params = [];
 
-    if (q && String(q).trim()) {
-      const like = `%${String(q).trim().toLowerCase()}%`;
+    if (qFinal) {
+      const like = `%${qFinal.toLowerCase()}%`;
       params.push(like);
       const p = `$${params.length}`;
       where.push(`(
@@ -357,13 +368,13 @@ app.get('/api/bookings', async (req, res) => {
       where.push(`b.status = $${params.length}`);
     }
 
-    if (date_from && String(date_from).trim()) {
-      params.push(String(date_from).trim().slice(0, 10));
+    if (dateFromFinal) {
+      params.push(dateFromFinal);
       where.push(`b.date >= $${params.length}`);
     }
 
-    if (date_to && String(date_to).trim()) {
-      params.push(String(date_to).trim().slice(0, 10));
+    if (dateToFinal) {
+      params.push(dateToFinal);
       where.push(`b.date <= $${params.length}`);
     }
 
@@ -382,20 +393,20 @@ app.get('/api/bookings', async (req, res) => {
         b.*,
         c.name AS customer_name,
         c.phone AS customer_phone,
+        c.phone AS phone,
         pet.name AS pet_name,
 
-        -- serviço (único)
+        -- serviço único (multi-serviços removido)
         s.title AS service_title,
         s.value_cents AS service_value_cents,
 
-        -- compatibilidade com UI (campos que existiam na versão multi-serviços)
+        -- compatibilidade: manter campos esperados pelo front
         '[]'::json AS services,
         COALESCE(s.value_cents, 0) AS services_total_cents
       FROM bookings b
       JOIN customers c ON c.id = b.customer_id
       LEFT JOIN pets pet ON pet.id = b.pet_id
       LEFT JOIN services s ON s.id = b.service_id
-      -- multi-serviços removido: não join em booking_services
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY b.date DESC, b.time DESC, b.id DESC
     `;

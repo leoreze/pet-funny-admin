@@ -55,8 +55,9 @@ const API_BASE_URL = '';
   };
 
   let currentEditId = null;
-  var cacheMimos = (typeof window !== 'undefined' && window.cacheMimos) ? window.cacheMimos : [];
-  if (typeof window !== 'undefined') window.cacheMimos = cacheMimos;
+  // Garantir cache global (evita ReferenceError em outras rotinas do admin)
+  var cacheMimos = (window.cacheMimos ? window.cacheMimos : []);
+  window.cacheMimos = cacheMimos;
 
   // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
   // seja populado mesmo sem o usuário abrir a aba "Mimos".
@@ -963,6 +964,11 @@ function normalizeHHMM(t) {
   const formPetSelect = document.getElementById('formPetSelect');
   const formPrize = document.getElementById('formPrize');
   const formService = document.getElementById('formService');
+  const btnAddService = document.getElementById('btnAddService');
+  const selectedServicesWrap = document.getElementById('selectedServicesWrap');
+  const selectedServicesList = document.getElementById('selectedServicesList');
+  const servicesTotalEl = document.getElementById('servicesTotal');
+  let selectedServiceIds = [];
   const formDate = document.getElementById('formDate');
   const formTime = document.getElementById('formTime');
 
@@ -1114,8 +1120,12 @@ function normalizeHHMM(t) {
 
   async function fetchBookings() {
     const params = {};
-    if (filtroData.value) params.date = filtroData.value;
-    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
+    // Backend atual usa: q, date_from, date_to. Mantemos compatibilidade.
+    if (filtroData.value) {
+      params.date_from = filtroData.value;
+      params.date_to = filtroData.value;
+    }
+    if (filtroBusca.value.trim()) params.q = filtroBusca.value.trim();
     const data = await apiGet('/api/bookings', params);
     return data.bookings || [];
   }
@@ -1256,28 +1266,45 @@ function normalizeHHMM(t) {
   }
 
   function preencherFormEdicao(booking) {
-  // ID do agendamento em edição
-  const id = booking && booking.id ? String(booking.id) : '';
-  bookingId.value = id;
+    const id = booking && booking.id ? String(booking.id) : '';
+    bookingId.value = id;
+    bookingOriginalStatus.value = (booking && booking.status) ? String(booking.status) : 'agendado';
 
-  // Cliente/Telefone
-  formPhone.value = booking && (booking.customer_phone || booking.phone || booking.customerPhone) ? (booking.customer_phone || booking.phone || booking.customerPhone) : '';
-  applyPhoneMask(formPhone); // garante máscara também ao carregar
+    // Cliente/Telefone
+    formPhone.value = booking ? (booking.customer_phone || booking.phone || '') : '';
+    applyPhoneMask(formPhone);
 
-  // Data / Horário
-  formDate.value = booking && booking.date ? booking.date : '';
-  formTime.value = booking && booking.time ? booking.time : '';
+    // Nome (quando disponível)
+    formNome.value = booking && booking.customer_name ? booking.customer_name : '';
 
-  // Serviço (único)
-  formService.value = booking && booking.service_id ? String(booking.service_id) : '';
+    // Pet
+    // (mantém seleção posterior via loadPetsForCustomer quando usuário troca telefone)
+    if (booking && booking.pet_id != null) {
+      try {
+        formPetSelect.disabled = false;
+      } catch (_) {}
+    }
 
-  // Mimo (pode ser nulo)
-  const prizeVal = booking && booking.prize ? booking.prize : 'Sem mimo';
-  formPrize.value = prizeVal;
+    // Data / Horário
+    formDate.value = booking && booking.date ? booking.date : '';
+    formTime.value = booking && booking.time ? booking.time : '';
 
-  // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
-  refreshBookingDateTimeState(id ? Number(id) : null);
-}
+    // Serviço único
+    formService.value = (booking && (booking.service_id || booking.serviceId)) ? String(booking.service_id || booking.serviceId) : '';
+
+    // Mimo
+    formPrize.value = booking && booking.prize ? booking.prize : 'Sem mimo';
+
+    // Status/Notas
+    formStatus.value = booking && booking.status ? booking.status : 'agendado';
+    formNotes.value = booking && booking.notes ? booking.notes : '';
+
+    setEditMode(true);
+    mostrarFormAgenda();
+
+    // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
+    refreshBookingDateTimeState(id ? Number(id) : null);
+  }
 
 
 
@@ -1301,6 +1328,46 @@ function normalizeHHMM(t) {
 
 
   let servicesCache = [];
+function getServiceById(id){
+  return servicesCache.find(s => String(s.id) === String(id));
+}
+
+function centsToBRL(cents){
+  const v = Number(cents || 0) / 100;
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function refreshSelectedServicesUI(){
+  if (!selectedServicesList || !selectedServicesWrap || !servicesTotalEl) return;
+
+  selectedServicesList.innerHTML = '';
+  let total = 0;
+
+  const unique = Array.from(new Set(selectedServiceIds.map(String)));
+  selectedServiceIds = unique;
+
+  unique.forEach((sid) => {
+    const svc = getServiceById(sid);
+    const name = svc ? svc.title : `Serviço #${sid}`;
+    const value_cents = svc ? Number(svc.value_cents || 0) : 0;
+    total += value_cents;
+
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)})</small></span>
+      <button type="button" class="btn btn-danger btn-xs" data-remove-sid="${escapeHtml(String(sid))}">Remover</button>
+    `;
+    selectedServicesList.appendChild(li);
+  });
+
+  servicesTotalEl.textContent = centsToBRL(total);
+  selectedServicesWrap.style.display = unique.length ? 'block' : 'none';
+}
+
+function clearSelectedServices(){
+  selectedServiceIds = [];
+  refreshSelectedServicesUI();
+}
  // [{id,title,value_cents,...}]
 
   function showServiceForm() { serviceFormPanel.classList.remove('hidden'); }
@@ -1403,6 +1470,25 @@ function normalizeHHMM(t) {
     if (current) formService.value = current;
   }
 
+// Multi-serviços - adicionar/remover
+if (btnAddService) {
+  btnAddService.addEventListener('click', () => {
+    const sid = formService.value;
+    if (!sid) return;
+    selectedServiceIds.push(String(sid));
+    refreshSelectedServicesUI();
+  });
+}
+
+if (selectedServicesList) {
+  selectedServicesList.addEventListener('click', (ev) => {
+    const btn = ev.target && ev.target.closest ? ev.target.closest('[data-remove-sid]') : null;
+    if (!btn) return;
+    const sid = btn.getAttribute('data-remove-sid');
+    selectedServiceIds = selectedServiceIds.filter(x => String(x) !== String(sid));
+    refreshSelectedServicesUI();
+  });
+}
 
 
   async function loadServices() {
@@ -1729,21 +1815,6 @@ function normalizeHHMM(t) {
     return serviceLabel;
   }
 
-  function getServiceValueCentsFromBooking(a) {
-    // Prefer campos que vêm da API
-    const direct = (a && (a.service_value_cents ?? a.services_total_cents ?? a.total_cents ?? null));
-    if (direct != null && Number.isFinite(Number(direct))) return Number(direct);
-
-    // Tenta inferir via service_id no cache
-    const sid = a ? (a.service_id ?? a.serviceId ?? null) : null;
-    if (sid != null) {
-      const svc = servicesCache.find(s => String(s.id) === String(sid));
-      if (svc && svc.value_cents != null) return Number(svc.value_cents);
-    }
-
-    return 0;
-  }
-
   function renderAgendaByView(lista) {
     // vazio: atualiza ambos estados para evitar inconsistências
     const isEmpty = !lista || !lista.length;
@@ -1770,13 +1841,9 @@ function normalizeHHMM(t) {
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone || a.phone || a.customerPhone);
+      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.customer_phone || a.phone);
 
-      const tdServ = document.createElement('td');
-      tdServ.textContent = getServiceLabelFromBooking(a);
-
-      const tdValor = document.createElement('td');
-      tdValor.textContent = formatCentsToBRL(getServiceValueCentsFromBooking(a));
+      const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
 
       const tdMimo = document.createElement('td');
       tdMimo.textContent = a.prize || '-';
@@ -1829,7 +1896,6 @@ function normalizeHHMM(t) {
       tr.appendChild(tdPet);
       tr.appendChild(tdTel);
       tr.appendChild(tdServ);
-      tr.appendChild(tdValor);
       tr.appendChild(tdMimo);
       tr.appendChild(tdStatus);
       tr.appendChild(tdNotif);
@@ -1891,15 +1957,11 @@ function normalizeHHMM(t) {
 
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
-      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone || a.phone || a.customerPhone)}</span>`;
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.customer_phone || a.phone)}</span>`;
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
       l4.innerHTML = `<span class="agenda-key">Serviço:</span> <span class="agenda-val">${serviceLabel}</span>`;
-
-      const l4v = document.createElement('div');
-      l4v.className = 'agenda-line';
-      l4v.innerHTML = `<span class="agenda-key">Valor:</span> <span class="agenda-muted">${formatCentsToBRL(getServiceValueCentsFromBooking(a))}</span>`;
 
       const l5 = document.createElement('div');
       l5.className = 'agenda-line';
@@ -1913,7 +1975,6 @@ function normalizeHHMM(t) {
       main.appendChild(l2);
       main.appendChild(l3);
       main.appendChild(l4);
-      main.appendChild(l4v);
       main.appendChild(l5);
       main.appendChild(l6);
 
@@ -2003,7 +2064,7 @@ function normalizeHHMM(t) {
   // Mimo default
   formPrize.value = 'Sem mimo';
 
-  // Serviço (único)
+  // Serviço único
   formService.value = '';
 
   formDate.value = '';
@@ -2092,7 +2153,7 @@ async function salvarAgendamento() {
         customer_id: customer.id,
         pet_id: petIdNum,
         date, time,
-        // serviço único
+        // Serviço único (multi-serviços removido)
         service_id: serviceIdSelected,
         service: servicesLabel,
         prize, notes, status
@@ -2152,7 +2213,7 @@ async function salvarAgendamento() {
         a.time || '',
         (a.customer_name || '').replace(/;/g, ','),
         (a.pet_name || '').replace(/;/g, ','),
-        formatTelefone(a.customer_phone || a.phone || a.customerPhone),
+        formatTelefone(a.phone),
         (serviceLabel || '').replace(/;/g, ','),
         (a.prize || '').replace(/;/g, ','),
         (a.status || 'agendado'),
