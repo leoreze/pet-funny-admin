@@ -1,3 +1,14 @@
+/* PATCH: Fase 1 (Bootstrap Helpers) - 2025-12-22
+   Garante que helpers globais existam antes do restante do admin,
+   evitando ReferenceError por ordem/escopo de declaração.
+*/
+(function(){
+  'use strict';
+  if (window.PF_HELPERS && typeof window.PF_HELPERS.normalizeTimeForApi === 'function') {
+    window.normalizeTimeForApi = window.normalizeTimeForApi || window.PF_HELPERS.normalizeTimeForApi;
+  }
+})();
+
 const API_BASE_URL = '';
 
   /* ===== Helpers de normalização (corrige acentos/variações) ===== */
@@ -161,22 +172,6 @@ const API_BASE_URL = '';
   function closeForm() {
     if (els.formWrap) els.formWrap.style.display = 'none';
   }
-
-  function normalizeTimeForApi(timeStr) {
-  if (!timeStr) return null;
-
-  const m = String(timeStr).match(/^(\d{1,2}):(\d{1,2})/);
-  if (!m) return null;
-
-  const hh = String(parseInt(m[1], 10)).padStart(2, '0');
-  const mm = String(parseInt(m[2], 10)).padStart(2, '0');
-
-  // backend só aceita 00 ou 30
-  if (mm !== '00' && mm !== '30') return null;
-
-  return `${hh}:${mm}`;
-}
-
 
   function clearForm() {
     currentEditId = null;
@@ -813,25 +808,6 @@ function normalizeHHMM(t) {
 
     return minutesToHHMM(total);
   }
-
-  // ===============================
-// Normalização de horário (API)
-// ===============================
-function normalizeTimeForApi(timeStr) {
-  if (!timeStr) return null;
-
-  const m = String(timeStr).match(/^(\d{1,2}):(\d{1,2})/);
-  if (!m) return null;
-
-  const hh = String(parseInt(m[1], 10)).padStart(2, '0');
-  const mm = String(parseInt(m[2], 10)).padStart(2, '0');
-
-  // Backend só aceita 00 ou 30
-  if (mm !== '00' && mm !== '30') return null;
-
-  return `${hh}:${mm}`;
-}
-
 
 
   function classStatus(status) {
@@ -2125,10 +2101,7 @@ async function salvarAgendamento() {
     const petIdRaw = formPetSelect.value;
     const petIdNum = petIdRaw ? parseInt(petIdRaw, 10) : null;
 
- const prize = (formPrize && formPrize.value && formPrize.value.trim())
-  ? formPrize.value.trim()
-  : 'Sem mimo';
-
+    const prize = formPrize.value;
 
     // serviço selecionado do banco (id)
     const serviceIdSelected = formService.value ? parseInt(formService.value, 10) : null;
@@ -2136,14 +2109,7 @@ async function salvarAgendamento() {
     const servicesLabel = serviceObj ? serviceObj.title : '';
 
     const date = formDate.value;
-const rawTime = formTime.value;
-const time = normalizeTimeForApi(rawTime);
-
-if (!time) {
-  alert('Horário inválido. Use apenas horários cheios (00 ou 30).');
-  return;
-}
-
+    const time = formTime.value;
 
     // Validação de data/horário (mesmas regras do cliente)
     const dtMsg = validarDiaHora(date, time);
@@ -2239,7 +2205,6 @@ if (!time) {
       formError.style.display = 'block';
     }
   }
-  
 
   function exportarCSV() {
     if (!ultimaLista.length) {
