@@ -17,7 +17,7 @@
     console.warn('[PF_TIME] bootstrap falhou:', e);
   }
 })();
-const API_BASE_URL = '';
+
 
   /* ===== Helpers de normalização (corrige acentos/variações) ===== */
   function normStr(s) {
@@ -563,49 +563,7 @@ const API_BASE_URL = '';
     if (confirm('Deseja sair do painel?')) doLogout();
   });
 
-  // ===== API HELPERS =====
-  async function apiGet(path, params) {
-    const url = new URL(API_BASE_URL + path, window.location.origin);
-    if (params) {
-      Object.keys(params).forEach(k => {
-        const v = params[k];
-        if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
-      });
-    }
-    const resp = await fetch(url.toString());
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
-    return data;
-  }
-
-  async function apiPost(path, body) {
-    const resp = await fetch(API_BASE_URL + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
-    return data;
-  }
-
-  async function apiPut(path, body) {
-    const resp = await fetch(API_BASE_URL + path, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao atualizar.');
-    return data;
-  }
-
-  async function apiDelete(path) {
-    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.error || 'Erro ao apagar.');
-    return data;
-  }
+  // ===== API HELPERS ===== (moved to pf_api.js)
 
   function sanitizePhone(phone) { return (phone || '').replace(/\D/g, ''); }
 

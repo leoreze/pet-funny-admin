@@ -1,74 +1,67 @@
-/* PATCH: Extrai helpers de API para módulo (PF_API) — 2025-12-22 */
-
+/* PATCH: Extract API layer to pf_api.js — 2025-12-22
+   PetFunny — API helper layer (fetch wrappers)
+*/
 (function () {
   'use strict';
 
-  function getBaseUrl() {
-    // Mantém compatibilidade: se existir API_BASE_URL global (string), prefixa.
-    // Caso contrário, usa string vazia e segue com paths relativos.
-    try {
-      if (typeof window.API_BASE_URL === 'string') return window.API_BASE_URL;
-    } catch (_) {}
-    return '';
-  }
+  // Keep empty by default (same-origin). If you later want to point to another host, set it here.
+  const API_BASE_URL = '';
 
-  function buildUrl(path, params) {
-    const base = getBaseUrl();
-    const url = new URL(base + path, window.location.origin);
-
-    if (params && typeof params === 'object') {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v === undefined || v === null || v === '') return;
-        url.searchParams.set(k, String(v));
+  async function apiGet(path, params) {
+    const url = new URL(API_BASE_URL + path, window.location.origin);
+    if (params) {
+      Object.keys(params).forEach(k => {
+        const v = params[k];
+        if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
       });
     }
-    return url.toString();
-  }
-
-  async function request(method, path, body, params) {
-    const url = buildUrl(path, params);
-
-    const opts = {
-      method,
-      headers: { 'Content-Type': 'application/json' }
-    };
-    if (body !== undefined) opts.body = JSON.stringify(body);
-
-    const res = await fetch(url, opts);
-
-    // Tenta ler JSON sempre (mantém comportamento do scripts.js original)
-    let data = null;
-    try {
-      data = await res.json();
-    } catch (_) {
-      data = null;
-    }
-
-    if (!res.ok) {
-      const msg =
-        (data && (data.error || data.message)) ||
-        `Erro HTTP ${res.status} em ${method} ${path}`;
-      throw new Error(msg);
-    }
-
+    const resp = await fetch(url.toString());
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
     return data;
   }
 
-  async function get(path, params) {
-    return request('GET', path, undefined, params);
+  async function apiPost(path, body) {
+    const resp = await fetch(API_BASE_URL + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    return data;
   }
 
-  async function post(path, body) {
-    return request('POST', path, body);
+  async function apiPut(path, body) {
+    const resp = await fetch(API_BASE_URL + path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao atualizar.');
+    return data;
   }
 
-  async function put(path, body) {
-    return request('PUT', path, body);
+  async function apiDelete(path) {
+    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao apagar.');
+    return data;
   }
 
-  async function del(path) {
-    return request('DELETE', path);
-  }
+  // Namespaced export + legacy aliases (minimize regressions)
+  window.PF_API = window.PF_API || {};
+  window.PF_API.API_BASE_URL = API_BASE_URL;
+  window.PF_API.apiGet = apiGet;
+  window.PF_API.apiPost = apiPost;
+  window.PF_API.apiPut = apiPut;
+  window.PF_API.apiDelete = apiDelete;
 
-  window.PF_API = { get, post, put, del };
+  // Legacy globals (scripts.js already calls these)
+  window.apiGet = window.apiGet || apiGet;
+  window.apiPost = window.apiPost || apiPost;
+  window.apiPut = window.apiPut || apiPut;
+  window.apiDelete = window.apiDelete || apiDelete;
+
 })();
