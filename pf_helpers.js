@@ -1,6 +1,5 @@
-/* PATCH: Fase 1 (Helpers compartilhados) - 2025-12-22
-   Objetivo: centralizar helpers reutilizáveis (string, tempo, telefone, datas, moeda),
-   sem alterar comportamento do sistema.
+/* PATCH: Fase 3 - Fix globals (formatCentsToBRL/parseBRLToCents) - 2025-12-22
+   Objetivo: garantir compatibilidade com scripts.js legado (usa helpers como globais).
 */
 (function () {
   'use strict';
@@ -102,16 +101,11 @@
     return Math.max(0, Math.round(n * 100));
   }
 
-/* =========================
-   MOEDA / FINANCEIRO
-========================= */
-function formatCentsToBRL(cents) {
-  const n = Number(cents || 0) / 100;
-  return n.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  });
-}
+  function formatCentsToBRL(cents, withSymbol = true) {
+    const v = Number(cents || 0) / 100;
+    if (withSymbol) return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   window.PF_HELPERS = {
     normStr,
@@ -141,7 +135,8 @@ function formatCentsToBRL(cents) {
   window.sanitizePhone = window.sanitizePhone || sanitizePhone;
   window.formatTelefone = window.formatTelefone || formatTelefone;
 
-})();
+  // FIX: estes dois precisam existir globalmente porque scripts.js chama direto
+  window.parseBRLToCents = window.parseBRLToCents || parseBRLToCents;
+  window.formatCentsToBRL = window.formatCentsToBRL || formatCentsToBRL;
 
-// ===== Exposição global (anti-regressão) =====
-window.formatCentsToBRL = formatCentsToBRL;
+})();
