@@ -157,3 +157,16 @@ window.PF_HELPERS = {
   window.formatTelefone = window.formatTelefone || formatTelefone;
 
 })();
+
+// ===============================
+// PATCH: Exposição global helpers
+// DATE: 2025-12-23
+// ===============================
+
+window.formatCentsToBRL = window.formatCentsToBRL || formatCentsToBRL;
+window.parseBRLToCents  = window.parseBRLToCents  || parseBRLToCents;
+
+// Se já existirem no helpers, só expor (não redefinir)
+window.formatTelefone  = window.formatTelefone  || formatTelefone;
+window.formatDataBr    = window.formatDataBr    || formatDataBr;
+window.formatDateTimeBr = window.formatDateTimeBr || formatDateTimeBr;
