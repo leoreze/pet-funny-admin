@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <!-- PATCH: FASE 3 (includes pf_helpers.js + pf_time.js) — 2025-12-22 -->
   <meta charset="UTF-8" />
   <title>Admin – Pet Funny</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -170,11 +171,17 @@
 
         <div class="form-row-2">
           <div class="form-group">
-            <label for="formService">Serviço</label>
+            <label for="formService">Serviços (pode adicionar mais de 1)</label>
             <div class="service-picker">
               <select id="formService">
                 <option value="">Carregando serviços...</option>
               </select>
+              <button type="button" class="btn btn-secondary" id="btnAddService">Adicionar</button>
+            </div>
+            <div class="selected-services" id="selectedServicesWrap" style="display:none;">
+              <div class="selected-services-title">Serviços selecionados</div>
+              <ul id="selectedServicesList"></ul>
+              <div class="selected-services-total">Total serviços: <span id="servicesTotal">R$ 0,00</span></div>
             </div>
           </div>
           <div class="form-group">
@@ -237,8 +244,8 @@
             <th>Tutor(a)</th>
             <th>Pet</th>
             <th>Telefone</th>
-            <th>Serviço</th>
-            <th>Valor</th>
+            <th>Serviço(s)</th>
+            <th>Total serviços</th>
             <th>Mimo</th>
             <th>Status</th>
             <th>Última notificação</th>
@@ -321,7 +328,7 @@
           </div>
           <div class="form-group">
             <label for="petBreed">Raça</label>
-            <input type="text" id="petBreed" placeholder="Ex: SRD, Shih-tzu, Spitz" />
+            <select id="petBreed"></select>
           </div>
           <div class="form-group">
             <label for="petInfo">Mais informações</label>
@@ -663,10 +670,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- PATCH: módulos PetFunny (helpers/api/time) — 2025-12-22 -->
 <script src="pf_helpers.js"></script>
-<script src="pf_api.js"></script>
-<script src="pf_time.js"></script>
-<script src="scripts.js"></script>
+  <script src="pf_time.js"></script>
+  <script src="scripts.js"></script>
 </body>
 </html>
