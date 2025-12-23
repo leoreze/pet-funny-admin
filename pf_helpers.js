@@ -137,3 +137,6 @@
   window.formatTelefone = window.formatTelefone || formatTelefone;
 
 })();
+
+// ===== Exposição global (anti-regressão) =====
+window.formatCentsToBRL = formatCentsToBRL;
