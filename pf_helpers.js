@@ -102,11 +102,16 @@
     return Math.max(0, Math.round(n * 100));
   }
 
-  function formatCentsToBRL(cents, withSymbol = true) {
-    const v = Number(cents || 0) / 100;
-    if (withSymbol) return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
+/* =========================
+   MOEDA / FINANCEIRO
+========================= */
+function formatCentsToBRL(cents) {
+  const n = Number(cents || 0) / 100;
+  return n.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+}
 
   window.PF_HELPERS = {
     normStr,
