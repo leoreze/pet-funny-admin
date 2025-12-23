@@ -1,14 +1,16 @@
-/* PATCH: Extract API layer to pf_api.js — 2025-12-22
-   PetFunny — API helper layer (fetch wrappers)
+/* PATCH: extrai camada de API (fetch helpers) - 2025-12-22
+   PetFunny Admin - pf_api.js
 */
 (function () {
   'use strict';
 
-  // Keep empty by default (same-origin). If you later want to point to another host, set it here.
-  const API_BASE_URL = '';
+  function getApiBase() {
+    const v = (typeof window !== 'undefined' && window.API_BASE_URL != null) ? String(window.API_BASE_URL) : '';
+    return v;
+  }
 
   async function apiGet(path, params) {
-    const url = new URL(API_BASE_URL + path, window.location.origin);
+    const url = new URL(getApiBase() + path, window.location.origin);
     if (params) {
       Object.keys(params).forEach(k => {
         const v = params[k];
@@ -22,7 +24,7 @@
   }
 
   async function apiPost(path, body) {
-    const resp = await fetch(API_BASE_URL + path, {
+    const resp = await fetch(getApiBase() + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -33,7 +35,7 @@
   }
 
   async function apiPut(path, body) {
-    const resp = await fetch(API_BASE_URL + path, {
+    const resp = await fetch(getApiBase() + path, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -44,24 +46,21 @@
   }
 
   async function apiDelete(path) {
-    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
+    const resp = await fetch(getApiBase() + path, { method: 'DELETE' });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.error || 'Erro ao apagar.');
     return data;
   }
 
-  // Namespaced export + legacy aliases (minimize regressions)
   window.PF_API = window.PF_API || {};
-  window.PF_API.API_BASE_URL = API_BASE_URL;
   window.PF_API.apiGet = apiGet;
   window.PF_API.apiPost = apiPost;
   window.PF_API.apiPut = apiPut;
   window.PF_API.apiDelete = apiDelete;
 
-  // Legacy globals (scripts.js already calls these)
-  window.apiGet = window.apiGet || apiGet;
-  window.apiPost = window.apiPost || apiPost;
-  window.apiPut = window.apiPut || apiPut;
-  window.apiDelete = window.apiDelete || apiDelete;
-
+  // Compat globals
+  window.apiGet = apiGet;
+  window.apiPost = apiPost;
+  window.apiPut = apiPut;
+  window.apiDelete = apiDelete;
 })();
