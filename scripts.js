@@ -1,3 +1,4 @@
+// PATCH: customer address fields + select-fill defaults - 2025-12-24
 /* PATCH: Fix global cacheMimos reference (admin bookings) — 2025-12-24 */
 const API_BASE_URL = '';
 
@@ -2358,6 +2359,13 @@ async function salvarAgendamento() {
   // ===== CLIENTES & PETS =====
   const cliPhone = document.getElementById('cliPhone');
   const cliName = document.getElementById('cliName');
+  const cliCep = document.getElementById('cliCep');
+  const cliStreet = document.getElementById('cliStreet');
+  const cliNumber = document.getElementById('cliNumber');
+  const cliComplement = document.getElementById('cliComplement');
+  const cliNeighborhood = document.getElementById('cliNeighborhood');
+  const cliCity = document.getElementById('cliCity');
+  const cliState = document.getElementById('cliState');
   const cliError = document.getElementById('cliError');
   const btnCliLimpar = document.getElementById('btnCliLimpar');
   const btnCliSalvar = document.getElementById('btnCliSalvar');
@@ -2390,56 +2398,6 @@ async function salvarAgendamento() {
   ];
 
   cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
-
-
-  // PATCH: lookup customer by phone + CEP autofill - 2025-12-24
-  async function hydrateCustomerFormFromRow(c) {
-    if (!c) return;
-    cliName.value = c.name || '';
-    cliPhone.value = c.phone || '';
-    const _set = (el, val) => { if (el) el.value = val || ''; };
-    _set(typeof cliEmail !== 'undefined' ? cliEmail : null, c.email);
-    _set(typeof cliCpf !== 'undefined' ? cliCpf : null, c.cpf);
-    _set(typeof cliAddress !== 'undefined' ? cliAddress : null, c.address);
-    _set(typeof cliNotes !== 'undefined' ? cliNotes : null, c.notes);
-    _set(cliCep, c.cep);
-    _set(cliStreet, c.street);
-    _set(cliNumber, c.number);
-    _set(cliComplement, c.complement);
-    _set(cliNeighborhood, c.neighborhood);
-    _set(cliCity, c.city);
-    _set(cliState, c.state);
-  }
-
-  async function lookupCustomerByPhoneForForm() {
-    const phone = String(cliPhone?.value || '').trim();
-    if (!phone) return;
-    try {
-      const resp = await apiPost('/api/customers/lookup', { phone });
-      if (resp && resp.customer) {
-        await hydrateCustomerFormFromRow(resp.customer);
-      }
-    } catch (e) {
-      // 404 (não encontrado) é esperado: segue cadastro normal
-    }
-  }
-
-  if (cliPhone) cliPhone.addEventListener('blur', lookupCustomerByPhoneForForm);
-
-  if (cliCep) {
-    cliCep.addEventListener('blur', async () => {
-      try {
-        const data = await (window.apiViaCep ? window.apiViaCep(cliCep.value) : null);
-        if (!data) return;
-        if (cliStreet && !cliStreet.value) cliStreet.value = data.logradouro || '';
-        if (cliNeighborhood && !cliNeighborhood.value) cliNeighborhood.value = data.bairro || '';
-        if (cliCity && !cliCity.value) cliCity.value = data.localidade || '';
-        if (cliState && !cliState.value) cliState.value = data.uf || '';
-      } catch (err) {
-        console.warn('ViaCEP falhou:', err);
-      }
-    });
-  }
 
   if (filtroClientes) {
     filtroClientes.addEventListener('input', () => {
@@ -2548,6 +2506,13 @@ async function salvarAgendamento() {
   function limparClienteForm() {
     cliPhone.value = '';
     cliName.value = '';
+    if (typeof cliCep !== 'undefined' && cliCep) cliCep.value = '';
+    if (typeof cliStreet !== 'undefined' && cliStreet) cliStreet.value = '';
+    if (typeof cliNumber !== 'undefined' && cliNumber) cliNumber.value = '';
+    if (typeof cliComplement !== 'undefined' && cliComplement) cliComplement.value = '';
+    if (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) cliNeighborhood.value = '';
+    if (typeof cliCity !== 'undefined' && cliCity) cliCity.value = '';
+    if (typeof cliState !== 'undefined' && cliState) cliState.value = '';
     cliError.style.display = 'none';
 
     clienteSelecionadoId = null;
@@ -2572,22 +2537,7 @@ async function salvarAgendamento() {
     }
 
     try {
-      const payloadCustomer = {
-        phone: phoneDigits,
-        name,
-        email: (typeof cliEmail !== 'undefined' && cliEmail) ? (cliEmail.value || '') : '',
-        cpf: (typeof cliCpf !== 'undefined' && cliCpf) ? (cliCpf.value || '') : '',
-        address: (typeof cliAddress !== 'undefined' && cliAddress) ? (cliAddress.value || '') : '',
-        notes: (typeof cliNotes !== 'undefined' && cliNotes) ? (cliNotes.value || '') : '',
-        cep: (typeof cliCep !== 'undefined' && cliCep) ? (cliCep.value || '') : '',
-        street: (typeof cliStreet !== 'undefined' && cliStreet) ? (cliStreet.value || '') : '',
-        number: (typeof cliNumber !== 'undefined' && cliNumber) ? (cliNumber.value || '') : '',
-        complement: (typeof cliComplement !== 'undefined' && cliComplement) ? (cliComplement.value || '') : '',
-        neighborhood: (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) ? (cliNeighborhood.value || '') : '',
-        city: (typeof cliCity !== 'undefined' && cliCity) ? (cliCity.value || '') : '',
-        state: (typeof cliState !== 'undefined' && cliState) ? (cliState.value || '') : ''
-      };
-      const data = await apiPost('/api/customers', payloadCustomer);
+      const data = await apiPost('/api/customers', { phone: phoneDigits, name });
       clienteSelecionadoId = data.customer.id;
       badgeClienteSelecionado.classList.remove('hidden');
       petsCard.classList.remove('hidden');

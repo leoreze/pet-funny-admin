@@ -1,3 +1,4 @@
+// PATCH: customers address fields in /api/customers - 2025-12-24
 // backend/server.js (UPDATED)
 const path = require('path');
 const express = require('express');
@@ -130,21 +131,28 @@ app.post('/api/customers', async (req, res) => {
   try {
     const phone = sanitizePhone(req.body.phone);
     const name = String(req.body.name || '').trim();
+    const cep = String(req.body.cep || '').replace(/\D/g, '').slice(0, 8) || null;
+    const street = String(req.body.street || '').trim() || null;
+    const number = String(req.body.number || '').trim() || null;
+    const complement = String(req.body.complement || '').trim() || null;
+    const neighborhood = String(req.body.neighborhood || '').trim() || null;
+    const city = String(req.body.city || '').trim() || null;
+    const state = String(req.body.state || '').trim().toUpperCase().slice(0, 2) || null;
     if (!phone || !name) return res.status(400).json({ error: 'Telefone e nome são obrigatórios.' });
 
     const existing = await db.get('SELECT * FROM customers WHERE phone = $1', [phone]);
 
     if (!existing) {
       const ins = await db.get(
-        'INSERT INTO customers (phone, name) VALUES ($1,$2) RETURNING *',
-        [phone, name]
+        'INSERT INTO customers (phone, name, cep, street, number, complement, neighborhood, city, state) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+        [phone, name, cep, street, number, complement, neighborhood, city, state]
       );
       return res.json({ customer: ins });
     }
 
     const upd = await db.get(
-      'UPDATE customers SET name = $2 WHERE phone = $1 RETURNING *',
-      [phone, name]
+      'UPDATE customers SET name=$2, cep=$3, street=$4, number=$5, complement=$6, neighborhood=$7, city=$8, state=$9 WHERE phone=$1 RETURNING *',
+      [phone, name, cep, street, number, complement, neighborhood, city, state]
     );
     res.json({ customer: upd });
   } catch (err) {
@@ -687,7 +695,7 @@ app.put('/api/mimos/:id', async (req, res) => {
     const row = await db.get(
       `UPDATE mimos
        SET title=$1, description=$2, value_cents=$3, starts_at=$4, ends_at=$5, is_active=$6, updated_at=NOW()
-       WHERE id=$14
+       WHERE id=$7
        RETURNING id, title, description, value_cents, starts_at, ends_at, is_active, updated_at`,
       [title, description, Math.round(value_cents), starts_at, ends_at, is_active, id]
     );
@@ -872,7 +880,7 @@ app.put('/api/mimos/:id', async (req, res) => {
     const row = await db.get(
       `UPDATE mimos
        SET title=$1, description=$2, value_cents=$3, starts_at=$4, ends_at=$5, is_active=$6, updated_at=NOW()
-       WHERE id=$14
+       WHERE id=$7
        RETURNING *`,
       [title, description, value_cents, starts_at, ends_at, is_active, id]
     );
