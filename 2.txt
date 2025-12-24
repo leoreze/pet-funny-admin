@@ -1,0 +1,16 @@
+Tenho um sistema para agendamento do PetShop PetFunny que oferece serviços de banho e tosa.... O projeto é desenvolvido em Html, css e js, com NodeJs e Postgree.... ele esta em um repositório no github e rodando no render.com, e existe 2 visões para 2 tipos de usuarios, clientes e administrador do sistema... a estrutura do projeto esta dessa forma:
+
+URL Produção para clientes poder se cadastrar e fazer agendamentos de serviços de banho e todas - https://agendapetfunny.com.br
+
+URL Produção para administrador do sistema - https://agendapetfunny.com.br/admin
+
+scr/node_modules/
+scr/admin.html (front admin)
+scr/scripts.js (admin.html)
+scr/style.css (admin.html)
+scr/db.js
+scr/server.js
+scr/package.json
+scr/index.html (front cliente)
+
+quero instruçoes explicitas, para sempre que eu pedir para fazer uma implementação, modificação etc, leve sempre em consideração os arquivos ja atualizados e corrigidos... nunca voltar versao de qualquer arquivo..

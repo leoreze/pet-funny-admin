@@ -1,23 +1,4 @@
-// PATCH: FASE 3 (helpers de horário em módulo) — 2025-12-22
-/* =========================
-   PATCH: FASE 3 — Time/Date helpers em módulo (pf_time.js)
-   DATE: 2025-12-22
-   ========================= */
-(function bootstrapPfTime(){
-  try {
-    if (!window.PF_TIME) {
-      console.warn('[PF_TIME] pf_time.js não encontrado. Mantendo fallback local.');
-      return;
-    }
-    // Expor globals para compatibilidade com código legado
-    if (typeof window.normalizeTimeForApi !== 'function' && typeof window.PF_TIME.normalizeTimeForApi === 'function') {
-      window.normalizeTimeForApi = window.PF_TIME.normalizeTimeForApi;
-    }
-  } catch (e) {
-    console.warn('[PF_TIME] bootstrap falhou:', e);
-  }
-})();
-
+const API_BASE_URL = '';
 
   /* ===== Helpers de normalização (corrige acentos/variações) ===== */
   function normStr(s) {
@@ -99,7 +80,7 @@
     els.msg.style.color = isError ? '#c0392b' : '';
   }
 
-  function pad2(n) { return (window.PF_TIME && window.PF_TIME.pad2) ? window.PF_TIME.pad2(n) : String(n).padStart(2, '0'); }
+  function pad2(n) { return String(n).padStart(2, '0'); }
 
   function toDatetimeLocalValue(isoOrTs) {
     if (!isoOrTs) return '';
@@ -563,7 +544,49 @@
     if (confirm('Deseja sair do painel?')) doLogout();
   });
 
-  // ===== API HELPERS ===== (moved to pf_api.js)
+  // ===== API HELPERS =====
+  async function apiGet(path, params) {
+    const url = new URL(API_BASE_URL + path, window.location.origin);
+    if (params) {
+      Object.keys(params).forEach(k => {
+        const v = params[k];
+        if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
+      });
+    }
+    const resp = await fetch(url.toString());
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
+    return data;
+  }
+
+  async function apiPost(path, body) {
+    const resp = await fetch(API_BASE_URL + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    return data;
+  }
+
+  async function apiPut(path, body) {
+    const resp = await fetch(API_BASE_URL + path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao atualizar.');
+    return data;
+  }
+
+  async function apiDelete(path) {
+    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Erro ao apagar.');
+    return data;
+  }
 
   function sanitizePhone(phone) { return (phone || '').replace(/\D/g, ''); }
 
@@ -635,7 +658,676 @@
   /* ===== Validação de Data/Horário (mesmas regras do index.html) ===== */
   const todayISO = new Date().toISOString().split('T')[0];
 
-  function validarDiaHora(dateStr, timeStr) { return (window.PF_TIME && window.PF_TIME.validarDiaHora) ? window.PF_TIME.validarDiaHora(dateStr, timeStr) : true; }
+  function validarDiaHora(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+
+    const date = new Date(dateStr + 'T' + timeStr + ':00');
+    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
+
+    const diaSemana = date.getDay();
+    const parts = String(timeStr).split(':');
+    const hh = parseInt(parts[0], 10);
+    const mm = parseInt(parts[1] || '0', 10);
+
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
+
+    // Admin também deve seguir a regra do cliente: somente 00 ou 30
+    if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
+
+    const minutos = hh * 60 + mm;
+    const inicio = 7 * 60 + 30;
+
+    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+    if (diaSemana >= 1 && diaSemana <= 5) {
+      const fim = 17 * 60 + 30;
+      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+    }
+    if (diaSemana === 6) {
+      const fim = 13 * 60;
+      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+    }
+
+    // Não permite agendar no passado (comparando data/hora local)
+    const now = new Date();
+    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+
+    return null;
+  }
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function buildRangeForDate(dateStr) {
+    if (!dateStr) return null;
+
+    // IMPORTANT: interpret the selected date in America/Sao_Paulo regardless of server/browser timezone.
+    // Using an explicit -03:00 offset avoids the common "weekday shifted" bug.
+    const d = new Date(dateStr + 'T00:00:00-03:00');
+    if (Number.isNaN(d.getTime())) return null;
+    const dow = d.getUTCDay(); // 0=Sun..6=Sat (São Paulo)
+
+    // Prefer configured Opening Hours (admin menu "Horário de Funcionamento")
+    const oh = Array.isArray(openingHoursCache)
+      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
+      : null;
+
+    if (oh) {
+      if (oh.is_closed) return { closed: true };
+      const openMin = hhmmToMinutes(normalizeHHMM(String(oh.open_time || '')));
+      const closeMin = hhmmToMinutes(normalizeHHMM(String(oh.close_time || '')));
+      if (!Number.isFinite(openMin) || !Number.isFinite(closeMin) || closeMin <= openMin) return { closed: true };
+      return { closed: false, startMin: openMin, endMin: closeMin };
+    }
+
+    // Fallback (if Opening Hours were not loaded)
+    if (dow === 0) return { closed: true };
+    const startMin = 7 * 60 + 30;
+    const endMin = (dow === 6) ? (12 * 60) : (17 * 60 + 30);
+    return { closed: false, startMin, endMin };
+  }
+
+  function getMaxPerHalfHourForDate(dateStr) {
+    if (!dateStr) return 1;
+    const d = new Date(dateStr + 'T00:00:00-03:00');
+    if (Number.isNaN(d.getTime())) return 1;
+    const dow = d.getUTCDay();
+
+    const oh = Array.isArray(openingHoursCache)
+      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
+      : null;
+
+    if (!oh) return 1;
+    if (oh.is_closed) return 0;
+    const cap = parseInt(oh.max_per_half_hour, 10);
+    return Number.isFinite(cap) && cap > 0 ? cap : 1;
+  }
+
+function normalizeHHMM(t) {
+    const s = String(t || '').trim();
+    const m = s.match(/^(\d{1,2}):(\d{1,2})/);
+    if (!m) return null;
+    const hh = pad2(parseInt(m[1], 10));
+    const mm = pad2(parseInt(m[2], 10));
+    return `${hh}:${mm}`;
+  }
+
+  function isActiveBookingStatus(status) {
+    const s = normStr(status);
+    // status "cancelado" não ocupa slot
+    return s !== 'cancelado';
+  }
+
+  async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
+    const data = await apiGet('/api/bookings', { date: dateStr });
+    const list = data.bookings || [];
+    const map = new Map();
+
+    list.forEach(b => {
+      if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
+      if (!isActiveBookingStatus(b.status)) return;
+      const t = normalizeHHMM(b.time);
+      if (!t) return;
+      map.set(t, (map.get(t) || 0) + 1);
+    });
+
+    return map;
+  }
+
+  function minutesToHHMM(totalMin) {
+    const hh = Math.floor(totalMin / 60);
+    const mm = totalMin % 60;
+    return `${pad2(hh)}:${pad2(mm)}`;
+  }
+
+  function clampToRange(timeStr, range) {
+    const t = normalizeHHMM(timeStr);
+    if (!t || !range || range.closed) return null;
+    const [hh, mm] = t.split(':').map(n => parseInt(n, 10));
+    let total = hh * 60 + mm;
+
+    // arredonda para o slot mais próximo (00/30)
+    total = Math.round(total / 30) * 30;
+
+    if (total < range.startMin) total = range.startMin;
+    if (total > range.endMin) total = range.endMin;
+
+    // garante que não sai do padrão 00/30 depois do clamp
+    total = Math.round(total / 30) * 30;
+
+    return minutesToHHMM(total);
+  }
+
+
+  function classStatus(status) {
+    const s = normStr(status);
+    if (s === 'agendado') return 'status-agendado';
+    if (s === 'confirmado') return 'status-confirmado';
+    if (s === 'recebido') return 'status-recebido';
+    if (s === 'em servico' || s === 'em serviço') return 'status-em-servico';
+    if (s === 'concluido' || s === 'concluído') return 'status-concluido';
+    if (s === 'entregue') return 'status-entregue';
+    if (s === 'cancelado') return 'status-cancelado';
+    return 'status-agendado';
+  }
+
+  function buildStatusMessage(status, nome, petLabel, service, dataBR, time, prize) {
+    const s = normStr(status);
+    const cabecalho = `Oi ${nome}! Aqui é do Pet Funny!\n\n`;
+    let corpo = '';
+
+    switch (s) {
+      case 'agendado':
+        corpo = `Acabamos de registrar o agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQuando estiver próximo do dia, te avisamos por aqui.`;
+        break;
+      case 'confirmado':
+        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CONFIRMADO* \n\nMimo garantido: *${prize}*.\n\nQualquer alteração é só avisar a gente aqui no WhatsApp.`;
+        break;
+      case 'recebido':
+        corpo = `*${petLabel}* já está aqui com a gente para *${service}* \n\nEstamos cuidando com muito carinho.\n\nMimo da vez: *${prize}*.\n\nAssim que estiver tudo pronto, te avisamos por aqui.`;
+        break;
+      case 'em servico':
+        corpo = `Estamos cuidando de *${petLabel}* agora mesmo no *${service}* \n\nMimo aplicado: *${prize}*.\n\nDaqui a pouco estará pronto(a) para ser buscado(a).`;
+        break;
+      case 'concluido':
+        corpo = `O serviço de *${petLabel}* (*${service}*) foi *CONCLUÍDO* \n\nMimo aplicado: *${prize}*.\n\nQuando quiser, já pode vir buscar.`;
+        break;
+      case 'entregue':
+        corpo = `Tudo entregue, e esperamos que você tenha gostado do resultado! \n\nReferência: *${petLabel}*\nServiço: *${service}*\nMimo da Roleta: *${prize}*.\n\nObrigada por confiar no Pet Funny!`;
+        break;
+      case 'cancelado':
+        corpo = `Seu agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi *CANCELADO* \n\nSe quiser remarcar, é só mandar mensagem por aqui que encontramos um novo horário.`;
+        break;
+      default:
+        corpo = `O status do agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}* foi atualizado para: *${String(status || '').toUpperCase()}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQualquer dúvida, é só chamar aqui no WhatsApp!`;
+    }
+    return cabecalho + corpo;
+  }
+
+  /* ===== MOEDA: máscara e conversões (value_cents) ===== */
+  function formatCentsToBRL(cents) {
+    const n = Number(cents || 0) / 100;
+    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  function applyCurrencyMask(input) {
+    if (!input) return;
+    let raw = String(input.value || '').replace(/\D/g, '');
+
+    // se usuário apagou tudo, ok
+    if (raw === '') {
+      input.value = '';
+      input.dataset.cents = '';
+      return;
+    }
+
+    // permite zero
+    raw = raw.replace(/^0+/, '');
+    if (raw === '') raw = '0';
+
+    input.dataset.cents = raw;
+    input.value = formatCentsToBRL(raw);
+  }
+
+  function getCentsFromCurrencyInput(input) {
+    if (!input) return null;
+
+    // 1) tenta via dataset (máscara)
+    let raw = String(input.dataset?.cents || '').replace(/\D/g, '');
+    if (raw) {
+      const cents = parseInt(raw, 10);
+      return Number.isFinite(cents) ? cents : null;
+    }
+
+    // 2) fallback: tenta parsear pelo texto digitado/colado (ex: "85,00" ou "R$ 85,00" ou "85")
+    const txt = String(input.value || '').trim();
+    if (!txt) return null;
+
+    const digits = txt.replace(/\s/g, '').replace(/[R$r$]/g, '');
+    // se tiver vírgula, assume centavos; se não tiver, assume reais inteiros
+    if (digits.includes(',')) {
+      const cleaned = digits.replace(/\./g, '').replace(',', '.');
+      const n = Number(cleaned);
+      if (!Number.isFinite(n)) return null;
+      return Math.round(n * 100);
+    } else {
+      const onlyDigits = digits.replace(/\D/g, '');
+      if (!onlyDigits) return null;
+      return parseInt(onlyDigits, 10) * 100;
+    }
+  }
+
+  /* ===== TABS ===== */
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabViews = document.querySelectorAll('.tab-view');
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const tabId = btn.getAttribute('data-tab');
+      tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
+
+      if (tabId === 'tab-servicos') loadServices().catch(console.error);
+      if (tabId === 'tab-racas') loadBreeds().catch(console.error);
+
+      if (tabId === 'tab-horarios') loadOpeningHours().catch(console.error);
+
+      if (tabId === 'tab-dashboard') {
+        loadDashboard().finally(() => {
+          setTimeout(() => {
+            try { if (statusChart) statusChart.resize(); } catch (_) {}
+            try { if (prizeChart) prizeChart.resize(); } catch (_) {}
+          }, 60);
+        });
+      }
+
+      // NOVO: quando voltar para agenda, renderiza conforme view atual
+      if (tabId === 'tab-agenda') {
+        try { renderAgendaByView(ultimaLista || []); } catch (_) {}
+      }
+    });
+  });
+
+  // ===== CAMPOS AGENDA =====
+  const filtroData = document.getElementById('filtroData');
+  const filtroBusca = document.getElementById('filtroBusca');
+  const btnHoje = document.getElementById('btnHoje');
+  const btnLimparFiltro = document.getElementById('btnLimparFiltro');
+  const btnExportarCSV = document.getElementById('btnExportarCSV');
+  const btnNovoAgendamento = document.getElementById('btnNovoAgendamento');
+
+  const tbodyAgenda = document.getElementById('tbodyAgenda');
+  const estadoVazio = document.getElementById('estadoVazio');
+
+  // NOVO: cards
+  const agendaListWrapper = document.getElementById('agendaListWrapper');
+  const agendaCardsWrapper = document.getElementById('agendaCardsWrapper');
+  const agendaCards = document.getElementById('agendaCards');
+  const estadoVazioCards = document.getElementById('estadoVazioCards');
+  const btnViewList = document.getElementById('btnViewList');
+  const btnViewCards = document.getElementById('btnViewCards');
+
+  const statTotal = document.getElementById('statTotal');
+  const statTosa = document.getElementById('statTosa');
+  const statHidratacao = document.getElementById('statHidratacao');
+  const statFotoVideo = document.getElementById('statFotoVideo');
+  const statPatinhas = document.getElementById('statPatinhas');
+
+  const formPanel = document.getElementById('formPanel');
+
+  const bookingId = document.getElementById('bookingId');
+  const bookingOriginalStatus = document.getElementById('bookingOriginalStatus');
+  const formPhone = document.getElementById('formPhone');
+  const formNome = document.getElementById('formNome');
+  const formPetSelect = document.getElementById('formPetSelect');
+  const formPrize = document.getElementById('formPrize');
+  const formService = document.getElementById('formService');
+  const btnAddService = document.getElementById('btnAddService');
+  const selectedServicesWrap = document.getElementById('selectedServicesWrap');
+  const selectedServicesList = document.getElementById('selectedServicesList');
+  const servicesTotalEl = document.getElementById('servicesTotal');
+  let selectedServiceIds = [];
+  const formDate = document.getElementById('formDate');
+  const formTime = document.getElementById('formTime');
+
+  // Regras padrão (mesmas do cliente)
+  if (formDate) formDate.min = todayISO;
+  if (formTime) formTime.step = 1800; // 30 minutos
+
+
+  // Revalida e aplica limites quando a data/horário mudam
+  if (formDate) {
+    const onDateChanged = async () => {
+      const excludeId = bookingId && bookingId.value ? Number(bookingId.value) : null;
+      await refreshBookingDateTimeState(excludeId);
+
+      // Hardening: se a data é válida e o dia não é "fechado", o campo de horário deve estar habilitado.
+      // Isso evita casos em que o evento "change" não chega a disparar como esperado.
+      try {
+        const dateStr = formDate.value;
+        const range = buildRangeForDate(dateStr);
+        if (dateStr && range && !range.closed && formTime) {
+          formTime.disabled = false;
+        }
+      } catch (_) {}
+    };
+
+    formDate.addEventListener('change', onDateChanged);
+    formDate.addEventListener('input', onDateChanged);
+  }
+
+  if (formTime) {
+    // arredonda para 00/30 e aplica faixa do dia
+    formTime.addEventListener('blur', () => {
+      const range = buildRangeForDate(formDate ? formDate.value : '');
+      const clamped = clampToRange(formTime.value, range);
+      if (clamped) formTime.value = clamped;
+    });
+  }
+  const formStatus = document.getElementById('formStatus');
+  const formNotes = document.getElementById('formNotes');
+  const formError = document.getElementById('formError');
+  const btnSalvar = document.getElementById('btnSalvar');
+  const btnCancelarEdicao = document.getElementById('btnCancelarEdicao');
+
+  // ===== DASHBOARD =====
+  const dashPeriod = document.getElementById('dashPeriod');
+  const dashCustomRange = document.getElementById('dashCustomRange');
+  const dashStart = document.getElementById('dashStart');
+  const dashEnd = document.getElementById('dashEnd');
+  const dashApply = document.getElementById('dashApply');
+
+  const dashTotalBookings = document.getElementById('dashTotalBookings');
+  const dashUniqueCustomers = document.getElementById('dashUniqueCustomers');
+  const dashTotalCustomers = document.getElementById('dashTotalCustomers');
+
+  const dashStatusAgendado = document.getElementById('dashStatusAgendado');
+  const dashStatusConfirmado = document.getElementById('dashStatusConfirmado');
+  const dashStatusRecebido = document.getElementById('dashStatusRecebido');
+  const dashStatusEmServico = document.getElementById('dashStatusEmServico');
+  const dashStatusConcluido = document.getElementById('dashStatusConcluido');
+  const dashStatusEntregue = document.getElementById('dashStatusEntregue');
+  const dashStatusCancelado = document.getElementById('dashStatusCancelado');
+
+  const dashPrizeTosa = document.getElementById('dashPrizeTosa');
+  const dashPrizeHidratacao = document.getElementById('dashPrizeHidratacao');
+  const dashPrizeFotoVideo = document.getElementById('dashPrizeFotoVideo');
+  const dashPrizePatinhas = document.getElementById('dashPrizePatinhas');
+
+  const tbodyDashServices = document.getElementById('tbodyDashServices');
+  const dashServicesEmpty = document.getElementById('dashServicesEmpty');
+  const dashRevenue = document.getElementById('dashRevenue');
+  const dashAvgTicket = document.getElementById('dashAvgTicket');
+
+  let ultimaLista = [];
+  let clientesCache = [];
+  let clienteSelecionadoId = null;
+  let petsCache = [];
+  let petEditIdLocal = null;
+
+  function setEditMode(isEdit) {
+    // Em edição: mantém Tutor/Telefone travados, mas permite editar Pet e Mimo
+    formPhone.disabled = isEdit;
+    formNome.disabled = isEdit;
+    formPetSelect.disabled = false;
+    formPrize.disabled = false;
+  }
+
+  /* ===== Estado de disponibilidade (Admin) ===== */
+  let occupiedTimesMap = new Map();
+
+  async function refreshBookingDateTimeState(excludeBookingId) {
+    if (!formDate || !formTime) return;
+
+    const dateStr = formDate.value;
+    if (!dateStr) return;
+
+    const range = buildRangeForDate(dateStr);
+    if (!range || range.closed) {
+      formTime.disabled = true;
+      formTime.value = '';
+      occupiedTimesMap = new Map();
+      return;
+    }
+
+    formTime.disabled = false;
+    formTime.step = 1800; // 30 min
+
+    formTime.min = minutesToHHMM(range.startMin);
+    formTime.max = minutesToHHMM(range.endMin);
+
+    // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
+    try {
+      occupiedTimesMap = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
+    } catch (e) {
+      console.warn('Falha ao carregar horários ocupados:', e);
+      occupiedTimesMap = new Map();
+    }
+
+    // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
+    if (formTime.value) {
+      const clamped = clampToRange(formTime.value, range);
+      if (clamped) formTime.value = clamped;
+    }
+  }
+
+  function getCapacityForDate(dateStr) {
+    const cache = (window.__pf_openingHoursCache || []);
+    if (!dateStr) return 1;
+    const d = new Date(dateStr + "T12:00:00");
+    if (Number.isNaN(d.getTime())) return 1;
+    const dow = d.getDay();
+    const row = cache.find(r => Number(r.dow) === Number(dow));
+    if (!row) return 1;
+    if (row.is_closed) return 0;
+    const cap = Number(row.max_per_half_hour);
+    return Number.isFinite(cap) ? cap : 1;
+  }
+
+  function isTimeOccupied(timeStr) {
+    const t = normalizeHHMM(timeStr);
+    if (!t) return false;
+    const cap = getCapacityForDate(formDate ? formDate.value : "");
+    if (cap <= 0) return true;
+    const used = occupiedTimesMap.get(t) || 0;
+    return used >= cap;
+  }
+
+  function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
+  function esconderFormAgenda() { formPanel.classList.add('hidden'); }
+
+  async function fetchBookings() {
+    const params = {};
+    if (filtroData.value) params.date = filtroData.value;
+    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
+    const data = await apiGet('/api/bookings', params);
+    return data.bookings || [];
+  }
+
+  function atualizaEstatisticas(lista) {
+    const total = lista.length;
+
+    // Mantém contadores existentes (por serviço) para compatibilidade do painel
+    const contTosa = lista.filter(a => (a.service || '').toLowerCase().includes('tosa higiênica')).length;
+    const contHidra = lista.filter(a => (a.service || '').toLowerCase().includes('hidrata')).length;
+    const contFoto = lista.filter(a => (a.service || '').toLowerCase().includes('foto')).length;
+    const contPatinhas = lista.filter(a => (a.service || '').toLowerCase().includes('patinhas')).length;
+
+    statTotal.textContent = total;
+    statTosa.textContent = contTosa;
+    statHidratacao.textContent = contHidra;
+    statFotoVideo.textContent = contFoto;
+    statPatinhas.textContent = contPatinhas;
+
+    // ===== Mimos (dinâmico, respeita período do mimo X data do agendamento) =====
+    const mimosEl = document.getElementById('statMimosList');
+    if (mimosEl) {
+      const counts = {};
+
+      const isActiveOnDate = (mimo, dateStr) => {
+        if (!mimo || !dateStr) return false;
+        const d = dateStr;
+        const start = (mimo.start_date || '').slice(0,10);
+        const end = (mimo.end_date || '').slice(0,10);
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        return true;
+      };
+
+      lista.forEach((a) => {
+        const prize = (a.prize || '').trim();
+        if (!prize || prize.toLowerCase() === 'sem mimo') return;
+
+        const mimo = (cacheMimos || []).find(m => String(m.name || '').trim() === prize);
+        if (!mimo) return;
+
+        if (!isActiveOnDate(mimo, a.date)) return;
+        counts[prize] = (counts[prize] || 0) + 1;
+      });
+
+      const lines = Object.entries(counts)
+        .sort((a,b) => (b[1]-a[1]) || a[0].localeCompare(b[0]))
+        .map(([name, count]) => `${name}: ${count}`);
+
+      mimosEl.textContent = lines.length ? lines.join('\n') : '—';
+    }
+  }
+
+  // ===== GRÁFICOS =====
+  let statusChart = null;
+  let prizeChart = null;
+
+  function renderCharts(bookings) {
+    const statusCounts = { agendado:0, confirmado:0, recebido:0, em_servico:0, concluido:0, entregue:0, cancelado:0 };
+    const prizeCounts = { 'Tosa Higiênica':0, 'Hidratação':0, 'Foto e Vídeo Profissional':0, 'Patinhas impecáveis':0 };
+
+    bookings.forEach(b => {
+      const s = normStr(b.status);
+      if (s === 'agendado') statusCounts.agendado++;
+      else if (s === 'confirmado') statusCounts.confirmado++;
+      else if (s === 'recebido') statusCounts.recebido++;
+      else if (s === 'em servico') statusCounts.em_servico++;
+      else if (s === 'concluido') statusCounts.concluido++;
+      else if (s === 'entregue') statusCounts.entregue++;
+      else if (s === 'cancelado') statusCounts.cancelado++;
+
+      const p = b.prize || '';
+      if (prizeCounts.hasOwnProperty(p)) prizeCounts[p]++;
+    });
+
+    const ctxStatusEl = document.getElementById('chartStatus');
+    const ctxPrizesEl = document.getElementById('chartPrizes');
+    if (!ctxStatusEl || !ctxPrizesEl) return;
+
+    const ctxStatus = ctxStatusEl.getContext('2d');
+    const ctxPrizes = ctxPrizesEl.getContext('2d');
+
+    if (statusChart) statusChart.destroy();
+    if (prizeChart) prizeChart.destroy();
+
+    statusChart = new Chart(ctxStatus, {
+      type: 'bar',
+      data: {
+        labels: ['Agendado','Confirmado','Recebido','Em serviço','Concluído','Entregue','Cancelado'],
+        datasets: [{
+          label: 'Agendamentos',
+          data: [
+            statusCounts.agendado,
+            statusCounts.confirmado,
+            statusCounts.recebido,
+            statusCounts.em_servico,
+            statusCounts.concluido,
+            statusCounts.entregue,
+            statusCounts.cancelado
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, precision: 0 }
+        }
+      }
+    });
+
+    prizeChart = new Chart(ctxPrizes, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(prizeCounts),
+        datasets: [{ data: Object.values(prizeCounts) }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+  }
+
+  /* ===== PETS no SELECT (Agenda) ===== */
+  async function loadPetsForCustomer(customerId) {
+    const data = await apiGet('/api/pets', { customer_id: customerId });
+    const pets = (data.pets || []);
+    formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
+    pets.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.breed ? `${p.name} (${p.breed})` : p.name;
+      formPetSelect.appendChild(opt);
+    });
+    return pets;
+  }
+
+  function preencherFormEdicao(booking) {
+  // ID do agendamento em edição
+  const id = booking && booking.id ? String(booking.id) : '';
+  bookingIdInput.value = id;
+
+  // Cliente/Telefone
+  formPhone.value = booking && booking.phone ? booking.phone : '';
+  applyPhoneMask(formPhone); // garante máscara também ao carregar
+
+  // Data / Horário
+  formDate.value = booking && booking.date ? booking.date : '';
+  formTime.value = booking && booking.time ? booking.time : '';
+
+  // Serviço(s)
+  clearSelectedServices();
+
+  let servicesJson = booking && booking.services_json ? booking.services_json : null;
+  if (typeof servicesJson === 'string') {
+    try { servicesJson = JSON.parse(servicesJson); } catch (_) { servicesJson = null; }
+  }
+
+  if (Array.isArray(servicesJson) && servicesJson.length) {
+    selectedServiceIds = servicesJson.map(s => String(s.id)).filter(Boolean);
+  } else if (booking && booking.service_id) {
+    selectedServiceIds = [String(booking.service_id)];
+  }
+
+  // Ajusta select para o 1º serviço (para facilitar adicionar/alterar)
+  formService.value = selectedServiceIds[0] || '';
+  refreshSelectedServicesUI();
+
+  // Mimo (pode ser nulo)
+  const prizeVal = booking && booking.prize ? booking.prize : 'Sem mimo';
+  formPrize.value = prizeVal;
+
+  // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
+  refreshBookingDateTimeState(id ? Number(id) : null);
+}
+
+
+
+  /* ===== Serviços (cache, dropdown e CRUD) ===== */
+  const btnNovoServico = document.getElementById('btnNovoServico');
+  const serviceFormPanel = document.getElementById('serviceFormPanel');
+  const serviceId = document.getElementById('serviceId');
+  const serviceDate = document.getElementById('serviceDate');
+  const serviceTitle = document.getElementById('serviceTitle');
+  const servicePrice = document.getElementById('servicePrice');
+  const serviceError = document.getElementById('serviceError');
+  const btnServiceCancel = document.getElementById('btnServiceCancel');
+  const btnServiceSave = document.getElementById('btnServiceSave');
+  const tbodyServices = document.getElementById('tbodyServices');
+  const servicesEmpty = document.getElementById('servicesEmpty');
+
+  // Filtro de busca (Serviços)
+  const filtroServicos = document.getElementById('filtroServicos');
+  const btnLimparServicos = document.getElementById('btnLimparServicos');
+  let filtroServicosTxt = '';
+
+
+  let servicesCache = [];
+function getServiceById(id){
+  return servicesCache.find(s => String(s.id) === String(id));
+}
+
+function centsToBRL(cents){
+  const v = Number(cents || 0) / 100;
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
 
 function refreshSelectedServicesUI(){
   if (!selectedServicesList || !selectedServicesWrap || !servicesTotalEl) return;
@@ -771,7 +1463,6 @@ function clearSelectedServices(){
   }
 
 // Multi-serviços - adicionar/remover
-const btnAddService = document.getElementById("btnAddService"); // PATCH: define element reference
 if (btnAddService) {
   btnAddService.addEventListener('click', () => {
     const sid = formService.value;
@@ -1400,8 +2091,7 @@ async function salvarAgendamento() {
     const servicesLabel = serviceObj ? serviceObj.title : '';
 
     const date = formDate.value;
-   const time = window.normalizeTimeForApi(rawTime);
-
+    const time = formTime.value;
 
     // Validação de data/horário (mesmas regras do cliente)
     const dtMsg = validarDiaHora(date, time);
@@ -1665,8 +2355,6 @@ async function salvarAgendamento() {
   const cliError = document.getElementById('cliError');
   const btnCliLimpar = document.getElementById('btnCliLimpar');
   const btnCliSalvar = document.getElementById('btnCliSalvar');
-tbodyClientes = document.getElementById("tbodyClientes"); // PATCH: assigned to predeclared var
-  
 
   // Filtro de busca (Clientes & Pets)
   const filtroClientes = document.getElementById('filtroClientes');
@@ -1725,7 +2413,9 @@ tbodyClientes = document.getElementById("tbodyClientes"); // PATCH: assigned to 
   }
 
   function renderClientes() {
-    tbodyClientes.innerHTML = '';
+    const tbodyClientesEl = document.getElementById('tbodyClientes');
+    if (!tbodyClientesEl) return;
+    tbodyClientesEl.innerHTML = '';
 
     const list = (clientesCache || []).filter(c => {
       if (!filtroClientesTxt) return true;
@@ -1795,7 +2485,7 @@ tbodyClientes = document.getElementById("tbodyClientes"); // PATCH: assigned to 
       tr.appendChild(tdPetsCount);
       tr.appendChild(tdAcoes);
 
-      tbodyClientes.appendChild(tr);
+      tbodyClientesEl.appendChild(tr);
     });
   }
 
@@ -2395,5 +3085,4 @@ tbodyClientes = document.getElementById("tbodyClientes"); // PATCH: assigned to 
     const cap = parseInt(oh.max_per_half_hour, 10);
     return Number.isFinite(cap) && cap > 0 ? cap : 1;
   }
-
 
