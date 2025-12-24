@@ -2391,6 +2391,71 @@ async function salvarAgendamento() {
 
   cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
 
+  // Lookup automático: ao sair do campo telefone, verifica se o cliente já existe.
+  // Se existir, carrega dados e pets; se não existir, prepara o formulário para cadastro.
+  async function handleCliPhoneLookup() {
+    if (!cliPhone || !cliName) return;
+
+    const phoneDigits = sanitizePhone(cliPhone.value.trim());
+    if (!phoneDigits || phoneDigits.length < 10) return;
+
+    try {
+      if (cliError) { cliError.style.display = 'none'; cliError.textContent = ''; }
+
+      const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
+
+      if (lookup && lookup.exists && lookup.customer) {
+        const c = lookup.customer;
+
+        // Seleciona cliente no contexto da aba "Clientes & Pets"
+        clienteSelecionadoId = c.id;
+
+        badgeClienteSelecionado?.classList.remove('hidden');
+        clienteFormBlock?.classList.remove('hidden');
+        petsCard?.classList.remove('hidden');
+
+        cliPhone.value = formatTelefone(c.phone || phoneDigits);
+        cliName.value = c.name || '';
+
+        limparPetsForm();
+        await loadPetsForClienteTab(c.id);
+
+        if (cliError) { cliError.style.display = 'none'; cliError.textContent = ''; }
+      } else {
+        // Não existe: habilita bloco de cadastro (sem selecionar cliente)
+        clienteSelecionadoId = null;
+
+        badgeClienteSelecionado?.classList.add('hidden');
+        clienteFormBlock?.classList.remove('hidden');
+        petsCard?.classList.add('hidden');
+
+        tbodyPets && (tbodyPets.innerHTML = '');
+        limparPetsForm();
+
+        cliPhone.value = formatTelefone(phoneDigits);
+        if (!cliName.value) cliName.value = '';
+
+        if (cliError) {
+          cliError.textContent = 'Cliente não cadastrado. Preencha o nome e clique em “Salvar cliente” para cadastrar e então cadastrar os pets.';
+          cliError.style.display = 'block';
+        }
+      }
+    } catch (e) {
+      // Em caso de erro, não bloqueia o usuário, mas informa
+      if (cliError) {
+        cliError.textContent = 'Erro ao buscar cliente pelo telefone. Tente novamente. Detalhe: ' + (e.message || e);
+        cliError.style.display = 'block';
+      }
+    }
+  }
+
+  // Dispara lookup ao sair do campo (e também ao pressionar Enter)
+  if (cliPhone) {
+    cliPhone.addEventListener('blur', () => { handleCliPhoneLookup(); });
+    cliPhone.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleCliPhoneLookup(); } });
+  }
+
+
   if (filtroClientes) {
     filtroClientes.addEventListener('input', () => {
       filtroClientesTxt = normStr(filtroClientes.value);
