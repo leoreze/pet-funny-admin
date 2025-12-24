@@ -1,3 +1,4 @@
+/* PATCH: Fix global cacheMimos reference (admin bookings) — 2025-12-24 */
 const API_BASE_URL = '';
 
   /* ===== Helpers de normalização (corrige acentos/variações) ===== */
@@ -55,7 +56,8 @@ const API_BASE_URL = '';
   };
 
   let currentEditId = null;
-  let cacheMimos = [];
+  window.cacheMimos = Array.isArray(window.cacheMimos) ? window.cacheMimos : [];
+  let cacheMimos = window.cacheMimos;
 
   // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
   // seja populado mesmo sem o usuário abrir a aba "Mimos".
@@ -348,6 +350,7 @@ const API_BASE_URL = '';
     setMsg('Carregando...', false);
     const mimos = await apiGetMimos();
     cacheMimos = mimos;
+    window.cacheMimos = cacheMimos;
     renderMimosTable(mimos);
     syncPrizeSelect(mimos);
     setMsg('', false);
@@ -1158,7 +1161,7 @@ function normalizeHHMM(t) {
         const prize = (a.prize || '').trim();
         if (!prize || prize.toLowerCase() === 'sem mimo') return;
 
-        const mimo = (cacheMimos || []).find(m => String(m.name || '').trim() === prize);
+        const mimo = (window.cacheMimos || []).find(m => String(m.name || '').trim() === prize);
         if (!mimo) return;
 
         if (!isActiveOnDate(mimo, a.date)) return;
@@ -3085,4 +3088,3 @@ async function salvarAgendamento() {
     const cap = parseInt(oh.max_per_half_hour, 10);
     return Number.isFinite(cap) && cap > 0 ? cap : 1;
   }
-
