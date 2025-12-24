@@ -2463,7 +2463,16 @@ async function salvarAgendamento() {
         cliPhone.value = formatTelefone(c.phone);
         cliName.value = c.name || '';
 
-        limparPetsForm();
+        
+        // Endereço: se não existir no cadastro, deve vir vazio (não "undefined"/"null")
+        if (typeof cliCep !== 'undefined' && cliCep) cliCep.value = c.cep || '';
+        if (typeof cliStreet !== 'undefined' && cliStreet) cliStreet.value = c.street || '';
+        if (typeof cliNumber !== 'undefined' && cliNumber) cliNumber.value = c.number || '';
+        if (typeof cliComplement !== 'undefined' && cliComplement) cliComplement.value = c.complement || '';
+        if (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) cliNeighborhood.value = c.neighborhood || '';
+        if (typeof cliCity !== 'undefined' && cliCity) cliCity.value = c.city || '';
+        if (typeof cliState !== 'undefined' && cliState) cliState.value = c.state || '';
+limparPetsForm();
         await loadPetsForClienteTab(c.id);
       });
 
