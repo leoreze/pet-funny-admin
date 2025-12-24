@@ -153,6 +153,73 @@
   // Importante: não usar "||" aqui para não ficar preso em uma versão errada.
   window.normalizeTimeForApi = normalizeTimeForApi;
 
+    // =========================
+  // CURRENCY MASK (GLOBAL WRAPPERS)
+  // =========================
+  // O sistema já tinha applyCurrencyMask/getCentsFromCurrencyInput no scripts.js.
+  // Para evitar regressão e passar no healthcheck, expomos wrappers globais aqui.
+  // Se o scripts.js já definir, respeitamos o existente.
+
+  function applyCurrencyMask(input) {
+    if (!input) return;
+
+    let raw = String(input.value || '').replace(/\D/g, '');
+
+    // Se usuário apagou tudo
+    if (raw === '') {
+      input.value = '';
+      if (input.dataset) input.dataset.cents = '';
+      return;
+    }
+
+    raw = raw.replace(/^0+/, '');
+    if (raw === '') raw = '0';
+
+    if (input.dataset) input.dataset.cents = raw;
+
+    // raw está em centavos
+    input.value = formatCentsToBRL(Number(raw));
+  }
+
+  function getCentsFromCurrencyInput(input) {
+    if (!input) return null;
+
+    // 1) dataset (máscara)
+    const ds = String(input.dataset?.cents || '').replace(/\D/g, '');
+    if (ds) {
+      const cents = parseInt(ds, 10);
+      return Number.isFinite(cents) ? cents : null;
+    }
+
+    // 2) fallback: parsear texto
+    const txt = String(input.value || '').trim();
+    if (!txt) return null;
+
+    const cleaned = txt.replace(/\s/g, '').replace(/[R$r$]/g, '');
+
+    // com vírgula: decimal
+    if (cleaned.includes(',')) {
+      const n = Number(cleaned.replace(/\./g, '').replace(',', '.'));
+      if (!Number.isFinite(n)) return null;
+      return Math.round(n * 100);
+    }
+
+    // sem vírgula: reais inteiros
+    const only = cleaned.replace(/\D/g, '');
+    if (!only) return null;
+    return parseInt(only, 10) * 100;
+  }
+
+  window.applyCurrencyMask = window.applyCurrencyMask || applyCurrencyMask;
+  window.getCentsFromCurrencyInput = window.getCentsFromCurrencyInput || getCentsFromCurrencyInput;
+
+  // também no namespace PF_HELPERS
+  window.PF_HELPERS = Object.assign({}, window.PF_HELPERS || {}, {
+    applyCurrencyMask,
+    getCentsFromCurrencyInput,
+  });
+
+
   // Mantém aliases legados se o sistema já usa direto no window (sem quebrar)
   window.formatCentsToBRL = window.formatCentsToBRL || formatCentsToBRL;
   window.parseBRLToCents = window.parseBRLToCents || parseBRLToCents;
