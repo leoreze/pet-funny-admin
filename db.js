@@ -62,18 +62,34 @@ async function initDb() {
   /* -------------------------
      Core
   ------------------------- */
+  // Customers
   await query(`
     CREATE TABLE IF NOT EXISTS customers (
       id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
       phone TEXT NOT NULL,
-      email TEXT,
-      cpf TEXT,
-      address TEXT,
-      notes TEXT,
+      name TEXT NOT NULL,
+      cep TEXT,
+      street TEXT,
+      number TEXT,
+      complement TEXT,
+      neighborhood TEXT,
+      city TEXT,
+      state TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  // PATCH: add detailed address fields to customers (CEP, street, etc) - 2025-12-24
+  await query(`
+    ALTER TABLE customers
+      ADD COLUMN IF NOT EXISTS cep TEXT,
+      ADD COLUMN IF NOT EXISTS street TEXT,
+      ADD COLUMN IF NOT EXISTS number TEXT,
+      ADD COLUMN IF NOT EXISTS complement TEXT,
+      ADD COLUMN IF NOT EXISTS neighborhood TEXT,
+      ADD COLUMN IF NOT EXISTS city TEXT,
+      ADD COLUMN IF NOT EXISTS state TEXT;
   `);
   await query(`CREATE INDEX IF NOT EXISTS customers_phone_idx ON customers (phone);`);
 

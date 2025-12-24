@@ -2391,70 +2391,55 @@ async function salvarAgendamento() {
 
   cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
 
-  // Lookup automático: ao sair do campo telefone, verifica se o cliente já existe.
-  // Se existir, carrega dados e pets; se não existir, prepara o formulário para cadastro.
-  async function handleCliPhoneLookup() {
-    if (!cliPhone || !cliName) return;
 
-    const phoneDigits = sanitizePhone(cliPhone.value.trim());
-    if (!phoneDigits || phoneDigits.length < 10) return;
+  // PATCH: lookup customer by phone + CEP autofill - 2025-12-24
+  async function hydrateCustomerFormFromRow(c) {
+    if (!c) return;
+    cliName.value = c.name || '';
+    cliPhone.value = c.phone || '';
+    const _set = (el, val) => { if (el) el.value = val || ''; };
+    _set(typeof cliEmail !== 'undefined' ? cliEmail : null, c.email);
+    _set(typeof cliCpf !== 'undefined' ? cliCpf : null, c.cpf);
+    _set(typeof cliAddress !== 'undefined' ? cliAddress : null, c.address);
+    _set(typeof cliNotes !== 'undefined' ? cliNotes : null, c.notes);
+    _set(cliCep, c.cep);
+    _set(cliStreet, c.street);
+    _set(cliNumber, c.number);
+    _set(cliComplement, c.complement);
+    _set(cliNeighborhood, c.neighborhood);
+    _set(cliCity, c.city);
+    _set(cliState, c.state);
+  }
 
+  async function lookupCustomerByPhoneForForm() {
+    const phone = String(cliPhone?.value || '').trim();
+    if (!phone) return;
     try {
-      if (cliError) { cliError.style.display = 'none'; cliError.textContent = ''; }
-
-      const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
-
-      if (lookup && lookup.exists && lookup.customer) {
-        const c = lookup.customer;
-
-        // Seleciona cliente no contexto da aba "Clientes & Pets"
-        clienteSelecionadoId = c.id;
-
-        badgeClienteSelecionado?.classList.remove('hidden');
-        clienteFormBlock?.classList.remove('hidden');
-        petsCard?.classList.remove('hidden');
-
-        cliPhone.value = formatTelefone(c.phone || phoneDigits);
-        cliName.value = c.name || '';
-
-        limparPetsForm();
-        await loadPetsForClienteTab(c.id);
-
-        if (cliError) { cliError.style.display = 'none'; cliError.textContent = ''; }
-      } else {
-        // Não existe: habilita bloco de cadastro (sem selecionar cliente)
-        clienteSelecionadoId = null;
-
-        badgeClienteSelecionado?.classList.add('hidden');
-        clienteFormBlock?.classList.remove('hidden');
-        petsCard?.classList.add('hidden');
-
-        tbodyPets && (tbodyPets.innerHTML = '');
-        limparPetsForm();
-
-        cliPhone.value = formatTelefone(phoneDigits);
-        if (!cliName.value) cliName.value = '';
-
-        if (cliError) {
-          cliError.textContent = 'Cliente não cadastrado. Preencha o nome e clique em “Salvar cliente” para cadastrar e então cadastrar os pets.';
-          cliError.style.display = 'block';
-        }
+      const resp = await apiPost('/api/customers/lookup', { phone });
+      if (resp && resp.customer) {
+        await hydrateCustomerFormFromRow(resp.customer);
       }
     } catch (e) {
-      // Em caso de erro, não bloqueia o usuário, mas informa
-      if (cliError) {
-        cliError.textContent = 'Erro ao buscar cliente pelo telefone. Tente novamente. Detalhe: ' + (e.message || e);
-        cliError.style.display = 'block';
-      }
+      // 404 (não encontrado) é esperado: segue cadastro normal
     }
   }
 
-  // Dispara lookup ao sair do campo (e também ao pressionar Enter)
-  if (cliPhone) {
-    cliPhone.addEventListener('blur', () => { handleCliPhoneLookup(); });
-    cliPhone.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); handleCliPhoneLookup(); } });
-  }
+  if (cliPhone) cliPhone.addEventListener('blur', lookupCustomerByPhoneForForm);
 
+  if (cliCep) {
+    cliCep.addEventListener('blur', async () => {
+      try {
+        const data = await (window.apiViaCep ? window.apiViaCep(cliCep.value) : null);
+        if (!data) return;
+        if (cliStreet && !cliStreet.value) cliStreet.value = data.logradouro || '';
+        if (cliNeighborhood && !cliNeighborhood.value) cliNeighborhood.value = data.bairro || '';
+        if (cliCity && !cliCity.value) cliCity.value = data.localidade || '';
+        if (cliState && !cliState.value) cliState.value = data.uf || '';
+      } catch (err) {
+        console.warn('ViaCEP falhou:', err);
+      }
+    });
+  }
 
   if (filtroClientes) {
     filtroClientes.addEventListener('input', () => {
@@ -2587,7 +2572,22 @@ async function salvarAgendamento() {
     }
 
     try {
-      const data = await apiPost('/api/customers', { phone: phoneDigits, name });
+      const payloadCustomer = {
+        phone: phoneDigits,
+        name,
+        email: (typeof cliEmail !== 'undefined' && cliEmail) ? (cliEmail.value || '') : '',
+        cpf: (typeof cliCpf !== 'undefined' && cliCpf) ? (cliCpf.value || '') : '',
+        address: (typeof cliAddress !== 'undefined' && cliAddress) ? (cliAddress.value || '') : '',
+        notes: (typeof cliNotes !== 'undefined' && cliNotes) ? (cliNotes.value || '') : '',
+        cep: (typeof cliCep !== 'undefined' && cliCep) ? (cliCep.value || '') : '',
+        street: (typeof cliStreet !== 'undefined' && cliStreet) ? (cliStreet.value || '') : '',
+        number: (typeof cliNumber !== 'undefined' && cliNumber) ? (cliNumber.value || '') : '',
+        complement: (typeof cliComplement !== 'undefined' && cliComplement) ? (cliComplement.value || '') : '',
+        neighborhood: (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) ? (cliNeighborhood.value || '') : '',
+        city: (typeof cliCity !== 'undefined' && cliCity) ? (cliCity.value || '') : '',
+        state: (typeof cliState !== 'undefined' && cliState) ? (cliState.value || '') : ''
+      };
+      const data = await apiPost('/api/customers', payloadCustomer);
       clienteSelecionadoId = data.customer.id;
       badgeClienteSelecionado.classList.remove('hidden');
       petsCard.classList.remove('hidden');

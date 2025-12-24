@@ -64,3 +64,18 @@
   window.apiDelete = window.apiDelete || apiDelete;
 
 })();
+
+
+// PATCH: ViaCEP lookup (admin/customer address autofill) - 2025-12-24
+async function apiViaCep(cep) {
+  const clean = String(cep || '').replace(/\D+/g, '');
+  if (clean.length !== 8) return null;
+  const url = `https://viacep.com.br/ws/${clean}/json/`;
+  const resp = await fetch(url, { method: 'GET' });
+  if (!resp.ok) return null;
+  const data = await resp.json();
+  if (data && data.erro) return null;
+  return data;
+}
+
+window.apiViaCep = apiViaCep;

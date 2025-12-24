@@ -687,7 +687,7 @@ app.put('/api/mimos/:id', async (req, res) => {
     const row = await db.get(
       `UPDATE mimos
        SET title=$1, description=$2, value_cents=$3, starts_at=$4, ends_at=$5, is_active=$6, updated_at=NOW()
-       WHERE id=$7
+       WHERE id=$14
        RETURNING id, title, description, value_cents, starts_at, ends_at, is_active, updated_at`,
       [title, description, Math.round(value_cents), starts_at, ends_at, is_active, id]
     );
@@ -872,7 +872,7 @@ app.put('/api/mimos/:id', async (req, res) => {
     const row = await db.get(
       `UPDATE mimos
        SET title=$1, description=$2, value_cents=$3, starts_at=$4, ends_at=$5, is_active=$6, updated_at=NOW()
-       WHERE id=$7
+       WHERE id=$14
        RETURNING *`,
       [title, description, value_cents, starts_at, ends_at, is_active, id]
     );
