@@ -771,6 +771,7 @@ function clearSelectedServices(){
   }
 
 // Multi-serviços - adicionar/remover
+const btnAddService = document.getElementById("btnAddService"); // PATCH: define element reference
 if (btnAddService) {
   btnAddService.addEventListener('click', () => {
     const sid = formService.value;
@@ -1664,7 +1665,8 @@ async function salvarAgendamento() {
   const cliError = document.getElementById('cliError');
   const btnCliLimpar = document.getElementById('btnCliLimpar');
   const btnCliSalvar = document.getElementById('btnCliSalvar');
-  const tbodyClientes = document.getElementById('tbodyClientes');
+tbodyClientes = document.getElementById("tbodyClientes"); // PATCH: assigned to predeclared var
+  
 
   // Filtro de busca (Clientes & Pets)
   const filtroClientes = document.getElementById('filtroClientes');
