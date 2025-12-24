@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<!-- PATCH: Desativar multi-serviços no agendamento (admin). 2025-12-24 -->
   <meta charset="UTF-8" />
   <title>Admin – Pet Funny</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -175,9 +176,9 @@
               <select id="formService">
                 <option value="">Carregando serviços...</option>
               </select>
-              <button type="button" class="btn btn-secondary" id="btnAddService">Adicionar</button>
+              <button type="button" class="btn btn-secondary" id="btnAddService" style="display:none">Adicionar</button>
             </div>
-            <div class="selected-services" id="selectedServicesWrap" style="display:none;">
+            <div class="selected-services" id="selectedServicesWrap" style="display:none;" style="display:none">
               <div class="selected-services-title">Serviços selecionados</div>
               <ul id="selectedServicesList"></ul>
               <div class="selected-services-total">Total serviços: <span id="servicesTotal">R$ 0,00</span></div>

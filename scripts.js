@@ -1467,13 +1467,16 @@ function clearSelectedServices(){
 
 // Multi-serviços - adicionar/remover
 if (btnAddService) {
-  btnAddService.addEventListener('click', () => {
+    // Multi-serviços desativado: botão oculto no HTML. Mantemos o handler por compatibilidade, mas forçamos 1 serviço.
+    btnAddService.addEventListener('click', () => {
+
     const sid = formService.value;
     if (!sid) return;
     selectedServiceIds.push(String(sid));
     refreshSelectedServicesUI();
-  });
-}
+  
+    });
+  }
 
 if (selectedServicesList) {
   selectedServicesList.addEventListener('click', (ev) => {
