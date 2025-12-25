@@ -2532,54 +2532,40 @@ function attachCepMaskToCrudIfPresent() {
 }
 
 function initCepAutofillToCrudIfPresent() {
-  const cepEl = document.getElementById('cliCep');
-  if (!cepEl) return;
+  const cepInput = document.getElementById('cliCep');
+  if (!cepInput) return;
 
-  const streetEl = document.getElementById('cliStreet');
-  const neighborhoodEl = document.getElementById('cliNeighborhood');
-  const cityEl = document.getElementById('cliCity');
-  const stateEl = document.getElementById('cliState');
-  const complementEl = document.getElementById('cliComplement');
+  // evita múltiplos listeners duplicados
+  if (cepInput.dataset.cepBound === '1') return;
+  cepInput.dataset.cepBound = '1';
 
-  let lastLookup = '';
-
-  async function lookupAndFill() {
-    const digits = String(cepEl.value || '').replace(/\D/g, '');
-    if (digits.length !== 8) return;
-    if (digits === lastLookup) return;
-    lastLookup = digits;
+  cepInput.addEventListener('blur', async () => {
+    const raw = (cepInput.value || '').replace(/\D/g, '');
+    if (raw.length !== 8) return;
 
     try {
-      const resp = await fetch(`https://viacep.com.br/ws/${digits}/json/`, { cache: 'no-store' });
-      if (!resp.ok) return;
+      const resp = await fetch(`https://viacep.com.br/ws/${raw}/json/`);
+      const data = await resp.json();
+      if (data.erro) return;
 
-      const json = await resp.json();
-      if (!json || json.erro) return;
+      const street = document.getElementById('cliStreet');
+      const neighborhood = document.getElementById('cliNeighborhood');
+      const city = document.getElementById('cliCity');
+      const state = document.getElementById('cliState');
+      const complement = document.getElementById('cliComplement');
 
-      // Preencher SEM sobrescrever o que o usuário já digitou
-      if (streetEl && !streetEl.value) streetEl.value = json.logradouro || '';
-      if (neighborhoodEl && !neighborhoodEl.value) neighborhoodEl.value = json.bairro || '';
-      if (cityEl && !cityEl.value) cityEl.value = json.localidade || '';
-      if (stateEl && !stateEl.value) stateEl.value = json.uf || '';
-      if (complementEl && !complementEl.value) complementEl.value = json.complemento || '';
+      if (street && !street.value) street.value = data.logradouro || '';
+      if (neighborhood && !neighborhood.value) neighborhood.value = data.bairro || '';
+      if (city && !city.value) city.value = data.localidade || '';
+      if (state && !state.value) state.value = data.uf || '';
+      if (complement && !complement.value) complement.value = data.complemento || '';
 
-      [streetEl, neighborhoodEl, cityEl, stateEl, complementEl].forEach((el) => {
-        if (!el) return;
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      });
     } catch (e) {
-      console.warn('CEP lookup failed:', e);
+      console.warn('Falha ao consultar CEP:', e);
     }
-  }
-
-  // On blur/change (menos ruído)
-  cepEl.addEventListener('blur', lookupAndFill);
-  cepEl.addEventListener('change', lookupAndFill);
-
-  // Se já veio preenchido (ex: selecionar cliente), tenta completar
-  setTimeout(() => lookupAndFill(), 0);
+  });
 }
+
 
 
 if (cliPhone) {
@@ -2694,7 +2680,7 @@ const cliState = document.getElementById('cliState') || document.getElementById(
       btnSel.type = 'button';
       btnSel.addEventListener('click', async () => {
         clienteSelecionadoId = c.id;
-
+initCepAutofillToCrudIfPresent();
         badgeClienteSelecionado.classList.remove('hidden');
         clienteFormBlock.classList.remove('hidden');
         petsCard.classList.remove('hidden');
@@ -2913,6 +2899,7 @@ limparPetsForm();
 
   btnNovoCliente.addEventListener('click', () => {
 
+    initCepAutofillToCrudIfPresent();
     modoNovoCliente = true;
 modoNovoClienteCRUD = true;
 attachCepMaskIfPresent();
