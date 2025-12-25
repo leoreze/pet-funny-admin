@@ -963,6 +963,103 @@ function normalizeHHMM(t) {
   const bookingOriginalStatus = document.getElementById('bookingOriginalStatus');
   const formPhone = document.getElementById('formPhone');
   const formNome = document.getElementById('formNome');
+
+  // PATCH: CEP mask + auto-lookup customer by WhatsApp phone on "Novo cliente" - 2025-12-24
+let modoNovoCliente = false;
+let _lookupPhoneTimer = null;
+
+function maskCepValue(raw) {
+  const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 5) return digits;
+  return digits.slice(0, 5) + '-' + digits.slice(5);
+}
+
+function attachCepMaskIfPresent() {
+  const el =
+    document.getElementById('formCep') ||
+    document.querySelector('input[name="cep"]') ||
+    document.querySelector('input[placeholder*="CEP" i]');
+  if (!el) return;
+
+  el.addEventListener('input', () => {
+    const masked = maskCepValue(el.value);
+    if (el.value !== masked) el.value = masked;
+  });
+
+  el.value = maskCepValue(el.value);
+}
+
+function setCustomerFormFromLookup(customer) {
+  if (formPhone) formPhone.value = customer?.phone || formPhone.value || '';
+  if (formNome) formNome.value = customer?.name || '';
+
+  // Endereço (se existir no HTML atual)
+  const map = [
+    ['formCep', 'cep'],
+    ['formStreet', 'street'],
+    ['formEndereco', 'street'],
+    ['formNumber', 'number'],
+    ['formNumero', 'number'],
+    ['formComplement', 'complement'],
+    ['formComplemento', 'complement'],
+    ['formNeighborhood', 'neighborhood'],
+    ['formBairro', 'neighborhood'],
+    ['formCity', 'city'],
+    ['formCidade', 'city'],
+    ['formState', 'state'],
+    ['formEstado', 'state'],
+    ['formUf', 'state'],
+    ['formUF', 'state'],
+  ];
+
+  for (const [id, key] of map) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.value = (customer && customer[key] != null) ? String(customer[key]) : '';
+  }
+}
+
+async function tryAutofillCustomerByPhone() {
+  if (!modoNovoCliente) return;
+  if (!formPhone) return;
+
+  const digits = String(formPhone.value || '').replace(/\D/g, '');
+  if (digits.length < 10) return;
+
+  try {
+    const data = await apiPost('/api/customers/lookup', { phone: digits });
+    const customer = data?.customer;
+
+    if (customer?.id) {
+      clienteSelecionadoId = customer.id;
+      setCustomerFormFromLookup(customer);
+
+      if (typeof toast === 'function') {
+        toast('Cliente já cadastrado. Dados carregados automaticamente.');
+      } else {
+        console.info('[PetFunny] Cliente já cadastrado. Autofill aplicado.');
+      }
+    }
+  } catch (e) {
+    console.warn('[PetFunny] Falha no lookup do cliente por telefone:', e);
+  }
+}
+
+// Bindings
+if (formPhone) {
+  formPhone.addEventListener('blur', () => {
+    clearTimeout(_lookupPhoneTimer);
+    _lookupPhoneTimer = setTimeout(tryAutofillCustomerByPhone, 180);
+  });
+  formPhone.addEventListener('input', () => {
+    clearTimeout(_lookupPhoneTimer);
+    _lookupPhoneTimer = setTimeout(tryAutofillCustomerByPhone, 320);
+  });
+}
+
+attachCepMaskIfPresent();
+
+
   const formPetSelect = document.getElementById('formPetSelect');
   const formPrize = document.getElementById('formPrize');
   const formService = document.getElementById('formService');
@@ -2359,6 +2456,94 @@ async function salvarAgendamento() {
   // ===== CLIENTES & PETS =====
   const cliPhone = document.getElementById('cliPhone');
   const cliName = document.getElementById('cliName');
+  // PATCH: auto-lookup no CRUD de Clientes ao digitar Telefone (WhatsApp) em "Novo cliente" - 2025-12-24
+let modoNovoClienteCRUD = false;
+let _lookupCrudTimer = null;
+
+function setCrudCustomerFormFromLookup(customer) {
+  if (cliPhone) cliPhone.value = customer?.phone || cliPhone.value || '';
+  if (cliName) cliName.value = customer?.name || '';
+
+  // Endereço (se existir no HTML atual)
+  const map = [
+    ['cliCep', 'cep'],
+    ['cliStreet', 'street'],
+    ['cliEndereco', 'street'],
+    ['cliNumber', 'number'],
+    ['cliNumero', 'number'],
+    ['cliComplement', 'complement'],
+    ['cliComplemento', 'complement'],
+    ['cliNeighborhood', 'neighborhood'],
+    ['cliBairro', 'neighborhood'],
+    ['cliCity', 'city'],
+    ['cliCidade', 'city'],
+    ['cliState', 'state'],
+    ['cliEstado', 'state'],
+    ['cliUf', 'state'],
+    ['cliUF', 'state'],
+  ];
+
+  for (const [id, key] of map) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.value = (customer && customer[key] != null) ? String(customer[key]) : '';
+  }
+}
+
+async function tryAutofillCrudCustomerByPhone() {
+  if (!modoNovoClienteCRUD) return;
+  if (!cliPhone) return;
+
+  const digits = String(cliPhone.value || '').replace(/\D/g, '');
+  if (digits.length < 10) return;
+
+  try {
+    const data = await apiPost('/api/customers/lookup', { phone: digits });
+    const customer = data?.customer;
+
+    if (customer?.id) {
+      clienteSelecionadoId = customer.id;
+      setCrudCustomerFormFromLookup(customer);
+
+      if (typeof toast === 'function') {
+        toast('Cliente já cadastrado. Dados carregados automaticamente.');
+      } else {
+        console.info('[PetFunny] CRUD: cliente já cadastrado. Autofill aplicado.');
+      }
+    }
+  } catch (e) {
+    console.warn('[PetFunny] CRUD: falha no lookup por telefone:', e);
+  }
+}
+
+function attachCepMaskToCrudIfPresent() {
+  const el =
+    document.getElementById('cliCep') ||
+    document.querySelector('#tabClientes input[name="cep"]') ||
+    document.querySelector('#tabClientes input[placeholder*="CEP" i]');
+  if (!el) return;
+
+  el.addEventListener('input', () => {
+    const masked = maskCepValue(el.value);
+    if (el.value !== masked) el.value = masked;
+  });
+
+  el.value = maskCepValue(el.value);
+}
+
+if (cliPhone) {
+  cliPhone.addEventListener('blur', () => {
+    clearTimeout(_lookupCrudTimer);
+    _lookupCrudTimer = setTimeout(tryAutofillCrudCustomerByPhone, 180);
+  });
+  cliPhone.addEventListener('input', () => {
+    clearTimeout(_lookupCrudTimer);
+    _lookupCrudTimer = setTimeout(tryAutofillCrudCustomerByPhone, 320);
+  });
+}
+
+attachCepMaskToCrudIfPresent();
+
 // PATCH: select customer fills address fields when present; defaults to empty when missing - 2025-12-24
 const cliCep = document.getElementById('cliCep') || document.getElementById('customerCep') || document.getElementById('cep') || null;
 const cliStreet = document.getElementById('cliStreet') || document.getElementById('customerStreet') || document.getElementById('street') || null;
@@ -2675,6 +2860,12 @@ limparPetsForm();
   btnNovoPet.addEventListener('click', () => limparPetsForm);
 
   btnNovoCliente.addEventListener('click', () => {
+
+    modoNovoCliente = true;
+modoNovoClienteCRUD = true;
+attachCepMaskIfPresent();
+attachCepMaskToCrudIfPresent();
+
     clienteSelecionadoId = null;
     badgeClienteSelecionado.classList.add('hidden');
 
