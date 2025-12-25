@@ -2531,6 +2531,57 @@ function attachCepMaskToCrudIfPresent() {
   el.value = maskCepValue(el.value);
 }
 
+function initCepAutofillToCrudIfPresent() {
+  const cepEl = document.getElementById('cliCep');
+  if (!cepEl) return;
+
+  const streetEl = document.getElementById('cliStreet');
+  const neighborhoodEl = document.getElementById('cliNeighborhood');
+  const cityEl = document.getElementById('cliCity');
+  const stateEl = document.getElementById('cliState');
+  const complementEl = document.getElementById('cliComplement');
+
+  let lastLookup = '';
+
+  async function lookupAndFill() {
+    const digits = String(cepEl.value || '').replace(/\D/g, '');
+    if (digits.length !== 8) return;
+    if (digits === lastLookup) return;
+    lastLookup = digits;
+
+    try {
+      const resp = await fetch(`https://viacep.com.br/ws/${digits}/json/`, { cache: 'no-store' });
+      if (!resp.ok) return;
+
+      const json = await resp.json();
+      if (!json || json.erro) return;
+
+      // Preencher SEM sobrescrever o que o usuário já digitou
+      if (streetEl && !streetEl.value) streetEl.value = json.logradouro || '';
+      if (neighborhoodEl && !neighborhoodEl.value) neighborhoodEl.value = json.bairro || '';
+      if (cityEl && !cityEl.value) cityEl.value = json.localidade || '';
+      if (stateEl && !stateEl.value) stateEl.value = json.uf || '';
+      if (complementEl && !complementEl.value) complementEl.value = json.complemento || '';
+
+      [streetEl, neighborhoodEl, cityEl, stateEl, complementEl].forEach((el) => {
+        if (!el) return;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    } catch (e) {
+      console.warn('CEP lookup failed:', e);
+    }
+  }
+
+  // On blur/change (menos ruído)
+  cepEl.addEventListener('blur', lookupAndFill);
+  cepEl.addEventListener('change', lookupAndFill);
+
+  // Se já veio preenchido (ex: selecionar cliente), tenta completar
+  setTimeout(() => lookupAndFill(), 0);
+}
+
+
 if (cliPhone) {
   cliPhone.addEventListener('blur', () => {
     clearTimeout(_lookupCrudTimer);
@@ -2544,6 +2595,7 @@ if (cliPhone) {
 
 attachCepMaskToCrudIfPresent();
 
+initCepAutofillToCrudIfPresent();
 // PATCH: select customer fills address fields when present; defaults to empty when missing - 2025-12-24
 const cliCep = document.getElementById('cliCep') || document.getElementById('customerCep') || document.getElementById('cep') || null;
 const cliStreet = document.getElementById('cliStreet') || document.getElementById('customerStreet') || document.getElementById('street') || null;
