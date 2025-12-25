@@ -2359,13 +2359,15 @@ async function salvarAgendamento() {
   // ===== CLIENTES & PETS =====
   const cliPhone = document.getElementById('cliPhone');
   const cliName = document.getElementById('cliName');
-  const cliCep = document.getElementById('cliCep');
-  const cliStreet = document.getElementById('cliStreet');
-  const cliNumber = document.getElementById('cliNumber');
-  const cliComplement = document.getElementById('cliComplement');
-  const cliNeighborhood = document.getElementById('cliNeighborhood');
-  const cliCity = document.getElementById('cliCity');
-  const cliState = document.getElementById('cliState');
+// PATCH: select customer fills address fields when present; defaults to empty when missing - 2025-12-24
+const cliCep = document.getElementById('cliCep') || document.getElementById('customerCep') || document.getElementById('cep') || null;
+const cliStreet = document.getElementById('cliStreet') || document.getElementById('customerStreet') || document.getElementById('street') || null;
+const cliNumber = document.getElementById('cliNumber') || document.getElementById('customerNumber') || document.getElementById('number') || null;
+const cliComplement = document.getElementById('cliComplement') || document.getElementById('customerComplement') || document.getElementById('complement') || null;
+const cliNeighborhood = document.getElementById('cliNeighborhood') || document.getElementById('customerNeighborhood') || document.getElementById('neighborhood') || null;
+const cliCity = document.getElementById('cliCity') || document.getElementById('customerCity') || document.getElementById('city') || null;
+const cliState = document.getElementById('cliState') || document.getElementById('customerState') || document.getElementById('state') || null;
+
   const cliError = document.getElementById('cliError');
   const btnCliLimpar = document.getElementById('btnCliLimpar');
   const btnCliSalvar = document.getElementById('btnCliSalvar');
@@ -2465,13 +2467,13 @@ async function salvarAgendamento() {
 
         
         // Endereço: se não existir no cadastro, deve vir vazio (não "undefined"/"null")
-        if (typeof cliCep !== 'undefined' && cliCep) cliCep.value = c.cep || '';
-        if (typeof cliStreet !== 'undefined' && cliStreet) cliStreet.value = c.street || '';
-        if (typeof cliNumber !== 'undefined' && cliNumber) cliNumber.value = c.number || '';
-        if (typeof cliComplement !== 'undefined' && cliComplement) cliComplement.value = c.complement || '';
-        if (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) cliNeighborhood.value = c.neighborhood || '';
-        if (typeof cliCity !== 'undefined' && cliCity) cliCity.value = c.city || '';
-        if (typeof cliState !== 'undefined' && cliState) cliState.value = c.state || '';
+   if (cliCep) cliCep.value = c.cep || '';
+if (cliStreet) cliStreet.value = c.street || '';
+if (cliNumber) cliNumber.value = c.number || '';
+if (cliComplement) cliComplement.value = c.complement || '';
+if (cliNeighborhood) cliNeighborhood.value = c.neighborhood || '';
+if (cliCity) cliCity.value = c.city || '';
+if (cliState) cliState.value = c.state || '';
 limparPetsForm();
         await loadPetsForClienteTab(c.id);
       });
