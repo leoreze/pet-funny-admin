@@ -108,6 +108,12 @@ async function initDb() {
     );
   `);
   await query(`CREATE INDEX IF NOT EXISTS pets_customer_idx ON pets (customer_id);`);
+
+  // PATCH compat: garante colunas de auditoria mesmo em bancos antigos
+  await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+  await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
+  await query(`UPDATE pets SET created_at = NOW() WHERE created_at IS NULL;`);
+  await query(`UPDATE pets SET updated_at = NOW() WHERE updated_at IS NULL;`);
   // Compat + novos campos (porte/pelagem/observações)
   // Mantém a coluna "info" por compatibilidade com versões antigas do backend/admin.
   await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS size TEXT;`);
