@@ -177,13 +177,15 @@ input[type="text"],
 input[type="time"],
 select,
 textarea {
-  padding: 7px 9px 10px; /* bottom = 10px */
+  padding: 10px;          /* espaçamento interno uniforme */
+  margin-bottom: 10px;    /* espaçamento externo entre campos */
   border-radius: 10px;
   border: 1px solid #d7dde0;
   font-size: 13px;
   min-width: 120px;
   font-family: inherit;
 }
+
 
     input:focus, select:focus, textarea:focus {
       outline: none;
