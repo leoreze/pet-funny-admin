@@ -360,10 +360,30 @@
             <label for="petBreed">Raça</label>
             <select id="petBreed"></select>
           </div>
-          <div class="form-group">
-            <label for="petInfo">Mais informações</label>
-            <textarea id="petInfo" placeholder="Porte, comportamento, medicação, etc."></textarea>
-          </div>
+          
+           <div class="form-row-2">
+             <div class="form-group">
+               <label for="petSize">Porte</label>
+               <select id="petSize">
+                 <option value="pequeno">Pequeno</option>
+                 <option value="medio">Médio</option>
+                 <option value="grande">Grande</option>
+               </select>
+             </div>
+             <div class="form-group">
+               <label for="petCoat">Pelagem</label>
+               <select id="petCoat">
+                 <option value="curta">Curta</option>
+                 <option value="media">Média</option>
+                 <option value="longa">Longa</option>
+               </select>
+             </div>
+           </div>
+
+           <div class="form-group">
+             <label for="petInfo">Observações</label>
+             <textarea id="petInfo" placeholder="Comportamento, medicação, restrições, etc."></textarea>
+           </div>
           <div id="petError" class="error-msg" style="display:none;"></div>
           <div class="form-actions">
             <button class="btn btn-secondary btn-small" id="btnPetLimpar" type="button">Limpar</button>

@@ -2606,6 +2606,8 @@ const cliState = document.getElementById('cliState') || document.getElementById(
 
   const petName = document.getElementById('petName');
   const petBreed = document.getElementById('petBreed');
+  const petSize = document.getElementById('petSize');
+  const petCoat = document.getElementById('petCoat');
   const petInfo = document.getElementById('petInfo');
   const petError = document.getElementById('petError');
   const btnPetLimpar = document.getElementById('btnPetLimpar');
@@ -2848,7 +2850,10 @@ limparPetsForm();
       const tdId = document.createElement('td'); tdId.textContent = p.id;
       const tdNome = document.createElement('td'); tdNome.textContent = p.name;
       const tdRaca = document.createElement('td'); tdRaca.textContent = p.breed || '-';
-      const tdInfo = document.createElement('td'); tdInfo.textContent = p.info || '-';
+
+      const tdPorte = document.createElement('td'); tdPorte.textContent = humanSize(p.size);
+      const tdPelagem = document.createElement('td'); tdPelagem.textContent = humanCoat(p.coat);
+      const tdInfo = document.createElement('td'); tdInfo.textContent = (p.notes || p.info || '-') || '-';
 
       const tdAcoes = document.createElement('td');
       const divActions = document.createElement('div'); divActions.className = 'actions';
@@ -2861,7 +2866,9 @@ limparPetsForm();
         petEditIdLocal = p.id;
         petName.value = p.name;
         petBreed.value = p.breed || 'SRD (Sem Raça Definida)';
-        petInfo.value = p.info || '';
+        if (petSize) petSize.value = (p.size || 'pequeno');
+        if (petCoat) petCoat.value = (p.coat || 'curta');
+        petInfo.value = (p.notes || p.info || '');
       });
 
       const btnDel = document.createElement('button');
@@ -2886,6 +2893,8 @@ limparPetsForm();
       tr.appendChild(tdId);
       tr.appendChild(tdNome);
       tr.appendChild(tdRaca);
+      tr.appendChild(tdPorte);
+      tr.appendChild(tdPelagem);
       tr.appendChild(tdInfo);
       tr.appendChild(tdAcoes);
 
@@ -2897,6 +2906,8 @@ limparPetsForm();
     petEditIdLocal = null;
     petName.value = '';
     petBreed.value = 'SRD (Sem Raça Definida)';
+    if (petSize) petSize.value = 'pequeno';
+    if (petCoat) petCoat.value = 'curta';
     petInfo.value = '';
     petError.style.display = 'none';
   }
@@ -2911,7 +2922,9 @@ limparPetsForm();
 
     const name = petName.value.trim();
     const breed = petBreed.value;
-    const info = petInfo.value.trim();
+    const size = petSize ? petSize.value : undefined;
+    const coat = petCoat ? petCoat.value : undefined;
+    const notes = petInfo.value.trim();
 
     if (!name || !breed) {
       petError.textContent = 'Informe nome e raça do pet.';
@@ -2921,9 +2934,9 @@ limparPetsForm();
 
     try {
       if (!petEditIdLocal) {
-        await apiPost('/api/pets', { customer_id: clienteSelecionadoId, name, breed, info });
+        await apiPost('/api/pets', { customer_id: clienteSelecionadoId, name, breed, size, coat, notes, info: notes });
       } else {
-        await apiPut('/api/pets/' + petEditIdLocal, { name, breed, info });
+        await apiPut('/api/pets/' + petEditIdLocal, { name, breed, size, coat, notes, info: notes });
       }
       limparPetsForm();
       await loadPetsForClienteTab(clienteSelecionadoId);
@@ -2943,7 +2956,12 @@ limparPetsForm();
   btnPetLimpar.addEventListener('click', limparPetsForm);
   btnPetSalvar.addEventListener('click', salvarPet);
 
-  btnNovoPet.addEventListener('click', () => limparPetsForm);
+  btnNovoPet.addEventListener('click', () => {
+    limparPetsForm();
+    petsCard.classList.remove('hidden');
+    window.scrollTo({ top: petsCard.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+    setTimeout(() => { try { petName.focus(); } catch (_) {} }, 200);
+  });
 
   btnNovoCliente.addEventListener('click', () => {
 

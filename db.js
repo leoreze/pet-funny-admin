@@ -108,6 +108,12 @@ async function initDb() {
     );
   `);
   await query(`CREATE INDEX IF NOT EXISTS pets_customer_idx ON pets (customer_id);`);
+  // Compat + novos campos (porte/pelagem/observações)
+  // Mantém a coluna "info" por compatibilidade com versões antigas do backend/admin.
+  await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS size TEXT;`);
+  await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS coat TEXT;`);
+  await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS notes TEXT;`);
+  await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS info TEXT;`);
 
   // IMPORTANTE: este schema de services é o que o server.js usa (date,title,value_cents)
   await query(`
