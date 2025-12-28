@@ -172,14 +172,19 @@
     }
 
 
-    input[type="date"], input[type="text"], input[type="time"], select, textarea {
-      padding: 7px 9px;
-      border-radius: 10px;
-      border: 1px solid #d7dde0;
-      font-size: 13px;
-      min-width: 120px;
-      font-family: inherit;
-    }
+input[type="date"],
+input[type="text"],
+input[type="time"],
+select,
+textarea {
+  padding: 7px 9px 10px; /* bottom = 10px */
+  border-radius: 10px;
+  border: 1px solid #d7dde0;
+  font-size: 13px;
+  min-width: 120px;
+  font-family: inherit;
+}
+
     input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--turquesa);
