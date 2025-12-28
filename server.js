@@ -295,20 +295,23 @@ app.get('/api/services', async (req, res) => {
 app.post('/api/services', async (req, res) => {
   try {
     const date = String(req.body.date || '').slice(0, 10);
+    const category = String(req.body.category || '').trim();
     const title = String(req.body.title || '').trim();
+    const size = String(req.body.size || '').trim();
+    const duration_minutes = Number(req.body.duration_minutes);
     const value_cents = Number(req.body.value_cents);
 
-    if (!date || !title || !Number.isFinite(value_cents)) {
-      return res.status(400).json({ error: 'date, title e value_cents são obrigatórios.' });
+    if (!date || !category || !title || !size || !Number.isFinite(duration_minutes) || !Number.isFinite(value_cents)) {
+      return res.status(400).json({ error: 'date, category, title, size, duration_minutes e value_cents são obrigatórios.' });
     }
 
     const row = await db.get(
       `
-      INSERT INTO services (date, title, value_cents, updated_at)
-      VALUES ($1,$2,$3,NOW())
+      INSERT INTO services (date, category, title, size, duration_minutes, value_cents, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,NOW())
       RETURNING *
       `,
-      [date, title, value_cents]
+      [date, category, title, size, duration_minutes, value_cents]
     );
     res.json({ service: row });
   } catch (err) {
@@ -321,21 +324,24 @@ app.put('/api/services/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const date = String(req.body.date || '').slice(0, 10);
+    const category = String(req.body.category || '').trim();
     const title = String(req.body.title || '').trim();
+    const size = String(req.body.size || '').trim();
+    const duration_minutes = Number(req.body.duration_minutes);
     const value_cents = Number(req.body.value_cents);
 
-    if (!id || !date || !title || !Number.isFinite(value_cents)) {
-      return res.status(400).json({ error: 'id, date, title e value_cents são obrigatórios.' });
+    if (!id || !date || !category || !title || !size || !Number.isFinite(duration_minutes) || !Number.isFinite(value_cents)) {
+      return res.status(400).json({ error: 'id, date, category, title, size, duration_minutes e value_cents são obrigatórios.' });
     }
 
     const row = await db.get(
       `
       UPDATE services
-      SET date=$2, title=$3, value_cents=$4, updated_at=NOW()
+      SET date=$2, category=$3, title=$4, size=$5, duration_minutes=$6, value_cents=$7, updated_at=NOW()
       WHERE id=$1
       RETURNING *
       `,
-      [id, date, title, value_cents]
+      [id, date, category, title, size, duration_minutes, value_cents]
     );
     res.json({ service: row });
   } catch (err) {

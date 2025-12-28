@@ -132,7 +132,13 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-  `);
+  `)
+
+  // PATCH: novos campos do CRUD de serviços (categoria, porte e tempo)
+  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS category TEXT;`);
+  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS size TEXT;`);
+  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS duration_minutes INTEGER;`);
+;
 
   // bookings (agendamentos) - compat com seu server.js (date/time como texto)
   await query(`

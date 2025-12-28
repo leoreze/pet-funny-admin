@@ -1408,6 +1408,10 @@ attachCepMaskIfPresent();
   const serviceDate = document.getElementById('serviceDate');
   const serviceTitle = document.getElementById('serviceTitle');
   const servicePrice = document.getElementById('servicePrice');
+  const serviceIdView = document.getElementById('serviceIdView');
+  const serviceCategory = document.getElementById('serviceCategory');
+  const serviceSize = document.getElementById('serviceSize');
+  const serviceDuration = document.getElementById('serviceDuration');
   const serviceError = document.getElementById('serviceError');
   const btnServiceCancel = document.getElementById('btnServiceCancel');
   const btnServiceSave = document.getElementById('btnServiceSave');
@@ -1468,20 +1472,28 @@ function clearSelectedServices(){
 
   function clearServiceForm() {
     serviceId.value = '';
+    if (serviceIdView) serviceIdView.value = '';
     serviceDate.value = toISODateOnly(new Date());
+    if (serviceCategory) serviceCategory.value = 'Banho';
     serviceTitle.value = '';
+    if (serviceSize) serviceSize.value = 'Pequeno';
     servicePrice.value = '';
     servicePrice.dataset.cents = '';
+    if (serviceDuration) serviceDuration.value = '60';
     serviceError.style.display = 'none';
     serviceError.textContent = '';
   }
 
   function fillServiceForm(svc) {
     serviceId.value = svc.id;
+    if (serviceIdView) serviceIdView.value = String(svc.id || '');
     serviceDate.value = (svc.date || '').slice(0, 10);
+    if (serviceCategory) serviceCategory.value = (svc.category || 'Banho');
     serviceTitle.value = svc.title || '';
+    if (serviceSize) serviceSize.value = (svc.size || 'Pequeno');
     servicePrice.dataset.cents = String(svc.value_cents ?? '');
     servicePrice.value = svc.value_cents != null ? formatCentsToBRL(svc.value_cents) : '';
+    if (serviceDuration) serviceDuration.value = String(svc.duration_minutes ?? svc.duration ?? '60');
     serviceError.style.display = 'none';
     serviceError.textContent = '';
   }
@@ -1501,8 +1513,11 @@ function clearSelectedServices(){
       const tr = document.createElement('tr');
 
       const tdId = document.createElement('td'); tdId.textContent = svc.id;
-      const tdDate = document.createElement('td'); tdDate.textContent = formatDataBr((svc.date || '').slice(0,10));
+      const tdDate = document.createElement('td'); tdDate.textContent = formatDataBr((svc.date || '').slice(0, 10));
+      const tdCat = document.createElement('td'); tdCat.textContent = svc.category || '-';
       const tdTitle = document.createElement('td'); tdTitle.textContent = svc.title || '-';
+      const tdSize = document.createElement('td'); tdSize.textContent = svc.size || '-';
+      const tdDur = document.createElement('td'); tdDur.textContent = (svc.duration_minutes != null ? String(svc.duration_minutes) + ' min' : '-');
       const tdPrice = document.createElement('td'); tdPrice.textContent = formatCentsToBRL(svc.value_cents || 0);
 
       const tdCreated = document.createElement('td'); tdCreated.textContent = svc.created_at ? formatDateTimeBr(svc.created_at) : '-';
@@ -1526,12 +1541,14 @@ function clearSelectedServices(){
       btnDel.className = 'btn btn-small btn-danger';
       btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
-        if (!confirm('Deseja realmente excluir este serviço?')) return;
+        if (!confirm('Excluir serviço #' + svc.id + '?')) return;
         try {
           await apiDelete('/api/services/' + svc.id);
           await loadServices();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) {
+          alert('Erro ao excluir: ' + e.message);
+        }
       });
 
       divActions.appendChild(btnEdit);
@@ -1540,7 +1557,10 @@ function clearSelectedServices(){
 
       tr.appendChild(tdId);
       tr.appendChild(tdDate);
+      tr.appendChild(tdCat);
       tr.appendChild(tdTitle);
+      tr.appendChild(tdSize);
+      tr.appendChild(tdDur);
       tr.appendChild(tdPrice);
       tr.appendChild(tdCreated);
       tr.appendChild(tdUpdated);
@@ -1608,14 +1628,17 @@ if (selectedServicesList) {
 
     const id = serviceId.value ? parseInt(serviceId.value, 10) : null;
     const date = serviceDate.value;
+    const category = serviceCategory ? String(serviceCategory.value || '').trim() : '';
     const title = serviceTitle.value.trim();
+    const size = serviceSize ? String(serviceSize.value || '').trim() : '';
+    const duration_minutes = serviceDuration ? Number(serviceDuration.value) : null;
 
     // garante dataset.cents sempre atualizado antes de validar
     applyCurrencyMask(servicePrice);
     const value_cents = getCentsFromCurrencyInput(servicePrice);
 
-    if (!date || !title) {
-      serviceError.textContent = 'Preencha data e título do serviço.';
+    if (!date || !category || !title || !size) {
+      serviceError.textContent = 'Preencha data, categoria, título e porte.';
       serviceError.style.display = 'block';
       return;
     }
@@ -1624,9 +1647,14 @@ if (selectedServicesList) {
       serviceError.style.display = 'block';
       return;
     }
+    if (duration_minutes == null || !Number.isFinite(duration_minutes) || duration_minutes < 0) {
+      serviceError.textContent = 'Tempo inválido. Use minutos (ex: 60).';
+      serviceError.style.display = 'block';
+      return;
+    }
 
     try {
-      const body = { date, title, value_cents };
+      const body = { date, category, title, size, value_cents, duration_minutes };
       if (!id) await apiPost('/api/services', body);
       else await apiPut('/api/services/' + id, body);
 

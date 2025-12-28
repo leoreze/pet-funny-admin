@@ -424,18 +424,50 @@
 
       <div class="form-panel hidden" id="serviceFormPanel">
         <input type="hidden" id="serviceId" />
+
         <div class="form-row-2">
+          <div class="form-group">
+            <label for="serviceIdView">ID</label>
+            <input type="text" id="serviceIdView" placeholder="(automático)" readonly />
+          </div>
           <div class="form-group">
             <label for="serviceDate">Data</label>
             <input type="date" id="serviceDate" />
           </div>
           <div class="form-group">
+            <label for="serviceCategory">Categoria</label>
+            <select id="serviceCategory">
+              <option value="Banho">Banho</option>
+              <option value="Complemento">Complemento</option>
+              <option value="Tosa">Tosa</option>
+              <option value="Avulso">Avulso</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
             <label for="serviceTitle">Título do serviço</label>
-            <input type="text" id="serviceTitle" placeholder="Ex: Banho + Tosa (Porte M)" />
+            <input type="text" id="serviceTitle" placeholder="Ex: Banho + Tosa" />
           </div>
           <div class="form-group">
-            <label for="servicePrice">Valor (R$)</label>
+            <label for="serviceSize">Porte</label>
+            <select id="serviceSize">
+              <option value="Pequeno">Pequeno</option>
+              <option value="Médio">Médio</option>
+              <option value="Grande">Grande</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="servicePrice">Preço (R$)</label>
             <input type="text" id="servicePrice" placeholder="R$ 0,00" inputmode="numeric" />
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="serviceDuration">Tempo (min)</label>
+            <input type="number" id="serviceDuration" placeholder="Ex: 60" min="0" step="5" />
           </div>
         </div>
 
@@ -453,8 +485,11 @@
             <tr>
               <th>ID</th>
               <th>Data</th>
+              <th>Categoria</th>
               <th>Título</th>
-              <th>Valor</th>
+              <th>Porte</th>
+              <th>Tempo</th>
+              <th>Preço</th>
               <th>Criado em</th>
               <th>Atualizado em</th>
               <th>Ações</th>
