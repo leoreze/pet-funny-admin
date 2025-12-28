@@ -185,7 +185,11 @@ app.get('/api/pets', async (req, res) => {
     if (!customerId) return res.status(400).json({ error: 'customer_id é obrigatório.' });
 
     const rows = await db.all(
-      'SELECT * FROM pets WHERE customer_id = $1 ORDER BY id DESC',
+      `SELECT *,
+              COALESCE(notes,'') AS info
+         FROM pets
+        WHERE customer_id = $1
+        ORDER BY id DESC`,
       [customerId]
     );
     res.json({ pets: rows });
@@ -195,24 +199,22 @@ app.get('/api/pets', async (req, res) => {
   }
 });
 
-// Criar pet
+// Create pet
 app.post('/api/pets', async (req, res) => {
   try {
     const customerId = Number(req.body.customer_id);
     const name = String(req.body.name || '').trim();
     const breed = req.body.breed ? String(req.body.breed).trim() : null;
 
-    // Novos campos
-    const size = req.body.size ? String(req.body.size).trim() : null;   // Porte
-    const coat = req.body.coat ? String(req.body.coat).trim() : null;   // Pelagem
+    // Novos campos (porte / pelagem)
+    const size = req.body.size ? String(req.body.size).trim() : null;
+    const coat = req.body.coat ? String(req.body.coat).trim() : null;
 
-    // Compatibilidade: se vier "info" do front antigo, salva em notes
+    // Compatibilidade: aceitar "info" (antigo) como notes
     const notesRaw = (req.body.notes ?? req.body.info);
     const notes = notesRaw ? String(notesRaw).trim() : null;
 
-    if (!customerId || !name) {
-      return res.status(400).json({ error: 'customer_id e name são obrigatórios.' });
-    }
+    if (!customerId || !name) return res.status(400).json({ error: 'customer_id e name são obrigatórios.' });
 
     const row = await db.get(
       `INSERT INTO pets (customer_id, name, breed, size, coat, notes)
@@ -221,6 +223,8 @@ app.post('/api/pets', async (req, res) => {
       [customerId, name, breed, size, coat, notes]
     );
 
+    // resposta com campo info também (compat)
+    row.info = row.notes ?? null;
     res.json({ pet: row });
   } catch (err) {
     console.error('Erro ao criar pet:', err);
@@ -228,24 +232,22 @@ app.post('/api/pets', async (req, res) => {
   }
 });
 
-// Atualizar pet
+// Update pet
 app.put('/api/pets/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const name = String(req.body.name || '').trim();
     const breed = req.body.breed ? String(req.body.breed).trim() : null;
 
-    // Novos campos
-    const size = req.body.size ? String(req.body.size).trim() : null;   // Porte
-    const coat = req.body.coat ? String(req.body.coat).trim() : null;   // Pelagem
+    // Novos campos (porte / pelagem)
+    const size = req.body.size ? String(req.body.size).trim() : null;
+    const coat = req.body.coat ? String(req.body.coat).trim() : null;
 
-    // Compatibilidade: se vier "info" do front antigo, salva em notes
+    // Compatibilidade: aceitar "info" (antigo) como notes
     const notesRaw = (req.body.notes ?? req.body.info);
     const notes = notesRaw ? String(notesRaw).trim() : null;
 
-    if (!id || !name) {
-      return res.status(400).json({ error: 'ID e name são obrigatórios.' });
-    }
+    if (!id || !name) return res.status(400).json({ error: 'ID e name são obrigatórios.' });
 
     const row = await db.get(
       `UPDATE pets
@@ -255,13 +257,13 @@ app.put('/api/pets/:id', async (req, res) => {
       [id, name, breed, size, coat, notes]
     );
 
+    if (row) row.info = row.notes ?? null; // compat
     res.json({ pet: row });
   } catch (err) {
     console.error('Erro ao atualizar pet:', err);
     res.status(500).json({ error: 'Erro interno ao atualizar pet.' });
   }
 });
-
 
 app.delete('/api/pets/:id', async (req, res) => {
   try {

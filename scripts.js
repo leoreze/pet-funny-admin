@@ -2850,10 +2850,9 @@ limparPetsForm();
       const tdId = document.createElement('td'); tdId.textContent = p.id;
       const tdNome = document.createElement('td'); tdNome.textContent = p.name;
       const tdRaca = document.createElement('td'); tdRaca.textContent = p.breed || '-';
-
-      const tdPorte = document.createElement('td'); tdPorte.textContent = humanSize(p.size);
-      const tdPelagem = document.createElement('td'); tdPelagem.textContent = humanCoat(p.coat);
-      const tdInfo = document.createElement('td'); tdInfo.textContent = (p.notes || p.info || '-') || '-';
+      const tdPorte = document.createElement('td'); tdPorte.textContent = p.size || '-';
+      const tdPelagem = document.createElement('td'); tdPelagem.textContent = p.coat || '-';
+      const tdInfo = document.createElement('td'); tdInfo.textContent = (p.notes || p.info) || '-';
 
       const tdAcoes = document.createElement('td');
       const divActions = document.createElement('div'); divActions.className = 'actions';
@@ -2866,9 +2865,9 @@ limparPetsForm();
         petEditIdLocal = p.id;
         petName.value = p.name;
         petBreed.value = p.breed || 'SRD (Sem Raça Definida)';
-        if (petSize) petSize.value = (p.size || 'pequeno');
-        if (petCoat) petCoat.value = (p.coat || 'curta');
-        petInfo.value = (p.notes || p.info || '');
+        if (petSize) petSize.value = p.size || '';
+        if (petCoat) petCoat.value = p.coat || '';
+        petInfo.value = (p.notes || p.info) || '';
       });
 
       const btnDel = document.createElement('button');
@@ -2906,8 +2905,8 @@ limparPetsForm();
     petEditIdLocal = null;
     petName.value = '';
     petBreed.value = 'SRD (Sem Raça Definida)';
-    if (petSize) petSize.value = 'pequeno';
-    if (petCoat) petCoat.value = 'curta';
+    if (petSize) petSize.value = '';
+    if (petCoat) petCoat.value = '';
     petInfo.value = '';
     petError.style.display = 'none';
   }
@@ -2922,11 +2921,10 @@ limparPetsForm();
 
     const name = petName.value.trim();
     const breed = petBreed.value;
-    const size = petSize ? petSize.value : undefined;
-    const coat = petCoat ? petCoat.value : undefined;
+    const size = petSize ? petSize.value : '';
+    const coat = petCoat ? petCoat.value : '';
     const notes = petInfo.value.trim();
-
-    if (!name || !breed) {
+if (!name || !breed) {
       petError.textContent = 'Informe nome e raça do pet.';
       petError.style.display = 'block';
       return;
@@ -2934,9 +2932,9 @@ limparPetsForm();
 
     try {
       if (!petEditIdLocal) {
-        await apiPost('/api/pets', { customer_id: clienteSelecionadoId, name, breed, size, coat, notes, info: notes });
+        await apiPost('/api/pets', { customer_id: clienteSelecionadoId, name, breed, size, coat, notes });
       } else {
-        await apiPut('/api/pets/' + petEditIdLocal, { name, breed, size, coat, notes, info: notes });
+        await apiPut('/api/pets/' + petEditIdLocal, { name, breed, size, coat, notes });
       }
       limparPetsForm();
       await loadPetsForClienteTab(clienteSelecionadoId);
@@ -2957,10 +2955,11 @@ limparPetsForm();
   btnPetSalvar.addEventListener('click', salvarPet);
 
   btnNovoPet.addEventListener('click', () => {
-    limparPetsForm();
+    // garante que o painel de pets está visível e prepara formulário para novo cadastro
     petsCard.classList.remove('hidden');
-    window.scrollTo({ top: petsCard.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
-    setTimeout(() => { try { petName.focus(); } catch (_) {} }, 200);
+    limparPetsForm();
+    try { petName.focus(); } catch(e) {}
+    try { petsCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
   });
 
   btnNovoCliente.addEventListener('click', () => {
