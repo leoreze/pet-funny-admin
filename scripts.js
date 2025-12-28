@@ -28,6 +28,36 @@ const API_BASE_URL = '';
 (function () {
   'use strict';
 
+
+  /* =========================
+     PF UI Notifications (Hint Modal)
+     - Usa pfHint/toast* de pf_helpers.js quando disponível
+     - Fallback para alert() se pfHint não estiver carregado
+  ========================= */
+  function pfAlert(message, type = 'info', focusEl = null, title = null, timeout = null) {
+    const msg = (message == null) ? '' : String(message);
+    const t = (type || 'info').toLowerCase();
+
+    // Preferir modal hint (pfHint/toast*)
+    if (typeof window.pfHint === 'function') {
+      const cfg = {
+        type: (t === 'success' || t === 'error' || t === 'warn' || t === 'info') ? t : 'info',
+        title: title || (t === 'success' ? 'Sucesso' : t === 'error' ? 'Erro' : t === 'warn' ? 'Atenção' : 'Info'),
+        message: msg,
+        timeout: Number.isFinite(timeout) ? timeout : (t === 'error' ? 3200 : t === 'success' ? 2400 : 2800),
+        focusEl: focusEl || null
+      };
+      window.pfHint(cfg);
+      return;
+    }
+
+    // Fallback
+    try { window.pfAlert(msg,'info'); } catch (_) {}
+    if (focusEl && typeof focusEl.focus === 'function') {
+      try { focusEl.focus(); } catch (_) {}
+    }
+  }
+
   const $ = (id) => document.getElementById(id);
   // Mesmo que a aba de Mimos não exista no DOM (variações de layout),
   // ainda precisamos carregar os mimos para o select do agendamento (#formPrize).
@@ -457,7 +487,7 @@ const API_BASE_URL = '';
     clearSession();
     adminApp.style.display = 'none';
     loginScreen.classList.remove('hidden');
-    alert('Sua sessão expirou. Faça login novamente.');
+    pfAlert('Sua sessão expirou. Faça login novamente.','warn');
   }
 
   function startSessionTimer() {
@@ -1535,7 +1565,7 @@ function clearSelectedServices(){
           await apiDelete('/api/services/' + svc.id);
           await loadServices();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) { pfAlert(e.message,'error'); }
       });
 
       divActions.appendChild(btnEdit);
@@ -1786,7 +1816,7 @@ if (selectedServicesList) {
         try {
           await apiDelete('/api/breeds/' + b.id);
           await loadBreeds();
-        } catch (e) { alert(e.message); }
+        } catch (e) { pfAlert(e.message,'error'); }
       });
 
       divActions.appendChild(btnEdit);
@@ -1987,7 +2017,7 @@ if (selectedServicesList) {
           await apiDelete('/api/bookings/' + a.id);
           await renderTabela();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) { pfAlert(e.message,'error'); }
       });
 
       divActions.appendChild(btnEditar);
@@ -2108,7 +2138,7 @@ if (selectedServicesList) {
           await apiDelete('/api/bookings/' + a.id);
           await renderTabela();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) { pfAlert(e.message,'error'); }
       });
 
       actions.appendChild(btnEditar);
@@ -2307,7 +2337,7 @@ async function salvarAgendamento() {
 
   function exportarCSV() {
     if (!ultimaLista.length) {
-      alert('Não há agendamentos para exportar no filtro atual.');
+      pfAlert('Não há agendamentos para exportar no filtro atual.','info');
       return;
     }
 
@@ -2732,7 +2762,7 @@ limparPetsForm();
           await loadClientes();
           await loadDashboard();
           await renderTabela();
-        } catch (e) { alert(e.message); }
+        } catch (e) { pfAlert(e.message,'error'); }
       });
 
       divActions.appendChild(btnSel);
@@ -2840,7 +2870,7 @@ limparPetsForm();
           await loadClientes();
           await loadDashboard();
           await renderTabela();
-        } catch (e) { alert(e.message); }
+        } catch (e) { pfAlert(e.message,'error'); }
       });
 
       divActions.appendChild(btnEdit);
@@ -3244,7 +3274,7 @@ attachCepMaskToCrudIfPresent();
       renderOpeningHoursTable();
       if (hoursMsg) hoursMsg.textContent = 'Horários salvos com sucesso.';
     } catch (e) {
-      alert(e.message);
+      pfAlert(e.message,'error');
       if (hoursMsg) hoursMsg.textContent = 'Erro ao salvar: ' + e.message;
     }
   }

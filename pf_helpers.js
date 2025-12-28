@@ -125,7 +125,7 @@
   };
 
   // Expor também como globais "de compatibilidade" (não sobrescreve se já existir)
-  window.normStr = 
+  window.normStr = window.normStr || normStr;
   /* =========================
      PF Hint Modal (auto-close + focus)
      - Não altera comportamento existente: apenas adiciona helpers globais.
@@ -273,7 +273,7 @@
   window.toastError = window.toastError || toastError;
   window.toastWarn = window.toastWarn || toastWarn;
 
-window.normStr || normStr;
+  window.normStr = window.normStr || normStr;
   window.normalizeHHMM = window.normalizeHHMM || normalizeHHMM;
   window.hhmmToMinutes = window.hhmmToMinutes || hhmmToMinutes;
   window.minutesToHHMM = window.minutesToHHMM || minutesToHHMM;
