@@ -936,15 +936,14 @@
 
 
 
-
 /* ===============================
-   PF HINT MODAL — VISUAL FINAL
+   PF HINT MODAL — VISUAL ATUALIZADO
    =============================== */
 
 .pf-hint-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(2px);
   display: none;
   align-items: center;
@@ -953,46 +952,49 @@
 }
 
 .pf-hint {
-  background: #01ADB7;
-  color: #014C5F;
+  background: #E0F4F6;
+  color: #1AB1BB;
   min-width: 320px;
   max-width: 420px;
   padding: 18px 20px 16px;
   border-radius: 14px;
-  box-shadow: 0 12px 40px rgba(0,0,0,.35);
+  box-shadow: 0 12px 40px rgba(0,0,0,.25);
   animation: pfPop .25s ease;
   position: relative;
 }
 
+/* Mantém animação existente */
 @keyframes pfPop {
   from { transform: scale(.92); opacity: 0; }
   to   { transform: scale(1); opacity: 1; }
 }
 
-/* Tipos (apenas detalhe visual, sem mudar lógica) */
-.pf-hint.success { border-left: 6px solid #FFFFFF; }
-.pf-hint.error   { border-left: 6px solid #FFFFFF; }
-.pf-hint.warn    { border-left: 6px solid #FFFFFF; }
-.pf-hint.info    { border-left: 6px solid #FFFFFF; }
+/* Tipos — apenas detalhe visual */
+.pf-hint.success,
+.pf-hint.error,
+.pf-hint.warn,
+.pf-hint.info {
+  border-left: 6px solid #1AB1BB;
+}
 
 .pf-hint h4 {
   margin: 0 0 6px;
   font-size: 15px;
   font-weight: 700;
-  color: #014C5F;
+  color: #1AB1BB;
 }
 
 .pf-hint p {
   margin: 0;
   font-size: 14px;
-  color: #014C5F;
+  color: #1AB1BB;
   opacity: .95;
 }
 
 /* Barra de tempo */
 .pf-hint-timer {
   height: 3px;
-  background: rgba(255,255,255,.35);
+  background: rgba(26, 177, 187, .25);
   margin-top: 14px;
   overflow: hidden;
   border-radius: 3px;
@@ -1002,7 +1004,7 @@
   display: block;
   height: 100%;
   width: 100%;
-  background: #FFFFFF;
+  background: #1AB1BB;
   animation: pfTimer linear forwards;
 }
 
@@ -1013,8 +1015,7 @@
 
 /* Foco em campo com erro */
 .pf-focus-error {
-  outline: 3px solid rgba(255,255,255,.85);
+  outline: 3px solid rgba(26, 177, 187, .85);
   outline-offset: 2px;
   border-radius: 6px;
 }
-
