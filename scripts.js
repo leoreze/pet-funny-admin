@@ -2803,32 +2803,63 @@ limparPetsForm();
 
   async function salvarCliente() {
     cliError.style.display = 'none';
+
     const phoneDigits = sanitizePhone(cliPhone.value.trim());
     const name = cliName.value.trim();
 
+    // Endereço (pode não existir em alguns layouts antigos, então é opcional)
+    const payload = {
+      phone: phoneDigits,
+      name,
+      cep: (typeof cliCep !== 'undefined' && cliCep) ? (cliCep.value || '').trim() : '',
+      street: (typeof cliStreet !== 'undefined' && cliStreet) ? (cliStreet.value || '').trim() : '',
+      number: (typeof cliNumber !== 'undefined' && cliNumber) ? (cliNumber.value || '').trim() : '',
+      complement: (typeof cliComplement !== 'undefined' && cliComplement) ? (cliComplement.value || '').trim() : '',
+      neighborhood: (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) ? (cliNeighborhood.value || '').trim() : '',
+      city: (typeof cliCity !== 'undefined' && cliCity) ? (cliCity.value || '').trim() : '',
+      state: (typeof cliState !== 'undefined' && cliState) ? (cliState.value || '').trim() : '',
+    };
+
     if (!phoneDigits || phoneDigits.length < 10 || !name) {
-      cliError.textContent = 'Preencha telefone (com DDD) e nome do tutor.';
+      const msg = 'Preencha telefone (com DDD) e nome do tutor.';
+      cliError.textContent = msg;
       cliError.style.display = 'block';
+      if (typeof uiWarn === 'function') uiWarn(msg, { title: 'Campos obrigatórios', focusEl: (!phoneDigits ? cliPhone : cliName) });
       return;
     }
 
     try {
-      const data = await apiPost('/api/customers', { phone: phoneDigits, name });
-      clienteSelecionadoId = data.customer.id;
+      let data;
+      if (clienteSelecionadoId) {
+        // Atualiza cliente existente (evita erro de duplicidade de telefone ao tentar "salvar" um cliente já cadastrado)
+        data = await apiPut('/api/customers/' + clienteSelecionadoId, payload);
+      } else {
+        // Cria novo cliente
+        data = await apiPost('/api/customers', payload);
+        clienteSelecionadoId = data?.customer?.id || data?.id || clienteSelecionadoId;
+      }
+
+      // Alguns endpoints retornam {customer: {...}}, outros podem retornar direto o objeto
+      const customer = data?.customer || data;
+
+      if (customer?.id) clienteSelecionadoId = customer.id;
+
       badgeClienteSelecionado.classList.remove('hidden');
       petsCard.classList.remove('hidden');
+
       await loadClientes();
-      await loadPetsForClienteTab(clienteSelecionadoId);
+      if (clienteSelecionadoId) await loadPetsForClienteTab(clienteSelecionadoId);
       await loadDashboard();
       await renderTabela();
 
+      if (typeof uiSuccess === 'function') uiSuccess('Cliente salvo com sucesso.');
+      else if (typeof toast === 'function') toast('Cliente salvo com sucesso.');
     } catch (e) {
       cliError.textContent = e.message;
       cliError.style.display = 'block';
+      if (typeof uiError === 'function') uiError(e.message, { title: 'Erro ao salvar cliente' });
     }
-  }
-
-  async function loadPetsForClienteTab(customerId) {
+  }async function loadPetsForClienteTab(customerId) {
     const data = await apiGet('/api/pets', { customer_id: customerId });
     petsCache = data.pets || [];
     renderPets();
