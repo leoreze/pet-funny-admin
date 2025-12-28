@@ -167,6 +167,12 @@ async function initDb() {
     );
   `);
 
+  // Campos adicionais do agendamento (pagamento + valor/tempo do(s) serviço(s))
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'Não Pago';`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT '';`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service_value_cents INTEGER;`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service_duration_min INTEGER;`);
+
 
   // ===== bookings: campos de pagamento =====
   await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'Não Pago';`);

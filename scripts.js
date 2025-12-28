@@ -1063,6 +1063,8 @@ attachCepMaskIfPresent();
   const formPetSelect = document.getElementById('formPetSelect');
   const formPrize = document.getElementById('formPrize');
   const formService = document.getElementById('formService');
+  const formServiceValue = document.getElementById('formServiceValue');
+  const formServiceDuration = document.getElementById('formServiceDuration');
   const btnAddService = document.getElementById('btnAddService');
   const selectedServicesWrap = document.getElementById('selectedServicesWrap');
   const selectedServicesList = document.getElementById('selectedServicesList');
@@ -1494,6 +1496,7 @@ function refreshSelectedServicesUI(){
 
   selectedServicesList.innerHTML = '';
   let total = 0;
+  let totalMin = 0;
 
   const unique = Array.from(new Set(selectedServiceIds.map(String)));
   selectedServiceIds = unique;
@@ -1502,11 +1505,14 @@ function refreshSelectedServicesUI(){
     const svc = getServiceById(sid);
     const name = svc ? svc.title : `Serviço #${sid}`;
     const value_cents = svc ? Number(svc.value_cents || 0) : 0;
+    const dur = svc ? Number(svc.duration_min || 0) : 0;
+
     total += value_cents;
+    totalMin += dur;
 
     const li = document.createElement('li');
     li.innerHTML = `
-      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)})</small></span>
+      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)} • ${escapeHtml(String(dur))} min)</small></span>
       <button type="button" class="btn btn-danger btn-xs" data-remove-sid="${escapeHtml(String(sid))}">Remover</button>
     `;
     selectedServicesList.appendChild(li);
@@ -1514,6 +1520,10 @@ function refreshSelectedServicesUI(){
 
   servicesTotalEl.textContent = centsToBRL(total);
   selectedServicesWrap.style.display = unique.length ? 'block' : 'none';
+
+  // preenche campos (somatório) - não editáveis
+  if (formServiceValue) formServiceValue.value = unique.length ? centsToBRL(total) : '';
+  if (formServiceDuration) formServiceDuration.value = unique.length ? String(totalMin) : '';
 }
 
 function clearSelectedServices(){
@@ -1668,6 +1678,14 @@ function clearSelectedServices(){
 
     if (current) formService.value = current;
   }
+
+if (formService) {
+  formService.addEventListener('change', () => {
+    const sid = formService.value;
+    selectedServiceIds = sid ? [String(sid)] : [];
+    refreshSelectedServicesUI();
+  });
+}
 
 // Multi-serviços - adicionar/remover
 if (btnAddService) {
@@ -2283,6 +2301,8 @@ if (selectedServicesList) {
   // Multi-serviços
   formService.value = '';
   clearSelectedServices();
+  if (formServiceValue) formServiceValue.value = '';
+  if (formServiceDuration) formServiceDuration.value = '';
 
   formDate.value = '';
   formTime.value = '';
@@ -2315,6 +2335,23 @@ async function salvarAgendamento() {
     const serviceIdSelected = formService.value ? parseInt(formService.value, 10) : null;
     const serviceObj = serviceIdSelected ? servicesCache.find(s => String(s.id) === String(serviceIdSelected)) : null;
     const servicesLabel = serviceObj ? serviceObj.title : '';
+
+    // Normaliza seleção (mantém compatibilidade com modo multi-serviços)
+    let selectedServices = [];
+    if (Array.isArray(selectedServiceIds) && selectedServiceIds.length) {
+      selectedServices = selectedServiceIds
+        .map((sid) => getServiceById(sid))
+        .filter(Boolean);
+    } else if (serviceObj) {
+      selectedServices = [serviceObj];
+      selectedServiceIds = [String(serviceObj.id)];
+      refreshSelectedServicesUI();
+    }
+
+    const firstServiceId = selectedServices.length ? Number(selectedServices[0].id) : (serviceIdSelected || null);
+    const servicesLabelAgg = selectedServices.length ? selectedServices.map(s => s.title).join(' + ') : servicesLabel;
+    const totalServicesCents = selectedServices.reduce((acc, s) => acc + Number(s.value_cents || 0), 0);
+    const totalServicesMin = selectedServices.reduce((acc, s) => acc + Number(s.duration_min || 0), 0);
 
     const date = formDate.value;
     const time = formTime.value;
@@ -2377,10 +2414,15 @@ async function salvarAgendamento() {
         payment_status: formPaymentStatus ? String(formPaymentStatus.value || '').trim() : '',
         payment_method: formPaymentMethod ? String(formPaymentMethod.value || '').trim() : '',
 
-        // envia multi-serviços (novo) + compatibilidade (service_id/service)
+        // Serviços (compatível com modo multi-serviços)
         service_ids: selectedServices.map(s => s.id),
         service_id: firstServiceId,
-        service: servicesLabel,
+        service: servicesLabelAgg,
+
+        // Snapshot do total (valor/tempo) no próprio agendamento
+        service_value_cents: totalServicesCents,
+        service_duration_min: totalServicesMin,
+
         prize, notes, status
       };
 
