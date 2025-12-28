@@ -1,81 +1,74 @@
-/* PATCH: API layer — PetFunny
-   DATE: 2025-12-23 */
+/* API layer — PetFunny (frontend)
+   Provides: apiGet, apiPost, apiPut, apiDelete, apiViaCep
+   NOTE: API_BASE_URL = '' keeps same-origin behavior (Render / Nginx)
+*/
 (function () {
   'use strict';
 
   const API_BASE_URL = '';
 
+  async function parseJsonSafe(resp) {
+    try { return await resp.json(); } catch { return {}; }
+  }
+
   async function apiGet(path, params) {
     const url = new URL(API_BASE_URL + path, window.location.origin);
-    if (params) {
+    if (params && typeof params === 'object') {
       Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== '') {
-          url.searchParams.append(k, v);
-        }
+        if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
       });
     }
-    const res = await fetch(url.toString());
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || 'Erro ao buscar dados');
-    return json;
+    const resp = await fetch(url.toString(), { method: 'GET' });
+    const data = await parseJsonSafe(resp);
+    if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
+    return data;
   }
 
   async function apiPost(path, body) {
-    const res = await fetch(API_BASE_URL + path, {
+    const resp = await fetch(API_BASE_URL + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(body || {})
     });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || 'Erro ao salvar');
-    return json;
+    const data = await parseJsonSafe(resp);
+    if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
+    return data;
   }
 
   async function apiPut(path, body) {
-    const res = await fetch(API_BASE_URL + path, {
+    const resp = await fetch(API_BASE_URL + path, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(body || {})
     });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || 'Erro ao atualizar');
-    return json;
+    const data = await parseJsonSafe(resp);
+    if (!resp.ok) throw new Error(data.error || 'Erro ao atualizar.');
+    return data;
   }
 
   async function apiDelete(path) {
-    const res = await fetch(API_BASE_URL + path, { method: 'DELETE' });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.error || 'Erro ao excluir');
-    return json;
+    const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
+    const data = await parseJsonSafe(resp);
+    if (!resp.ok) throw new Error(data.error || 'Erro ao excluir.');
+    return data;
   }
 
-  // Namespace
-  window.PF_API = {
-    get: apiGet,
-    post: apiPost,
-    put: apiPut,
-    del: apiDelete,
-  };
+  // ViaCEP lookup (admin/customer address autofill)
+  async function apiViaCep(cep) {
+    const clean = String(cep || '').replace(/\D+/g, '');
+    if (clean.length !== 8) return null;
+    const url = `https://viacep.com.br/ws/${clean}/json/`;
+    const resp = await fetch(url, { method: 'GET' });
+    if (!resp.ok) return null;
+    const data = await resp.json().catch(() => null);
+    if (!data || data.erro) return null;
+    return data;
+  }
 
-  // Compatibilidade (scripts.js legado)
-  window.apiGet = window.apiGet || apiGet;
-  window.apiPost = window.apiPost || apiPost;
-  window.apiPut = window.apiPut || apiPut;
-  window.apiDelete = window.apiDelete || apiDelete;
-
+  // Export to window (backward compatible)
+  window.apiGet = apiGet;
+  window.apiPost = apiPost;
+  window.apiPut = apiPut;
+  window.apiDelete = apiDelete;
+  window.apiViaCep = apiViaCep;
 })();
-
-
-// PATCH: ViaCEP lookup (admin/customer address autofill) - 2025-12-24
-async function apiViaCep(cep) {
-  const clean = String(cep || '').replace(/\D+/g, '');
-  if (clean.length !== 8) return null;
-  const url = `https://viacep.com.br/ws/${clean}/json/`;
-  const resp = await fetch(url, { method: 'GET' });
-  if (!resp.ok) return null;
-  const data = await resp.json();
-  if (data && data.erro) return null;
-  return data;
-}
-
-window.apiViaCep = apiViaCep;

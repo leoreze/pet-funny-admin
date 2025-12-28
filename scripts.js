@@ -28,36 +28,6 @@ const API_BASE_URL = '';
 (function () {
   'use strict';
 
-
-  /* =========================
-     PF UI Notifications (Hint Modal)
-     - Usa pfHint/toast* de pf_helpers.js quando disponível
-     - Fallback para alert() se pfHint não estiver carregado
-  ========================= */
-  function pfAlert(message, type = 'info', focusEl = null, title = null, timeout = null) {
-    const msg = (message == null) ? '' : String(message);
-    const t = (type || 'info').toLowerCase();
-
-    // Preferir modal hint (pfHint/toast*)
-    if (typeof window.pfHint === 'function') {
-      const cfg = {
-        type: (t === 'success' || t === 'error' || t === 'warn' || t === 'info') ? t : 'info',
-        title: title || (t === 'success' ? 'Sucesso' : t === 'error' ? 'Erro' : t === 'warn' ? 'Atenção' : 'Info'),
-        message: msg,
-        timeout: Number.isFinite(timeout) ? timeout : (t === 'error' ? 3200 : t === 'success' ? 2400 : 2800),
-        focusEl: focusEl || null
-      };
-      window.pfHint(cfg);
-      return;
-    }
-
-    // Fallback
-    try { window.pfAlert(msg,'info'); } catch (_) {}
-    if (focusEl && typeof focusEl.focus === 'function') {
-      try { focusEl.focus(); } catch (_) {}
-    }
-  }
-
   const $ = (id) => document.getElementById(id);
   // Mesmo que a aba de Mimos não exista no DOM (variações de layout),
   // ainda precisamos carregar os mimos para o select do agendamento (#formPrize).
@@ -487,7 +457,7 @@ const API_BASE_URL = '';
     clearSession();
     adminApp.style.display = 'none';
     loginScreen.classList.remove('hidden');
-    pfAlert('Sua sessão expirou. Faça login novamente.','warn');
+    alert('Sua sessão expirou. Faça login novamente.');
   }
 
   function startSessionTimer() {
@@ -566,12 +536,8 @@ const API_BASE_URL = '';
   btnLogin.addEventListener('click', () => {
     const u = loginUser.value.trim();
     const p = loginPass.value.trim();
-    if (u === 'adminpetfunny' && p === 'admin2605') {
-      enterAdminMode();
-    } else {
-      loginError.classList.remove('hidden');
-      uiWarn('Usuário ou senha inválidos.', { title: 'Login', focusEl: loginUser, timeout: 3500 });
-    }
+    if (u === 'adminpetfunny' && p === 'admin2605') enterAdminMode();
+    else loginError.classList.remove('hidden');
   });
 
   [loginUser, loginPass].forEach(el => {
@@ -1565,7 +1531,7 @@ function clearSelectedServices(){
           await apiDelete('/api/services/' + svc.id);
           await loadServices();
           await loadDashboard();
-        } catch (e) { pfAlert(e.message,'error'); }
+        } catch (e) { alert(e.message); }
       });
 
       divActions.appendChild(btnEdit);
@@ -1661,12 +1627,8 @@ if (selectedServicesList) {
 
     try {
       const body = { date, title, value_cents };
-      if (!id) {
-        await apiPost('/api/services', body);
-      } else {
-        await apiPut('/api/services/' + id, body);
-      }
-      uiSuccess('Serviço salvo.');
+      if (!id) await apiPost('/api/services', body);
+      else await apiPut('/api/services/' + id, body);
 
       clearServiceForm();
       hideServiceForm();
@@ -1816,7 +1778,7 @@ if (selectedServicesList) {
         try {
           await apiDelete('/api/breeds/' + b.id);
           await loadBreeds();
-        } catch (e) { pfAlert(e.message,'error'); }
+        } catch (e) { alert(e.message); }
       });
 
       divActions.appendChild(btnEdit);
@@ -2017,7 +1979,7 @@ if (selectedServicesList) {
           await apiDelete('/api/bookings/' + a.id);
           await renderTabela();
           await loadDashboard();
-        } catch (e) { pfAlert(e.message,'error'); }
+        } catch (e) { alert(e.message); }
       });
 
       divActions.appendChild(btnEditar);
@@ -2138,7 +2100,7 @@ if (selectedServicesList) {
           await apiDelete('/api/bookings/' + a.id);
           await renderTabela();
           await loadDashboard();
-        } catch (e) { pfAlert(e.message,'error'); }
+        } catch (e) { alert(e.message); }
       });
 
       actions.appendChild(btnEditar);
@@ -2316,12 +2278,8 @@ async function salvarAgendamento() {
         body.last_notification_at = new Date().toISOString();
       }
 
-      if (!id) {
-        await apiPost('/api/bookings', body);
-      } else {
-        await apiPut('/api/bookings/' + id, body);
-      }
-      uiSuccess('Agendamento salvo.');
+      if (!id) await apiPost('/api/bookings', body);
+      else await apiPut('/api/bookings/' + id, body);
 
       if (precisaWhats && urlWhats) window.open(urlWhats, '_blank');
 
@@ -2337,7 +2295,7 @@ async function salvarAgendamento() {
 
   function exportarCSV() {
     if (!ultimaLista.length) {
-      pfAlert('Não há agendamentos para exportar no filtro atual.','info');
+      alert('Não há agendamentos para exportar no filtro atual.');
       return;
     }
 
@@ -2762,7 +2720,7 @@ limparPetsForm();
           await loadClientes();
           await loadDashboard();
           await renderTabela();
-        } catch (e) { pfAlert(e.message,'error'); }
+        } catch (e) { alert(e.message); }
       });
 
       divActions.appendChild(btnSel);
@@ -2801,47 +2759,55 @@ limparPetsForm();
     limparPetsForm();
   }
 
-  async function salvarCliente() {
+    async function salvarCliente() {
     cliError.style.display = 'none';
 
     const phoneDigits = sanitizePhone(cliPhone.value.trim());
     const name = cliName.value.trim();
 
-    // Endereço (pode não existir em alguns layouts antigos, então é opcional)
+    // Endereço (inputs podem existir ou não, então lemos de forma defensiva)
+    const getVal = (id) => {
+      const el = document.getElementById(id);
+      return el ? String(el.value || '').trim() : '';
+    };
+
     const payload = {
       phone: phoneDigits,
       name,
-      cep: (typeof cliCep !== 'undefined' && cliCep) ? (cliCep.value || '').trim() : '',
-      street: (typeof cliStreet !== 'undefined' && cliStreet) ? (cliStreet.value || '').trim() : '',
-      number: (typeof cliNumber !== 'undefined' && cliNumber) ? (cliNumber.value || '').trim() : '',
-      complement: (typeof cliComplement !== 'undefined' && cliComplement) ? (cliComplement.value || '').trim() : '',
-      neighborhood: (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) ? (cliNeighborhood.value || '').trim() : '',
-      city: (typeof cliCity !== 'undefined' && cliCity) ? (cliCity.value || '').trim() : '',
-      state: (typeof cliState !== 'undefined' && cliState) ? (cliState.value || '').trim() : '',
+      cep: getVal('cliCep'),
+      street: getVal('cliStreet'),
+      number: getVal('cliNumber'),
+      complement: getVal('cliComplement'),
+      neighborhood: getVal('cliNeighborhood'),
+      city: getVal('cliCity'),
+      state: getVal('cliState'),
     };
 
-    if (!phoneDigits || phoneDigits.length < 10 || !name) {
-      const msg = 'Preencha telefone (com DDD) e nome do tutor.';
-      cliError.textContent = msg;
+    if (!payload.phone || payload.phone.length < 10 || !payload.name) {
+      cliError.textContent = 'Preencha telefone (com DDD) e nome do tutor.';
       cliError.style.display = 'block';
-      if (typeof uiWarn === 'function') uiWarn(msg, { title: 'Campos obrigatórios', focusEl: (!phoneDigits ? cliPhone : cliName) });
       return;
     }
 
     try {
       let data;
+
+      // Se já existe cliente selecionado, tentamos atualizar.
       if (clienteSelecionadoId) {
-        // Atualiza cliente existente (evita erro de duplicidade de telefone ao tentar "salvar" um cliente já cadastrado)
-        data = await apiPut('/api/customers/' + clienteSelecionadoId, payload);
+        try {
+          data = await apiPut('/api/customers/' + clienteSelecionadoId, payload);
+        } catch (err) {
+          // Fallback compatível: alguns backends não expõem PUT e aceitam update via POST com id.
+          data = await apiPost('/api/customers', { id: clienteSelecionadoId, ...payload });
+        }
       } else {
-        // Cria novo cliente
+        // Novo cliente
         data = await apiPost('/api/customers', payload);
-        clienteSelecionadoId = data?.customer?.id || data?.id || clienteSelecionadoId;
+        if (data?.customer?.id) clienteSelecionadoId = data.customer.id;
       }
 
-      // Alguns endpoints retornam {customer: {...}}, outros podem retornar direto o objeto
+      // Backend pode responder como {customer:{...}} ou {...}
       const customer = data?.customer || data;
-
       if (customer?.id) clienteSelecionadoId = customer.id;
 
       badgeClienteSelecionado.classList.remove('hidden');
@@ -2849,17 +2815,26 @@ limparPetsForm();
 
       await loadClientes();
       if (clienteSelecionadoId) await loadPetsForClienteTab(clienteSelecionadoId);
+
+      // feedback visual (modal se existir)
+      if (typeof window.pfHint === 'function') {
+        window.pfHint({ type: 'success', title: 'Cliente salvo', msg: 'Cadastro atualizado com sucesso.', time: 2200 });
+      }
+
       await loadDashboard();
       await renderTabela();
-
-      if (typeof uiSuccess === 'function') uiSuccess('Cliente salvo com sucesso.');
-      else if (typeof toast === 'function') toast('Cliente salvo com sucesso.');
     } catch (e) {
-      cliError.textContent = e.message;
+      const msg = (e && e.message) ? e.message : 'Erro ao salvar cliente.';
+      cliError.textContent = msg;
       cliError.style.display = 'block';
-      if (typeof uiError === 'function') uiError(e.message, { title: 'Erro ao salvar cliente' });
+
+      if (typeof window.pfHint === 'function') {
+        window.pfHint({ type: 'error', title: 'Erro ao salvar', msg, time: 3200 });
+      }
     }
-  }async function loadPetsForClienteTab(customerId) {
+  }
+
+  async function loadPetsForClienteTab(customerId) {
     const data = await apiGet('/api/pets', { customer_id: customerId });
     petsCache = data.pets || [];
     renderPets();
@@ -2901,7 +2876,7 @@ limparPetsForm();
           await loadClientes();
           await loadDashboard();
           await renderTabela();
-        } catch (e) { pfAlert(e.message,'error'); }
+        } catch (e) { alert(e.message); }
       });
 
       divActions.appendChild(btnEdit);
@@ -3305,7 +3280,7 @@ attachCepMaskToCrudIfPresent();
       renderOpeningHoursTable();
       if (hoursMsg) hoursMsg.textContent = 'Horários salvos com sucesso.';
     } catch (e) {
-      pfAlert(e.message,'error');
+      alert(e.message);
       if (hoursMsg) hoursMsg.textContent = 'Erro ao salvar: ' + e.message;
     }
   }
