@@ -195,22 +195,32 @@ app.get('/api/pets', async (req, res) => {
   }
 });
 
-// Create pet
+// Criar pet
 app.post('/api/pets', async (req, res) => {
   try {
     const customerId = Number(req.body.customer_id);
     const name = String(req.body.name || '').trim();
     const breed = req.body.breed ? String(req.body.breed).trim() : null;
-    const size = req.body.size ? String(req.body.size).trim() : null;
-    const coat = req.body.coat ? String(req.body.coat).trim() : null;
-    const notes = (req.body.notes != null ? String(req.body.notes) : (req.body.info != null ? String(req.body.info) : '')).trim() || null;
 
-    if (!customerId || !name) return res.status(400).json({ error: 'customer_id e name são obrigatórios.' });
+    // Novos campos
+    const size = req.body.size ? String(req.body.size).trim() : null;   // Porte
+    const coat = req.body.coat ? String(req.body.coat).trim() : null;   // Pelagem
+
+    // Compatibilidade: se vier "info" do front antigo, salva em notes
+    const notesRaw = (req.body.notes ?? req.body.info);
+    const notes = notesRaw ? String(notesRaw).trim() : null;
+
+    if (!customerId || !name) {
+      return res.status(400).json({ error: 'customer_id e name são obrigatórios.' });
+    }
 
     const row = await db.get(
-      'INSERT INTO pets (customer_id, name, breed, size, coat, notes, info) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-      [customerId, name, breed, size, coat, notes, notes]
+      `INSERT INTO pets (customer_id, name, breed, size, coat, notes)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING *`,
+      [customerId, name, breed, size, coat, notes]
     );
+
     res.json({ pet: row });
   } catch (err) {
     console.error('Erro ao criar pet:', err);
@@ -218,28 +228,40 @@ app.post('/api/pets', async (req, res) => {
   }
 });
 
-// Update pet
+// Atualizar pet
 app.put('/api/pets/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const name = String(req.body.name || '').trim();
     const breed = req.body.breed ? String(req.body.breed).trim() : null;
-    const size = req.body.size ? String(req.body.size).trim() : null;
-    const coat = req.body.coat ? String(req.body.coat).trim() : null;
-    const notes = (req.body.notes != null ? String(req.body.notes) : (req.body.info != null ? String(req.body.info) : '')).trim() || null;
 
-    if (!id || !name) return res.status(400).json({ error: 'ID e name são obrigatórios.' });
+    // Novos campos
+    const size = req.body.size ? String(req.body.size).trim() : null;   // Porte
+    const coat = req.body.coat ? String(req.body.coat).trim() : null;   // Pelagem
+
+    // Compatibilidade: se vier "info" do front antigo, salva em notes
+    const notesRaw = (req.body.notes ?? req.body.info);
+    const notes = notesRaw ? String(notesRaw).trim() : null;
+
+    if (!id || !name) {
+      return res.status(400).json({ error: 'ID e name são obrigatórios.' });
+    }
 
     const row = await db.get(
-      'UPDATE pets SET name=$2, breed=$3, size=$4, coat=$5, notes=$6, info=$7, updated_at=NOW() WHERE id=$1 RETURNING *',
-      [id, name, breed, size, coat, notes, notes]
+      `UPDATE pets
+         SET name=$2, breed=$3, size=$4, coat=$5, notes=$6, updated_at=NOW()
+       WHERE id=$1
+       RETURNING *`,
+      [id, name, breed, size, coat, notes]
     );
+
     res.json({ pet: row });
   } catch (err) {
     console.error('Erro ao atualizar pet:', err);
     res.status(500).json({ error: 'Erro interno ao atualizar pet.' });
   }
 });
+
 
 app.delete('/api/pets/:id', async (req, res) => {
   try {
