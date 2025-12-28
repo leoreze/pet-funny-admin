@@ -135,7 +135,17 @@ async function initDb() {
   `);
 
   
-  // services - novos campos (categoria, porte, tempo)
+  
+  // ===== services: novos campos (categoria/porte/tempo) =====
+  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'Banho';`);
+  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS porte TEXT;`);
+  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS duration_min INTEGER NOT NULL DEFAULT 0;`);
+
+  // Normaliza dados existentes
+  await query(`UPDATE services SET category = 'Banho' WHERE category IS NULL OR category = '';`);
+  await query(`UPDATE services SET duration_min = 0 WHERE duration_min IS NULL;`);
+
+// services - novos campos (categoria, porte, tempo)
   await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS category TEXT;`);
   await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS porte TEXT;`);
   await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS duration_min INTEGER;`);
@@ -156,6 +166,13 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+
+
+  // ===== bookings: campos de pagamento =====
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'Não Pago';`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT '';`);
+  await query(`UPDATE bookings SET payment_status = 'Não Pago' WHERE payment_status IS NULL OR payment_status = '';`);
+  await query(`UPDATE bookings SET payment_method = '' WHERE payment_method IS NULL;`);
 
 /* =========================
      BOOKING_SERVICES (múltiplos serviços por agendamento)

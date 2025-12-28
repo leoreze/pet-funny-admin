@@ -1105,7 +1105,23 @@ attachCepMaskIfPresent();
       if (clamped) formTime.value = clamped;
     });
   }
-  const formStatus = document.getElementById('formStatus');
+  
+  // Atualiza porte atual ao trocar o pet e refaz o select de serviços filtrando por porte
+  if (formPetSelect) {
+    formPetSelect.addEventListener('change', () => {
+      const pid = String(formPetSelect.value || '');
+      const pet = bookingPetsCache.find(x => String(x.id) === pid);
+      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
+      refreshServiceOptionsInAgenda();
+    });
+  }
+const formStatus = document.getElementById('formStatus');
+  const formPaymentStatus = document.getElementById('formPaymentStatus');
+  const formPaymentMethod = document.getElementById('formPaymentMethod');
+
+  // cache de pets carregados para o agendamento atual (para descobrir o porte)
+  let bookingPetsCache = [];
+  let currentPetSize = '';
   const formNotes = document.getElementById('formNotes');
   const formError = document.getElementById('formError');
   const btnSalvar = document.getElementById('btnSalvar');
@@ -1350,6 +1366,8 @@ attachCepMaskIfPresent();
   async function loadPetsForCustomer(customerId) {
     const data = await apiGet('/api/pets', { customer_id: customerId });
     const pets = (data.pets || []);
+    bookingPetsCache = pets;
+
     formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
     pets.forEach(p => {
       const opt = document.createElement('option');
@@ -1357,6 +1375,17 @@ attachCepMaskIfPresent();
       opt.textContent = p.breed ? `${p.name} (${p.breed})` : p.name;
       formPetSelect.appendChild(opt);
     });
+
+    // tenta manter porte atual (caso esteja editando e o pet já esteja selecionado)
+    const currentPetId = formPetSelect ? String(formPetSelect.value || '') : '';
+    if (currentPetId) {
+      const pet = bookingPetsCache.find(x => String(x.id) === currentPetId);
+      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
+    } else {
+      currentPetSize = '';
+    }
+
+    refreshServiceOptionsInAgenda(); // refaz o select respeitando porte
     return pets;
   }
 
@@ -1369,9 +1398,33 @@ attachCepMaskIfPresent();
   formPhone.value = booking && booking.phone ? booking.phone : '';
   applyPhoneMask(formPhone); // garante máscara também ao carregar
 
+  if (formNome) formNome.value = booking && (booking.customer_name || booking.name) ? (booking.customer_name || booking.name) : (formNome.value || '');
+
+  // Carrega pets do cliente para permitir selecionar/validar porte
+  const custId = booking && (booking.customer_id || booking.customerId) ? (booking.customer_id || booking.customerId) : null;
+  if (custId) {
+    loadPetsForCustomer(custId).then(() => {
+      if (booking && booking.pet_id) formPetSelect.value = String(booking.pet_id);
+      const pid = String(formPetSelect.value || '');
+      const pet = bookingPetsCache.find(x => String(x.id) === pid);
+      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
+      refreshServiceOptionsInAgenda();
+    }).catch(()=>{});
+  } else {
+    bookingPetsCache = [];
+    currentPetSize = '';
+    refreshServiceOptionsInAgenda();
+  }
+
   // Data / Horário
   formDate.value = booking && booking.date ? booking.date : '';
   formTime.value = booking && booking.time ? booking.time : '';
+  // Status + pagamento
+  formStatus.value = booking && booking.status ? booking.status : 'agendado';
+  bookingOriginalStatus.value = booking && booking.status ? booking.status : 'agendado';
+  if (formPaymentStatus) formPaymentStatus.value = booking && booking.payment_status ? booking.payment_status : 'Não Pago';
+  if (formPaymentMethod) formPaymentMethod.value = booking && booking.payment_method ? booking.payment_method : '';
+
 
   // Serviço(s)
   clearSelectedServices();
@@ -1583,12 +1636,36 @@ function clearSelectedServices(){
     // mantém seleção atual se possível
     const current = formService.value || '';
     formService.innerHTML = '<option value="">Selecione...</option>';
-    servicesCache.forEach(s => {
+
+    const sizeFilter = (typeof currentPetSize === 'string') ? currentPetSize.trim() : '';
+    const sizeNorm = sizeFilter.toLowerCase();
+
+    const normalizeSize = (v) => String(v || '').trim().toLowerCase();
+
+    const list = servicesCache.filter(s => {
+      if (!sizeNorm) return true; // sem pet selecionado => mostra tudo
+      const sSize = normalizeSize(s.porte || s.size || s.pet_size);
+      if (!sSize) return true; // serviços sem porte cadastrado continuam aparecendo
+      return sSize === sizeNorm;
+    });
+
+    list.forEach(s => {
       const opt = document.createElement('option');
       opt.value = String(s.id);
-      opt.textContent = s.title;
+
+      const price = (s.value_cents != null) ? centsToBRL(s.value_cents) : '';
+      const dur = (s.duration_min != null ? s.duration_min
+        : (s.tempo_min != null ? s.tempo_min
+        : (s.duration != null ? s.duration
+        : (s.tempo != null ? s.tempo : null))));
+
+      const parts = [s.title];
+      if (price) parts.push(price);
+      if (dur != null && String(dur).trim() !== '') parts.push(`${dur} min`);
+      opt.textContent = parts.join(' • ');
       formService.appendChild(opt);
     });
+
     if (current) formService.value = current;
   }
 
@@ -2210,6 +2287,8 @@ if (selectedServicesList) {
   formDate.value = '';
   formTime.value = '';
   formStatus.value = 'agendado';
+  if (formPaymentStatus) formPaymentStatus.value = 'Não Pago';
+  if (formPaymentMethod) formPaymentMethod.value = '';
   formNotes.value = '';
   formError.style.display = 'none';
   formError.textContent = '';
@@ -2293,6 +2372,11 @@ async function salvarAgendamento() {
         customer_id: customer.id,
         pet_id: petIdNum,
         date, time,
+
+        // Pagamento
+        payment_status: formPaymentStatus ? String(formPaymentStatus.value || '').trim() : '',
+        payment_method: formPaymentMethod ? String(formPaymentMethod.value || '').trim() : '',
+
         // envia multi-serviços (novo) + compatibilidade (service_id/service)
         service_ids: selectedServices.map(s => s.id),
         service_id: firstServiceId,
@@ -2425,6 +2509,9 @@ async function salvarAgendamento() {
     try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
 
     formDate.value = toISODateOnly(new Date());
+    if (formPaymentStatus) formPaymentStatus.value = 'Não Pago';
+    if (formPaymentMethod) formPaymentMethod.value = '';
+
     // dispara change porque set programtico no dispara evento
     try { formDate.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente

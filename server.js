@@ -294,59 +294,74 @@ app.get('/api/services', async (req, res) => {
 
 app.post('/api/services', async (req, res) => {
   try {
-    const date = String(req.body.date || '').slice(0, 10);
-    const title = String(req.body.title || '').trim();
-    const category = String(req.body.category || '').trim();
-    const porte = String(req.body.porte || '').trim();
-    const duration_min = req.body.duration_min == null ? null : Number(req.body.duration_min);
+    const today = new Date().toISOString().slice(0, 10);
 
+    const date = String(req.body.date || today).slice(0, 10);
+    const title = String(req.body.title || '').trim();
     const value_cents = Number(req.body.value_cents);
 
-    if (!date || !title || !category || !porte || !Number.isFinite(value_cents) || duration_min == null || !Number.isFinite(duration_min) || duration_min <= 0) {
-      return res.status(400).json({ error: 'date, category, title, porte, duration_min e value_cents são obrigatórios.' });
+    const category = String(req.body.category || 'Banho').trim();
+    const porte = String(req.body.porte || '').trim();
+    const duration_min = Number(req.body.duration_min ?? req.body.tempo_min ?? 0);
+
+    if (!title || !Number.isFinite(value_cents)) {
+      return res.status(400).json({ error: 'title e value_cents são obrigatórios.' });
+    }
+    if (!Number.isFinite(duration_min) || duration_min < 0) {
+      return res.status(400).json({ error: 'duration_min inválido.' });
     }
 
     const row = await db.get(
       `
-      INSERT INTO services (date, category, title, porte, duration_min, value_cents, updated_at)
+      INSERT INTO services (date, category, title, porte, value_cents, duration_min, updated_at)
       VALUES ($1,$2,$3,$4,$5,$6,NOW())
       RETURNING *
       `,
-      [date, category, title, porte, duration_min, value_cents]
+      [date, category, title, porte || null, value_cents, duration_min]
     );
     res.json({ service: row });
   } catch (err) {
     console.error('Erro ao criar service:', err);
-    res.status(500).json({ error: 'Erro interno ao salvar serviço.' });
+    res.status(500).json({ error: 'Erro interno ao criar serviço.' });
   }
 });
-
-
 
 app.put('/api/services/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const date = String(req.body.date || '').slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const date = String(req.body.date || today).slice(0, 10);
     const title = String(req.body.title || '').trim();
     const value_cents = Number(req.body.value_cents);
 
-    
-    const category = String(req.body.category || '').trim();
+    const category = String(req.body.category || 'Banho').trim();
     const porte = String(req.body.porte || '').trim();
-    const duration_min = req.body.duration_min == null ? null : Number(req.body.duration_min);
-if (!id || !date || !title || !category || !porte || !Number.isFinite(value_cents) || (duration_min == null || !Number.isFinite(duration_min) || duration_min <= 0)) {
-      return res.status(400).json({ error: 'id, date, category, title, porte, duration_min e value_cents são obrigatórios.' });
+    const duration_min = Number(req.body.duration_min ?? req.body.tempo_min ?? 0);
+
+    if (!id || !title || !Number.isFinite(value_cents)) {
+      return res.status(400).json({ error: 'id, title e value_cents são obrigatórios.' });
+    }
+    if (!Number.isFinite(duration_min) || duration_min < 0) {
+      return res.status(400).json({ error: 'duration_min inválido.' });
     }
 
     const row = await db.get(
       `
       UPDATE services
-      SET date=$2, category=$3, title=$4, porte=$5, duration_min=$6, value_cents=$7, updated_at=NOW()
+      SET date=$2,
+          category=$3,
+          title=$4,
+          porte=$5,
+          value_cents=$6,
+          duration_min=$7,
+          updated_at=NOW()
       WHERE id=$1
       RETURNING *
       `,
-      [id, date, category, title, porte, duration_min, value_cents]
+      [id, date, category, title, porte || null, value_cents, duration_min]
     );
+
     res.json({ service: row });
   } catch (err) {
     console.error('Erro ao atualizar service:', err);
@@ -480,6 +495,9 @@ app.post('/api/bookings', async (req, res) => {
     const status = req.body.status ? String(req.body.status).trim() : 'agendado';
     const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
+    const payment_status = req.body.payment_status ? String(req.body.payment_status).trim() : 'Não Pago';
+    const payment_method = req.body.payment_method ? String(req.body.payment_method).trim() : '';
+
     if (!customer_id || !date || !time || !prize) {
       return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
     }
@@ -490,11 +508,11 @@ app.post('/api/bookings', async (req, res) => {
 
     const row = await db.get(
       `
-      INSERT INTO bookings (customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      INSERT INTO bookings (customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at, payment_status, payment_method)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       RETURNING *
       `,
-      [customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at]
+      [customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at, payment_status, payment_method]
     );
     res.json({ booking: row });
   } catch (err) {
@@ -518,6 +536,9 @@ app.put('/api/bookings/:id', async (req, res) => {
     const status = req.body.status ? String(req.body.status).trim() : 'agendado';
     const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
+    const payment_status = req.body.payment_status ? String(req.body.payment_status).trim() : 'Não Pago';
+    const payment_method = req.body.payment_method ? String(req.body.payment_method).trim() : '';
+
     if (!id || !customer_id || !date || !time || !prize) {
       return res.status(400).json({ error: 'id, customer_id, date, time e prize são obrigatórios.' });
     }
@@ -533,7 +554,7 @@ app.put('/api/bookings/:id', async (req, res) => {
       WHERE id=$1
       RETURNING *
       `,
-      [id, customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at]
+      [id, customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at, payment_status, payment_method]
     );
     res.json({ booking: row });
   } catch (err) {
