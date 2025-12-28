@@ -68,7 +68,7 @@
       align-items: center;
       justify-content: center;
       gap: 4px;
-      padding: 8px 14px;
+      padding: 10px;
       border-radius: 999px;
       border: none;
       background: linear-gradient(135deg, var(--turquesa), var(--coral));
