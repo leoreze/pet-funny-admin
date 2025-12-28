@@ -3275,6 +3275,32 @@ attachCepMaskToCrudIfPresent();
     }, 180);
   }
 
+  const inpPhone = document.querySelector('#cliPhone'); // exemplo
+if (!inpPhone || !inpPhone.value.trim()) {
+  window.pfHint?.show({
+    type: 'error',
+    message: 'Preencha o Telefone (WhatsApp) para salvar.',
+    durationMs: 1800,
+    focusEl: inpPhone
+  });
+  return;
+}
+
+
+window.pfHint?.show({
+  type: 'success',
+  message: 'Agendamento salvo com sucesso!',
+  durationMs: 1200
+});
+
+
+window.pfHint?.show({
+  type: 'info',
+  message: 'Buscando dados do CEP…',
+  durationMs: 900
+});
+
+
   btnMenu.addEventListener('click', () => {
     const isOpen = sidebar.classList.contains('open');
     if (isOpen) closeMenu();

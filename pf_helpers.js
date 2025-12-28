@@ -136,3 +136,140 @@
   window.formatTelefone = window.formatTelefone || formatTelefone;
 
 })();
+
+// =========================================================
+// PATCH: PF Hint Modal/Toast + AutoFocus
+// Date: 2025-12-28
+// =========================================================
+(function () {
+  if (window.pfHint) return; // evita duplicar
+
+  let overlayEl = null;
+  let hideTimer = null;
+  let barTimer = null;
+
+  function ensureUI() {
+    if (overlayEl) return;
+
+    overlayEl = document.createElement('div');
+    overlayEl.className = 'pf-hint-overlay';
+    overlayEl.innerHTML = `
+      <div class="pf-hint-modal pf-type-info" role="dialog" aria-live="polite" aria-modal="true">
+        <div class="pf-hint-head">
+          <div class="pf-hint-left">
+            <div class="pf-hint-ic" aria-hidden="true">ℹ️</div>
+            <div>
+              <div class="pf-hint-title">Aviso</div>
+              <p class="pf-hint-msg"></p>
+            </div>
+          </div>
+          <button class="pf-hint-x" type="button" aria-label="Fechar">×</button>
+        </div>
+        <div class="pf-hint-bar"><i></i></div>
+      </div>
+    `;
+
+    document.body.appendChild(overlayEl);
+
+    // Fechar ao clicar fora
+    overlayEl.addEventListener('click', (e) => {
+      if (e.target === overlayEl) hide();
+    });
+
+    // Fechar no X
+    overlayEl.querySelector('.pf-hint-x').addEventListener('click', hide);
+
+    // Esc fecha
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlayEl.style.display === 'flex') hide();
+    });
+  }
+
+  function setType(modal, type) {
+    modal.classList.remove('pf-type-success', 'pf-type-error', 'pf-type-warn', 'pf-type-info');
+    modal.classList.add(`pf-type-${type || 'info'}`);
+
+    const ic = modal.querySelector('.pf-hint-ic');
+    const title = modal.querySelector('.pf-hint-title');
+
+    if (type === 'success') { ic.textContent = '✅'; title.textContent = 'Sucesso'; }
+    else if (type === 'error') { ic.textContent = '⚠️'; title.textContent = 'Atenção'; }
+    else if (type === 'warn') { ic.textContent = '⚠️'; title.textContent = 'Atenção'; }
+    else { ic.textContent = 'ℹ️'; title.textContent = 'Informação'; }
+  }
+
+  function focusField(el, { shake = true, highlightMs = 1200 } = {}) {
+    if (!el) return;
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (_) {}
+
+    // focus após um pequeno delay para garantir que o modal já apareceu
+    setTimeout(() => {
+      try { el.focus({ preventScroll: true }); } catch (_) { try { el.focus(); } catch (__) {} }
+
+      // highlight + shake
+      el.classList.add('pf-focus-ring');
+      if (shake) el.classList.add('pf-shake');
+
+      setTimeout(() => {
+        el.classList.remove('pf-focus-ring');
+        el.classList.remove('pf-shake');
+      }, highlightMs);
+    }, 120);
+  }
+
+  function show({ message, type = 'info', durationMs = 1600, focusEl = null, focusOpts = {} } = {}) {
+    ensureUI();
+
+    const modal = overlayEl.querySelector('.pf-hint-modal');
+    const msgEl = overlayEl.querySelector('.pf-hint-msg');
+    const bar = overlayEl.querySelector('.pf-hint-bar > i');
+
+    setType(modal, type);
+    msgEl.textContent = message || '';
+
+    // reset timers
+    if (hideTimer) clearTimeout(hideTimer);
+    if (barTimer) clearInterval(barTimer);
+
+    // show
+    overlayEl.style.display = 'flex';
+    requestAnimationFrame(() => overlayEl.classList.add('pf-show'));
+
+    // progress bar anim (JS simples para compatibilidade)
+    let start = Date.now();
+    bar.style.transform = 'scaleX(1)';
+
+    barTimer = setInterval(() => {
+      const t = Date.now() - start;
+      const p = Math.max(0, 1 - (t / durationMs));
+      bar.style.transform = `scaleX(${p})`;
+      if (p <= 0) {
+        clearInterval(barTimer);
+        barTimer = null;
+      }
+    }, 30);
+
+    // focus if requested
+    if (focusEl) focusField(focusEl, focusOpts);
+
+    // auto hide
+    hideTimer = setTimeout(hide, durationMs);
+  }
+
+  function hide() {
+    if (!overlayEl) return;
+    overlayEl.classList.remove('pf-show');
+    // pequena transição
+    setTimeout(() => {
+      overlayEl.style.display = 'none';
+    }, 120);
+
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    if (barTimer) { clearInterval(barTimer); barTimer = null; }
+  }
+
+  // API global
+  window.pfHint = { show, hide };
+})();

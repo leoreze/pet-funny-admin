@@ -782,198 +782,130 @@
   white-space:pre-line;
 }
 
-/* ====== SEU style.css ATUAL (mantido) ====== */
 
-:root {
-  --bg: #0b1220;
-  --card: rgba(255,255,255,0.06);
-  --card2: rgba(255,255,255,0.08);
-  --text: rgba(255,255,255,0.9);
-  --muted: rgba(255,255,255,0.65);
-  --turquesa: #01ADB7;
-  --coral: #F9A197;
-  --ok: #2ecc71;
-  --warn: #f1c40f;
-  --err: #e74c3c;
-  --radius: 16px;
-  --shadow: 0 10px 30px rgba(0,0,0,.35);
-}
-
-/* ====== (restante do seu CSS existente...) ====== */
-/* Como você já tem o arquivo local, mantenha todo o conteúdo existente acima.
-   Abaixo está APENAS o bloco PATCH que entra no final do arquivo. */
-
-
-/* =========================================================
-   PATCH: Admin UX messages + labels (no HTML structural change)
-   Date: 2025-12-28
-   Notes:
-   - Styles existing message placeholders:
-     #formError, #cliError, #petError, #serviceError, #breedError, #loginError -> error style
-     #mimoMsg, #hoursMsg -> success/info style (can be reused by other blocks)
-   - Enhances form labels and required-field affordance (visual only)
-========================================================= */
-
-/* ---- Form labels (admin) ---- */
-#adminApp label,
-#loginScreen label {
-  display: inline-flex;
+.pf-hint-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(2px);
+  display: none;
   align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: .2px;
-  text-transform: uppercase;
-  color: rgba(255,255,255,.86);
-  margin-bottom: 6px;
+  justify-content: center;
+  z-index: 9999;
 }
 
-#adminApp label::after,
-#loginScreen label::after {
-  content: "";
-  display: inline-block;
-  height: 2px;
-  width: 20px;
-  border-radius: 99px;
-  background: linear-gradient(90deg, var(--turquesa), transparent);
-  opacity: .9;
+.pf-hint-modal {
+  width: min(520px, calc(100vw - 32px));
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(15, 23, 42, .92);
+  box-shadow: 0 18px 50px rgba(0,0,0,.45);
+  padding: 14px 14px 12px;
+  transform: translateY(6px);
+  opacity: 0;
+  transition: opacity .14s ease-out, transform .14s ease-out;
 }
 
-/* Inputs focus ring (subtle + consistent) */
-#adminApp input:focus,
-#adminApp select:focus,
-#adminApp textarea:focus,
-#loginScreen input:focus {
-  outline: none !important;
-  box-shadow:
-    0 0 0 2px rgba(1,173,183,.22),
-    0 0 0 6px rgba(1,173,183,.10);
-  border-color: rgba(1,173,183,.65);
+.pf-hint-overlay.pf-show .pf-hint-modal {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-/* ---- Message blocks (base) ---- */
-#formError,
-#cliError,
-#petError,
-#serviceError,
-#breedError,
-#loginError,
-#mimoMsg,
-#hoursMsg {
-  display: none; /* they already toggle via JS; keep default hidden */
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.06);
-  color: rgba(255,255,255,.92);
-  font-size: 13px;
-  line-height: 1.35;
-  white-space: pre-line;
-  position: relative;
-  overflow: hidden;
+.pf-hint-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-/* When JS sets display:block/inline-block, we keep the look */
-#formError[style*="display: block"],
-#cliError[style*="display: block"],
-#petError[style*="display: block"],
-#serviceError[style*="display: block"],
-#breedError[style*="display: block"],
-#loginError[style*="display: block"],
-#mimoMsg:not(:empty),
-#hoursMsg:not(:empty) {
-  display: block;
-  animation: pfMsgIn .16s ease-out;
+.pf-hint-left {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
 }
 
-@keyframes pfMsgIn {
-  from { transform: translateY(-2px); opacity: .0; }
-  to   { transform: translateY(0); opacity: 1; }
-}
-
-/* ---- Error style (existing "*Error" placeholders) ---- */
-#formError,
-#cliError,
-#petError,
-#serviceError,
-#breedError,
-#loginError {
-  border-color: rgba(231, 76, 60, .35);
-  background: rgba(231, 76, 60, .10);
-}
-
-#formError::before,
-#cliError::before,
-#petError::before,
-#serviceError::before,
-#breedError::before,
-#loginError::before {
-  content: "⚠";
-  position: absolute;
-  left: 10px;
-  top: 10px;
-  font-size: 14px;
-  opacity: .95;
-}
-
-#formError,
-#cliError,
-#petError,
-#serviceError,
-#breedError,
-#loginError {
-  padding-left: 32px; /* room for icon */
-  border-left: 4px solid rgba(231, 76, 60, .90);
-}
-
-/* ---- Success / info style (#mimoMsg, #hoursMsg) ---- */
-#mimoMsg,
-#hoursMsg {
-  border-color: rgba(46, 204, 113, .32);
-  background: rgba(46, 204, 113, .10);
-  border-left: 4px solid rgba(46, 204, 113, .90);
-  padding-left: 32px;
-}
-
-#mimoMsg::before,
-#hoursMsg::before {
-  content: "✅";
-  position: absolute;
-  left: 10px;
-  top: 10px;
-  font-size: 14px;
-  opacity: .95;
-}
-
-/* ---- Inline helper chips (optional; no structure change required) ---- */
-.pf-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border-radius: 999px;
+.pf-hint-ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
   border: 1px solid rgba(255,255,255,.12);
   background: rgba(255,255,255,.06);
-  font-size: 12px;
+}
+
+.pf-hint-title {
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: .2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.90);
+  margin: 0 0 4px 0;
+}
+
+.pf-hint-msg {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: rgba(255,255,255,.86);
+  white-space: pre-line;
+}
+
+.pf-hint-x {
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,.75);
+  font-size: 18px;
   line-height: 1;
-  color: rgba(255,255,255,.88);
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+.pf-hint-x:hover { background: rgba(255,255,255,.08); }
+
+.pf-hint-bar {
+  margin-top: 10px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.10);
+  overflow: hidden;
+}
+.pf-hint-bar > i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  transform: scaleX(1);
+  background: rgba(1, 173, 183, .85);
 }
 
-.pf-chip--ok { border-color: rgba(46,204,113,.30); background: rgba(46,204,113,.10); }
-.pf-chip--warn { border-color: rgba(241,196,15,.30); background: rgba(241,196,15,.10); }
-.pf-chip--err { border-color: rgba(231,76,60,.30); background: rgba(231,76,60,.10); }
+/* Tipos */
+.pf-type-success .pf-hint-ic { background: rgba(46,204,113,.12); border-color: rgba(46,204,113,.25); }
+.pf-type-success .pf-hint-bar > i { background: rgba(46,204,113,.90); }
 
-/* ---- Small, consistent hint text under inputs (optional) ---- */
-.pf-hint {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.25;
-  color: rgba(255,255,255,.68);
+.pf-type-error .pf-hint-ic { background: rgba(231,76,60,.12); border-color: rgba(231,76,60,.25); }
+.pf-type-error .pf-hint-bar > i { background: rgba(231,76,60,.90); }
+
+.pf-type-warn .pf-hint-ic { background: rgba(241,196,15,.12); border-color: rgba(241,196,15,.25); }
+.pf-type-warn .pf-hint-bar > i { background: rgba(241,196,15,.90); }
+
+.pf-type-info .pf-hint-ic { background: rgba(1,173,183,.12); border-color: rgba(1,173,183,.25); }
+.pf-type-info .pf-hint-bar > i { background: rgba(1,173,183,.90); }
+
+/* Highlight + shake no campo */
+.pf-focus-ring {
+  box-shadow: 0 0 0 2px rgba(231,76,60,.25), 0 0 0 6px rgba(231,76,60,.12) !important;
+  border-color: rgba(231,76,60,.65) !important;
 }
-.pf-hint strong { color: rgba(255,255,255,.86); }
 
-/* ---- Buttons: subtle feedback on success/error patterns ---- */
-.btn:active { transform: translateY(1px); }
-.btn.btn-danger { box-shadow: 0 8px 20px rgba(231,76,60,.12); }
-.btn.btn-secondary { box-shadow: 0 8px 20px rgba(0,0,0,.18); }
+@keyframes pfShake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-3px); }
+  100% { transform: translateX(0); }
+}
+.pf-shake {
+  animation: pfShake .18s ease-in-out 2;
+}
