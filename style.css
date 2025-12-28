@@ -235,7 +235,23 @@
     .form-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
     .form-row-2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
     .form-group { display: flex; flex-direction: column; gap: 3px; }
-    label { font-size: 12px; font-weight: 500; color: #555; }
+    #adminApp label {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: #37474f;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #adminApp label::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(1,173,183,0.9);
+      box-shadow: 0 0 0 3px rgba(1,173,183,0.12);
+    }
     textarea { min-height: 48px; resize: vertical; }
 
     .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
@@ -908,4 +924,12 @@
 }
 .pf-shake {
   animation: pfShake .18s ease-in-out 2;
+}
+
+
+/* PF: notas pequenas em formulários */
+#adminApp .pf-field-note{
+  font-size: 11px;
+  color: #78909c;
+  margin-top: 2px;
 }

@@ -125,7 +125,155 @@
   };
 
   // Expor também como globais "de compatibilidade" (não sobrescreve se já existir)
-  window.normStr = window.normStr || normStr;
+  window.normStr = 
+  /* =========================
+     PF Hint Modal (auto-close + focus)
+     - Não altera comportamento existente: apenas adiciona helpers globais.
+  ========================= */
+
+  function _pfEnsureHintDom() {
+    let overlay = document.getElementById('pfHintOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'pfHintOverlay';
+      overlay.className = 'pf-hint-overlay';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.innerHTML = `
+        <div class="pf-hint-modal" role="dialog" aria-modal="true" aria-label="Notificação">
+          <div class="pf-hint-head">
+            <div class="pf-hint-left">
+              <div class="pf-hint-ic" aria-hidden="true">i</div>
+              <div>
+                <p class="pf-hint-title" id="pfHintTitle">Aviso</p>
+                <p class="pf-hint-msg" id="pfHintMsg"></p>
+              </div>
+            </div>
+            <button class="pf-hint-x" id="pfHintClose" type="button" aria-label="Fechar">×</button>
+          </div>
+          <div class="pf-hint-bar" aria-hidden="true"><i id="pfHintBar"></i></div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    }
+    return overlay;
+  }
+
+  function _pfGetHintEls() {
+    const overlay = _pfEnsureHintDom();
+    return {
+      overlay,
+      modal: overlay.querySelector('.pf-hint-modal'),
+      ic: overlay.querySelector('.pf-hint-ic'),
+      title: overlay.querySelector('#pfHintTitle'),
+      msg: overlay.querySelector('#pfHintMsg'),
+      close: overlay.querySelector('#pfHintClose'),
+      bar: overlay.querySelector('#pfHintBar')
+    };
+  }
+
+  function _pfSetFocusFx(el) {
+    try {
+      if (!el) return;
+      if (typeof el.focus !== 'function') return;
+
+      // garante que pode receber foco (ex: div)
+      if (!/^(input|select|textarea|button|a)$/i.test(el.tagName || '') && !el.hasAttribute('tabindex')) {
+        el.setAttribute('tabindex', '-1');
+      }
+
+      el.classList.add('pf-focus-ring');
+      el.classList.add('pf-shake');
+      el.focus({ preventScroll: false });
+
+      setTimeout(() => el.classList.remove('pf-shake'), 520);
+      setTimeout(() => el.classList.remove('pf-focus-ring'), 1600);
+    } catch (_) {}
+  }
+
+  let __pfHintTimer = null;
+
+  function pfHint(opts) {
+    const o = opts || {};
+    const type = (o.type || 'info').toLowerCase(); // success | error | warn | info
+    const title = String(o.title || (type === 'success' ? 'Sucesso' : type === 'error' ? 'Erro' : type === 'warn' ? 'Atenção' : 'Aviso'));
+    const message = String(o.message || '');
+    const timeout = Number.isFinite(o.timeout) ? o.timeout : 2400;
+
+    const els = _pfGetHintEls();
+    if (!els.overlay) return;
+
+    // reset
+    if (__pfHintTimer) { clearTimeout(__pfHintTimer); __pfHintTimer = null; }
+    els.overlay.style.display = 'flex';
+    els.overlay.setAttribute('aria-hidden', 'false');
+    els.overlay.classList.remove('pf-type-success','pf-type-error','pf-type-warn','pf-type-info','pf-show');
+    els.overlay.classList.add(`pf-type-${type}`);
+
+    // ícone simples
+    els.ic.textContent = type === 'success' ? '✓' : type === 'error' ? '!' : type === 'warn' ? '⚠' : 'i';
+
+    els.title.textContent = title;
+    els.msg.textContent = message;
+
+    // progress bar
+    if (els.bar) {
+      els.bar.style.transition = 'none';
+      els.bar.style.transform = 'scaleX(1)';
+      // anima na próxima frame
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          els.bar.style.transition = `transform ${timeout}ms linear`;
+          els.bar.style.transform = 'scaleX(0)';
+        });
+      });
+    }
+
+    // show animation
+    requestAnimationFrame(() => els.overlay.classList.add('pf-show'));
+
+    function closeNow() {
+      if (__pfHintTimer) { clearTimeout(__pfHintTimer); __pfHintTimer = null; }
+      els.overlay.classList.remove('pf-show');
+      els.overlay.setAttribute('aria-hidden', 'true');
+      setTimeout(() => {
+        els.overlay.style.display = 'none';
+        // focus no campo após fechar
+        if (o.focusEl) _pfSetFocusFx(o.focusEl);
+      }, 120);
+    }
+
+    // handlers
+    const onClose = (ev) => { ev && ev.preventDefault && ev.preventDefault(); closeNow(); };
+    if (els.close) {
+      els.close.onclick = onClose;
+    }
+    // click fora fecha
+    els.overlay.onclick = (ev) => {
+      if (ev && ev.target === els.overlay) closeNow();
+    };
+    // ESC fecha
+    document.onkeydown = (ev) => {
+      if (ev && ev.key === 'Escape' && els.overlay.style.display === 'flex') closeNow();
+    };
+
+    __pfHintTimer = setTimeout(closeNow, Math.max(800, timeout));
+
+    return { close: closeNow };
+  }
+
+  // Aliases simples (compatibilidade com patches anteriores)
+  function toast(msg) { return pfHint({ type: 'info', title: 'Info', message: msg, timeout: 2200 }); }
+  function toastSuccess(msg) { return pfHint({ type: 'success', title: 'Sucesso', message: msg, timeout: 2200 }); }
+  function toastError(msg, focusEl) { return pfHint({ type: 'error', title: 'Erro', message: msg, timeout: 3200, focusEl }); }
+  function toastWarn(msg, focusEl) { return pfHint({ type: 'warn', title: 'Atenção', message: msg, timeout: 2800, focusEl }); }
+
+  window.pfHint = window.pfHint || pfHint;
+  window.toast = window.toast || toast;
+  window.toastSuccess = window.toastSuccess || toastSuccess;
+  window.toastError = window.toastError || toastError;
+  window.toastWarn = window.toastWarn || toastWarn;
+
+window.normStr || normStr;
   window.normalizeHHMM = window.normalizeHHMM || normalizeHHMM;
   window.hhmmToMinutes = window.hhmmToMinutes || hhmmToMinutes;
   window.minutesToHHMM = window.minutesToHHMM || minutesToHHMM;
@@ -137,139 +285,3 @@
 
 })();
 
-// =========================================================
-// PATCH: PF Hint Modal/Toast + AutoFocus
-// Date: 2025-12-28
-// =========================================================
-(function () {
-  if (window.pfHint) return; // evita duplicar
-
-  let overlayEl = null;
-  let hideTimer = null;
-  let barTimer = null;
-
-  function ensureUI() {
-    if (overlayEl) return;
-
-    overlayEl = document.createElement('div');
-    overlayEl.className = 'pf-hint-overlay';
-    overlayEl.innerHTML = `
-      <div class="pf-hint-modal pf-type-info" role="dialog" aria-live="polite" aria-modal="true">
-        <div class="pf-hint-head">
-          <div class="pf-hint-left">
-            <div class="pf-hint-ic" aria-hidden="true">ℹ️</div>
-            <div>
-              <div class="pf-hint-title">Aviso</div>
-              <p class="pf-hint-msg"></p>
-            </div>
-          </div>
-          <button class="pf-hint-x" type="button" aria-label="Fechar">×</button>
-        </div>
-        <div class="pf-hint-bar"><i></i></div>
-      </div>
-    `;
-
-    document.body.appendChild(overlayEl);
-
-    // Fechar ao clicar fora
-    overlayEl.addEventListener('click', (e) => {
-      if (e.target === overlayEl) hide();
-    });
-
-    // Fechar no X
-    overlayEl.querySelector('.pf-hint-x').addEventListener('click', hide);
-
-    // Esc fecha
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && overlayEl.style.display === 'flex') hide();
-    });
-  }
-
-  function setType(modal, type) {
-    modal.classList.remove('pf-type-success', 'pf-type-error', 'pf-type-warn', 'pf-type-info');
-    modal.classList.add(`pf-type-${type || 'info'}`);
-
-    const ic = modal.querySelector('.pf-hint-ic');
-    const title = modal.querySelector('.pf-hint-title');
-
-    if (type === 'success') { ic.textContent = '✅'; title.textContent = 'Sucesso'; }
-    else if (type === 'error') { ic.textContent = '⚠️'; title.textContent = 'Atenção'; }
-    else if (type === 'warn') { ic.textContent = '⚠️'; title.textContent = 'Atenção'; }
-    else { ic.textContent = 'ℹ️'; title.textContent = 'Informação'; }
-  }
-
-  function focusField(el, { shake = true, highlightMs = 1200 } = {}) {
-    if (!el) return;
-    try {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } catch (_) {}
-
-    // focus após um pequeno delay para garantir que o modal já apareceu
-    setTimeout(() => {
-      try { el.focus({ preventScroll: true }); } catch (_) { try { el.focus(); } catch (__) {} }
-
-      // highlight + shake
-      el.classList.add('pf-focus-ring');
-      if (shake) el.classList.add('pf-shake');
-
-      setTimeout(() => {
-        el.classList.remove('pf-focus-ring');
-        el.classList.remove('pf-shake');
-      }, highlightMs);
-    }, 120);
-  }
-
-  function show({ message, type = 'info', durationMs = 1600, focusEl = null, focusOpts = {} } = {}) {
-    ensureUI();
-
-    const modal = overlayEl.querySelector('.pf-hint-modal');
-    const msgEl = overlayEl.querySelector('.pf-hint-msg');
-    const bar = overlayEl.querySelector('.pf-hint-bar > i');
-
-    setType(modal, type);
-    msgEl.textContent = message || '';
-
-    // reset timers
-    if (hideTimer) clearTimeout(hideTimer);
-    if (barTimer) clearInterval(barTimer);
-
-    // show
-    overlayEl.style.display = 'flex';
-    requestAnimationFrame(() => overlayEl.classList.add('pf-show'));
-
-    // progress bar anim (JS simples para compatibilidade)
-    let start = Date.now();
-    bar.style.transform = 'scaleX(1)';
-
-    barTimer = setInterval(() => {
-      const t = Date.now() - start;
-      const p = Math.max(0, 1 - (t / durationMs));
-      bar.style.transform = `scaleX(${p})`;
-      if (p <= 0) {
-        clearInterval(barTimer);
-        barTimer = null;
-      }
-    }, 30);
-
-    // focus if requested
-    if (focusEl) focusField(focusEl, focusOpts);
-
-    // auto hide
-    hideTimer = setTimeout(hide, durationMs);
-  }
-
-  function hide() {
-    if (!overlayEl) return;
-    overlayEl.classList.remove('pf-show');
-    // pequena transição
-    setTimeout(() => {
-      overlayEl.style.display = 'none';
-    }, 120);
-
-    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-    if (barTimer) { clearInterval(barTimer); barTimer = null; }
-  }
-
-  // API global
-  window.pfHint = { show, hide };
-})();

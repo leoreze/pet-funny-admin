@@ -2,6 +2,37 @@
 /* PATCH: Fix global cacheMimos reference (admin bookings) — 2025-12-24 */
 const API_BASE_URL = '';
 
+  /* =========================
+     PF UI helpers (Hint modal)
+  ========================= */
+  function uiHint(type, message, options) {
+    const opt = options || {};
+    const title = opt.title || (type === 'success' ? 'Sucesso' : type === 'error' ? 'Erro' : type === 'warn' ? 'Atenção' : 'Aviso');
+    if (typeof window.pfHint === 'function') {
+      return window.pfHint({ type, title, message, timeout: opt.timeout, focusEl: opt.focusEl });
+    }
+    // fallback sem quebrar
+    if (type === 'error') console.error('[PetFunny]', message);
+    else console.info('[PetFunny]', message);
+    try { alert(message); } catch (_) {}
+  }
+  function uiSuccess(message, options) { return uiHint('success', message, options); }
+  function uiError(message, options) { return uiHint('error', message, options); }
+  function uiWarn(message, options) { return uiHint('warn', message, options); }
+  function uiInfo(message, options) { return uiHint('info', message, options); }
+
+  function uiFocus(el) {
+    try {
+      if (!el) return;
+      if (!/^(input|select|textarea|button|a)$/i.test(el.tagName || '') && !el.hasAttribute('tabindex')) {
+        el.setAttribute('tabindex', '-1');
+      }
+      el.focus({ preventScroll: false });
+    } catch (_) {}
+  }
+
+
+
   /* ===== Helpers de normalização (corrige acentos/variações) ===== */
   function normStr(s) {
     return String(s || '')
@@ -457,7 +488,7 @@ const API_BASE_URL = '';
     clearSession();
     adminApp.style.display = 'none';
     loginScreen.classList.remove('hidden');
-    alert('Sua sessão expirou. Faça login novamente.');
+    uiWarn('Sua sessão expirou. Faça login novamente.', { title: 'Sessão expirada', timeout: 3200, focusEl: document.getElementById('loginUser') });
   }
 
   function startSessionTimer() {
@@ -1035,7 +1066,7 @@ async function tryAutofillCustomerByPhone() {
       setCustomerFormFromLookup(customer);
 
       if (typeof toast === 'function') {
-        toast('Cliente já cadastrado. Dados carregados automaticamente.');
+        uiInfo('Cliente já cadastrado. Dados carregados automaticamente.');
       } else {
         console.info('[PetFunny] Cliente já cadastrado. Autofill aplicado.');
       }
@@ -1529,9 +1560,10 @@ function clearSelectedServices(){
         if (!confirm('Deseja realmente excluir este serviço?')) return;
         try {
           await apiDelete('/api/services/' + svc.id);
+          uiSuccess('Serviço excluído.');
           await loadServices();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) { uiError(e.message); }
       });
 
       divActions.appendChild(btnEdit);
@@ -1617,17 +1649,20 @@ if (selectedServicesList) {
     if (!date || !title) {
       serviceError.textContent = 'Preencha data e título do serviço.';
       serviceError.style.display = 'block';
+      uiWarn('Preencha data e título do serviço.', { title: 'Campos obrigatórios', focusEl: (!date ? serviceDate : serviceTitle) });
       return;
     }
     if (value_cents == null || value_cents < 0) {
       serviceError.textContent = 'Valor inválido. Digite no formato moeda (ex: 85,00).';
       serviceError.style.display = 'block';
+      uiWarn('Valor inválido. Digite no formato moeda (ex: 85,00).', { title: 'Verifique o valor', focusEl: servicePrice });
       return;
     }
 
     try {
       const body = { date, title, value_cents };
       if (!id) await apiPost('/api/services', body);
+      uiSuccess('Serviço salvo.');
       else await apiPut('/api/services/' + id, body);
 
       clearServiceForm();
@@ -1777,8 +1812,9 @@ if (selectedServicesList) {
         if (!confirm('Deseja realmente excluir esta raça?')) return;
         try {
           await apiDelete('/api/breeds/' + b.id);
+          uiSuccess('Raça excluída.');
           await loadBreeds();
-        } catch (e) { alert(e.message); }
+        } catch (e) { uiError(e.message); }
       });
 
       divActions.appendChild(btnEdit);
@@ -1834,6 +1870,7 @@ if (selectedServicesList) {
     try {
       const body = { name, size, coat, history };
       if (!id) await apiPost('/api/breeds', body);
+      uiSuccess('Raça salva.');
       else await apiPut('/api/breeds/' + id, body);
 
       clearBreedForm();
@@ -1977,9 +2014,10 @@ if (selectedServicesList) {
         if (!confirm('Deseja realmente excluir este agendamento?')) return;
         try {
           await apiDelete('/api/bookings/' + a.id);
+          uiSuccess('Agendamento excluído.');
           await renderTabela();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) { uiError(e.message); }
       });
 
       divActions.appendChild(btnEditar);
@@ -2098,9 +2136,10 @@ if (selectedServicesList) {
         if (!confirm('Deseja realmente excluir este agendamento?')) return;
         try {
           await apiDelete('/api/bookings/' + a.id);
+          uiSuccess('Agendamento excluído.');
           await renderTabela();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) { uiError(e.message); }
       });
 
       actions.appendChild(btnEditar);
@@ -2210,6 +2249,7 @@ async function salvarAgendamento() {
     if (isTimeOccupied(time)) {
       formError.textContent = 'Horário indisponível para esta data. Selecione outro horário.';
       formError.style.display = 'block';
+      uiWarn('Horário indisponível para esta data. Selecione outro horário.', { title: 'Horário cheio', focusEl: formTime });
       return;
     }
 
@@ -2219,17 +2259,20 @@ async function salvarAgendamento() {
     if (!date || !time || !serviceIdSelected) {
       formError.textContent = 'Data, horário e serviço são obrigatórios.';
       formError.style.display = 'block';
+      uiWarn('Data, horário e serviço são obrigatórios.', { title: 'Campos obrigatórios', focusEl: (!date ? formDate : (!time ? formTime : formService)) });
       return;
     }
     // Novo agendamento: Pet obrigatório
     if (!id && !petIdNum) {
       formError.textContent = 'Para NOVO agendamento, selecione um pet.';
       formError.style.display = 'block';
+      uiWarn('Para NOVO agendamento, selecione um pet.', { title: 'Selecione um pet', focusEl: formPetSelect });
       return;
     }
     if (!phone || phone.length < 10 || !nome) {
       formError.textContent = 'Preencha telefone (com DDD) e nome do tutor.';
       formError.style.display = 'block';
+      uiWarn('Preencha telefone (com DDD) e nome do tutor.', { title: 'Dados do tutor', focusEl: (!phone || phone.length < 10 ? formPhone : formNome) });
       return;
     }
 
@@ -2243,6 +2286,7 @@ async function salvarAgendamento() {
       if (!customer) {
         formError.textContent = 'Cliente não cadastrado. Cadastre o tutor e os pets na aba "Clientes & Pets" antes de criar o agendamento.';
         formError.style.display = 'block';
+        uiWarn('Cliente não cadastrado. Cadastre o tutor e os pets na aba "Clientes & Pets" antes de criar o agendamento.', { title: 'Cadastre o tutor', focusEl: formPhone, timeout: 4200 });
         return;
       }
 
@@ -2279,6 +2323,7 @@ async function salvarAgendamento() {
       }
 
       if (!id) await apiPost('/api/bookings', body);
+      uiSuccess('Agendamento salvo.');
       else await apiPut('/api/bookings/' + id, body);
 
       if (precisaWhats && urlWhats) window.open(urlWhats, '_blank');
@@ -2506,7 +2551,7 @@ async function tryAutofillCrudCustomerByPhone() {
       setCrudCustomerFormFromLookup(customer);
 
       if (typeof toast === 'function') {
-        toast('Cliente já cadastrado. Dados carregados automaticamente.');
+        uiInfo('Cliente já cadastrado. Dados carregados automaticamente.');
       } else {
         console.info('[PetFunny] CRUD: cliente já cadastrado. Autofill aplicado.');
       }
@@ -2720,7 +2765,7 @@ limparPetsForm();
           await loadClientes();
           await loadDashboard();
           await renderTabela();
-        } catch (e) { alert(e.message); }
+        } catch (e) { uiError(e.message); }
       });
 
       divActions.appendChild(btnSel);
@@ -2767,11 +2812,13 @@ limparPetsForm();
     if (!phoneDigits || phoneDigits.length < 10 || !name) {
       cliError.textContent = 'Preencha telefone (com DDD) e nome do tutor.';
       cliError.style.display = 'block';
+      uiWarn('Preencha telefone (com DDD) e nome do tutor.', { title: 'Campos obrigatórios', focusEl: (!phoneDigits || phoneDigits.length < 10 ? cliPhone : cliName) });
       return;
     }
 
     try {
       const data = await apiPost('/api/customers', { phone: phoneDigits, name });
+      uiSuccess('Cliente salvo.');
       clienteSelecionadoId = data.customer.id;
       badgeClienteSelecionado.classList.remove('hidden');
       petsCard.classList.remove('hidden');
@@ -2828,7 +2875,7 @@ limparPetsForm();
           await loadClientes();
           await loadDashboard();
           await renderTabela();
-        } catch (e) { alert(e.message); }
+        } catch (e) { uiError(e.message); }
       });
 
       divActions.appendChild(btnEdit);
@@ -2858,6 +2905,14 @@ limparPetsForm();
     if (!clienteSelecionadoId) {
       petError.textContent = 'Selecione um cliente na lista ao lado antes de cadastrar o pet.';
       petError.style.display = 'block';
+
+      const tbody = document.getElementById('tbodyClientes');
+      let focusEl = tbody;
+      if (tbody && typeof tbody.closest === 'function') {
+        focusEl = tbody.closest('.subcard') || tbody.closest('.subtable-wrapper') || tbody;
+      }
+
+      uiWarn('Selecione um cliente na lista ao lado antes de cadastrar o pet.', { title: 'Selecione o tutor', focusEl, timeout: 4200 });
       return;
     }
 
@@ -2868,12 +2923,14 @@ limparPetsForm();
     if (!name || !breed) {
       petError.textContent = 'Informe nome e raça do pet.';
       petError.style.display = 'block';
+      uiWarn('Informe nome e raça do pet.', { title: 'Campos obrigatórios', focusEl: (!name ? petName : petBreed) });
       return;
     }
 
     try {
       if (!petEditIdLocal) {
         await apiPost('/api/pets', { customer_id: clienteSelecionadoId, name, breed, info });
+      uiSuccess('Pet salvo.');
       } else {
         await apiPut('/api/pets/' + petEditIdLocal, { name, breed, info });
       }
@@ -3231,8 +3288,9 @@ attachCepMaskToCrudIfPresent();
       window.__pf_openingHoursCache = openingHoursCache;
       renderOpeningHoursTable();
       if (hoursMsg) hoursMsg.textContent = 'Horários salvos com sucesso.';
+      uiSuccess('Horários salvos com sucesso.');
     } catch (e) {
-      alert(e.message);
+      uiError(e.message);
       if (hoursMsg) hoursMsg.textContent = 'Erro ao salvar: ' + e.message;
     }
   }
@@ -3275,31 +3333,7 @@ attachCepMaskToCrudIfPresent();
     }, 180);
   }
 
-  const inpPhone = document.querySelector('#cliPhone'); // exemplo
-if (!inpPhone || !inpPhone.value.trim()) {
-  window.pfHint?.show({
-    type: 'error',
-    message: 'Preencha o Telefone (WhatsApp) para salvar.',
-    durationMs: 1800,
-    focusEl: inpPhone
-  });
-  return;
-}
-
-
-window.pfHint?.show({
-  type: 'success',
-  message: 'Agendamento salvo com sucesso!',
-  durationMs: 1200
-});
-
-
-window.pfHint?.show({
-  type: 'info',
-  message: 'Buscando dados do CEP…',
-  durationMs: 900
-});
-
+  
 
   btnMenu.addEventListener('click', () => {
     const isOpen = sidebar.classList.contains('open');

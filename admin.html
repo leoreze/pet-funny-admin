@@ -700,11 +700,28 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-
+<!-- PATCH: load modular JS in correct order (globals for backward compatibility) - 2025-12-24 -->
+<script src="pf_time.js"></script>
 <script src="pf_helpers.js"></script>
 <script src="pf_api.js"></script>
-<script src="pf_time.js"></script>
 <script src="scripts.js"></script>
 <!-- <script src="pf_healthcheck.js"></script> -->
+<!-- PF HINT MODAL (auto-close + focus) -->
+<div id="pfHintOverlay" class="pf-hint-overlay" aria-hidden="true">
+  <div class="pf-hint-modal" role="dialog" aria-modal="true" aria-label="Notificação">
+    <div class="pf-hint-head">
+      <div class="pf-hint-left">
+        <div class="pf-hint-ic" aria-hidden="true">i</div>
+        <div>
+          <p class="pf-hint-title" id="pfHintTitle">Aviso</p>
+          <p class="pf-hint-msg" id="pfHintMsg">...</p>
+        </div>
+      </div>
+      <button class="pf-hint-x" id="pfHintClose" type="button" aria-label="Fechar">×</button>
+    </div>
+    <div class="pf-hint-bar" aria-hidden="true"><i id="pfHintBar"></i></div>
+  </div>
+</div>
+
 </body>
 </html>
