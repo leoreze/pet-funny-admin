@@ -1026,3 +1026,19 @@ textarea {
   outline-offset: 2px;
   border-radius: 6px;
 }
+
+
+
+/* Serviços - campo Tempo (min) + filtro de categoria */
+.input-tempo-min{
+  max-width: 140px;
+  text-align: center;
+}
+.input-tempo-min::-webkit-outer-spin-button,
+.input-tempo-min::-webkit-inner-spin-button{
+  opacity: 1;
+}
+.select-small{
+  min-width: 170px;
+  height: 38px;
+}
