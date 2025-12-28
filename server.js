@@ -295,23 +295,26 @@ app.get('/api/services', async (req, res) => {
 app.post('/api/services', async (req, res) => {
   try {
     const date = String(req.body.date || '').slice(0, 10);
-    const category = String(req.body.category || '').trim();
     const title = String(req.body.title || '').trim();
-    const size = String(req.body.size || '').trim();
-    const duration_minutes = Number(req.body.duration_minutes);
     const value_cents = Number(req.body.value_cents);
+    const category = String(req.body.category || '').trim();
+    const porte = String(req.body.porte || '').trim();
+    const duration_min = req.body.duration_min == null ? null : Number(req.body.duration_min);
+    const category = String(req.body.category || '').trim();
+    const porte = String(req.body.porte || '').trim();
+    const duration_min = req.body.duration_min == null ? null : Number(req.body.duration_min);
 
-    if (!date || !category || !title || !size || !Number.isFinite(duration_minutes) || !Number.isFinite(value_cents)) {
-      return res.status(400).json({ error: 'date, category, title, size, duration_minutes e value_cents são obrigatórios.' });
+    if (!date || !title || !category || !porte || !Number.isFinite(value_cents) || (duration_min == null || !Number.isFinite(duration_min) || duration_min <= 0)) {
+      return res.status(400).json({ error: 'date, category, title, porte, duration_min e value_cents são obrigatórios.' });
     }
 
     const row = await db.get(
       `
-      INSERT INTO services (date, category, title, size, duration_minutes, value_cents, updated_at)
+      INSERT INTO services (date, category, title, porte, duration_min, value_cents, updated_at)
       VALUES ($1,$2,$3,$4,$5,$6,NOW())
       RETURNING *
       `,
-      [date, category, title, size, duration_minutes, value_cents]
+      [date, category, title, porte, duration_min, value_cents]
     );
     res.json({ service: row });
   } catch (err) {
@@ -324,24 +327,25 @@ app.put('/api/services/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const date = String(req.body.date || '').slice(0, 10);
-    const category = String(req.body.category || '').trim();
     const title = String(req.body.title || '').trim();
-    const size = String(req.body.size || '').trim();
-    const duration_minutes = Number(req.body.duration_minutes);
     const value_cents = Number(req.body.value_cents);
 
-    if (!id || !date || !category || !title || !size || !Number.isFinite(duration_minutes) || !Number.isFinite(value_cents)) {
-      return res.status(400).json({ error: 'id, date, category, title, size, duration_minutes e value_cents são obrigatórios.' });
+    
+    const category = String(req.body.category || '').trim();
+    const porte = String(req.body.porte || '').trim();
+    const duration_min = req.body.duration_min == null ? null : Number(req.body.duration_min);
+if (!id || !date || !title || !category || !porte || !Number.isFinite(value_cents) || (duration_min == null || !Number.isFinite(duration_min) || duration_min <= 0)) {
+      return res.status(400).json({ error: 'id, date, category, title, porte, duration_min e value_cents são obrigatórios.' });
     }
 
     const row = await db.get(
       `
       UPDATE services
-      SET date=$2, category=$3, title=$4, size=$5, duration_minutes=$6, value_cents=$7, updated_at=NOW()
+      SET date=$2, category=$3, title=$4, porte=$5, duration_min=$6, value_cents=$7, updated_at=NOW()
       WHERE id=$1
       RETURNING *
       `,
-      [id, date, category, title, size, duration_minutes, value_cents]
+      [id, date, category, title, porte, duration_min, value_cents]
     );
     res.json({ service: row });
   } catch (err) {

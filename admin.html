@@ -416,58 +416,65 @@
           <div class="filters-group">
             <span style="font-size:13px;">Buscar:</span>
             <input type="text" id="filtroServicos" placeholder="Título do serviço" />
-            <button class="btn btn-light" id="btnLimparServicos" type="button">Limpar</button>
+            
+            <select id="filtroCategoriaServicos" class="select-small" aria-label="Filtrar por categoria">
+              <option value="">Todas categorias</option>
+              <option value="Banho">Banho</option>
+              <option value="Complemento">Complemento</option>
+              <option value="Tosa">Tosa</option>
+              <option value="Avulso">Avulso</option>
+            </select>
+<button class="btn btn-light" id="btnLimparServicos" type="button">Limpar</button>
           </div>
         </div>
         <button class="btn btn-light" id="btnNovoServico" type="button">+ Novo serviço</button>
       </div>
 
       <div class="form-panel hidden" id="serviceFormPanel">
-        <input type="hidden" id="serviceId" />
-
         <div class="form-row-2">
           <div class="form-group">
-            <label for="serviceIdView">ID</label>
-            <input type="text" id="serviceIdView" placeholder="(automático)" readonly />
+            <label for="serviceId">ID</label>
+            <input type="text" id="serviceId" placeholder="(gerado automaticamente)" readonly />
           </div>
           <div class="form-group">
             <label for="serviceDate">Data</label>
             <input type="date" id="serviceDate" />
           </div>
+
           <div class="form-group">
             <label for="serviceCategory">Categoria</label>
             <select id="serviceCategory">
+              <option value="">Selecione...</option>
               <option value="Banho">Banho</option>
               <option value="Complemento">Complemento</option>
               <option value="Tosa">Tosa</option>
               <option value="Avulso">Avulso</option>
             </select>
           </div>
-        </div>
 
-        <div class="form-row-2">
           <div class="form-group">
             <label for="serviceTitle">Título do serviço</label>
-            <input type="text" id="serviceTitle" placeholder="Ex: Banho + Tosa" />
+            <input type="text" id="serviceTitle" placeholder="Ex: Banho (Porte M)" />
           </div>
+
           <div class="form-group">
-            <label for="serviceSize">Porte</label>
-            <select id="serviceSize">
+            <label for="servicePorte">Porte</label>
+            <select id="servicePorte">
+              <option value="">Selecione...</option>
               <option value="Pequeno">Pequeno</option>
               <option value="Médio">Médio</option>
               <option value="Grande">Grande</option>
             </select>
           </div>
+
           <div class="form-group">
             <label for="servicePrice">Preço (R$)</label>
             <input type="text" id="servicePrice" placeholder="R$ 0,00" inputmode="numeric" />
           </div>
-        </div>
 
-        <div class="form-row-2">
           <div class="form-group">
-            <label for="serviceDuration">Tempo (min)</label>
-            <input type="number" id="serviceDuration" placeholder="Ex: 60" min="0" step="5" />
+            <label for="serviceTempo">Tempo (min)</label>
+            <input type="number" id="serviceTempo" class="input-tempo-min" min="0" step="5" placeholder="Ex: 60" inputmode="numeric" />
           </div>
         </div>
 
@@ -489,7 +496,7 @@
               <th>Título</th>
               <th>Porte</th>
               <th>Tempo</th>
-              <th>Preço</th>
+              <th>Valor</th>
               <th>Criado em</th>
               <th>Atualizado em</th>
               <th>Ações</th>

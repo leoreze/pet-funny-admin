@@ -1407,11 +1407,11 @@ attachCepMaskIfPresent();
   const serviceId = document.getElementById('serviceId');
   const serviceDate = document.getElementById('serviceDate');
   const serviceTitle = document.getElementById('serviceTitle');
-  const servicePrice = document.getElementById('servicePrice');
-  const serviceIdView = document.getElementById('serviceIdView');
   const serviceCategory = document.getElementById('serviceCategory');
-  const serviceSize = document.getElementById('serviceSize');
-  const serviceDuration = document.getElementById('serviceDuration');
+  const servicePorte = document.getElementById('servicePorte');
+  const serviceTempo = document.getElementById('serviceTempo');
+
+  const servicePrice = document.getElementById('servicePrice');
   const serviceError = document.getElementById('serviceError');
   const btnServiceCancel = document.getElementById('btnServiceCancel');
   const btnServiceSave = document.getElementById('btnServiceSave');
@@ -1420,8 +1420,10 @@ attachCepMaskIfPresent();
 
   // Filtro de busca (Serviços)
   const filtroServicos = document.getElementById('filtroServicos');
-  const btnLimparServicos = document.getElementById('btnLimparServicos');
+  
+  const filtroCategoriaServicos = document.getElementById('filtroCategoriaServicos');const btnLimparServicos = document.getElementById('btnLimparServicos');
   let filtroServicosTxt = '';
+  let filtroCategoriaServicosVal = '';
 
 
   let servicesCache = [];
@@ -1472,28 +1474,28 @@ function clearSelectedServices(){
 
   function clearServiceForm() {
     serviceId.value = '';
-    if (serviceIdView) serviceIdView.value = '';
     serviceDate.value = toISODateOnly(new Date());
-    if (serviceCategory) serviceCategory.value = 'Banho';
     serviceTitle.value = '';
-    if (serviceSize) serviceSize.value = 'Pequeno';
+    if (serviceCategory) serviceCategory.value = '';
+    if (servicePorte) servicePorte.value = '';
+    if (serviceTempo) serviceTempo.value = '';
+
     servicePrice.value = '';
     servicePrice.dataset.cents = '';
-    if (serviceDuration) serviceDuration.value = '60';
     serviceError.style.display = 'none';
     serviceError.textContent = '';
   }
 
   function fillServiceForm(svc) {
     serviceId.value = svc.id;
-    if (serviceIdView) serviceIdView.value = String(svc.id || '');
     serviceDate.value = (svc.date || '').slice(0, 10);
-    if (serviceCategory) serviceCategory.value = (svc.category || 'Banho');
     serviceTitle.value = svc.title || '';
-    if (serviceSize) serviceSize.value = (svc.size || 'Pequeno');
+    if (serviceCategory) serviceCategory.value = svc.category || '';
+    if (servicePorte) servicePorte.value = svc.porte || '';
+    if (serviceTempo) serviceTempo.value = (svc.duration_min != null ? String(svc.duration_min) : '');
+
     servicePrice.dataset.cents = String(svc.value_cents ?? '');
     servicePrice.value = svc.value_cents != null ? formatCentsToBRL(svc.value_cents) : '';
-    if (serviceDuration) serviceDuration.value = String(svc.duration_minutes ?? svc.duration ?? '60');
     serviceError.style.display = 'none';
     serviceError.textContent = '';
   }
@@ -1502,9 +1504,18 @@ function clearSelectedServices(){
     tbodyServices.innerHTML = '';
 
     const list = (servicesCache || []).filter(s => {
-      if (!filtroServicosTxt) return true;
-      const hay = normStr((s.title || ''));
-      return hay.includes(filtroServicosTxt);
+      // filtro por texto (título)
+      if (filtroServicosTxt) {
+        const hay = normStr((s.title || ''));
+        if (!hay.includes(filtroServicosTxt)) return false;
+      }
+
+      // filtro por categoria
+      if (filtroCategoriaServicosVal) {
+        if (String(s.category || '') !== String(filtroCategoriaServicosVal)) return false;
+      }
+
+      return true;
     });
 
     servicesEmpty.style.display = list.length ? 'none' : 'block';
@@ -1513,11 +1524,11 @@ function clearSelectedServices(){
       const tr = document.createElement('tr');
 
       const tdId = document.createElement('td'); tdId.textContent = svc.id;
-      const tdDate = document.createElement('td'); tdDate.textContent = formatDataBr((svc.date || '').slice(0, 10));
+      const tdDate = document.createElement('td'); tdDate.textContent = formatDataBr((svc.date || '').slice(0,10));
       const tdCat = document.createElement('td'); tdCat.textContent = svc.category || '-';
       const tdTitle = document.createElement('td'); tdTitle.textContent = svc.title || '-';
-      const tdSize = document.createElement('td'); tdSize.textContent = svc.size || '-';
-      const tdDur = document.createElement('td'); tdDur.textContent = (svc.duration_minutes != null ? String(svc.duration_minutes) + ' min' : '-');
+      const tdPorte = document.createElement('td'); tdPorte.textContent = svc.porte || '-';
+      const tdTempo = document.createElement('td'); tdTempo.textContent = (svc.duration_min != null ? String(svc.duration_min) + ' min' : '-');
       const tdPrice = document.createElement('td'); tdPrice.textContent = formatCentsToBRL(svc.value_cents || 0);
 
       const tdCreated = document.createElement('td'); tdCreated.textContent = svc.created_at ? formatDateTimeBr(svc.created_at) : '-';
@@ -1541,14 +1552,12 @@ function clearSelectedServices(){
       btnDel.className = 'btn btn-small btn-danger';
       btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
-        if (!confirm('Excluir serviço #' + svc.id + '?')) return;
+        if (!confirm('Deseja realmente excluir este serviço?')) return;
         try {
           await apiDelete('/api/services/' + svc.id);
           await loadServices();
           await loadDashboard();
-        } catch (e) {
-          alert('Erro ao excluir: ' + e.message);
-        }
+        } catch (e) { alert(e.message); }
       });
 
       divActions.appendChild(btnEdit);
@@ -1559,8 +1568,8 @@ function clearSelectedServices(){
       tr.appendChild(tdDate);
       tr.appendChild(tdCat);
       tr.appendChild(tdTitle);
-      tr.appendChild(tdSize);
-      tr.appendChild(tdDur);
+      tr.appendChild(tdPorte);
+      tr.appendChild(tdTempo);
       tr.appendChild(tdPrice);
       tr.appendChild(tdCreated);
       tr.appendChild(tdUpdated);
@@ -1628,17 +1637,19 @@ if (selectedServicesList) {
 
     const id = serviceId.value ? parseInt(serviceId.value, 10) : null;
     const date = serviceDate.value;
-    const category = serviceCategory ? String(serviceCategory.value || '').trim() : '';
     const title = serviceTitle.value.trim();
-    const size = serviceSize ? String(serviceSize.value || '').trim() : '';
-    const duration_minutes = serviceDuration ? Number(serviceDuration.value) : null;
 
-    // garante dataset.cents sempre atualizado antes de validar
+    
+
+    const category = serviceCategory ? String(serviceCategory.value || '').trim() : '';
+    const porte = servicePorte ? String(servicePorte.value || '').trim() : '';
+    const duration_min = serviceTempo ? Number(serviceTempo.value) : null;
+// garante dataset.cents sempre atualizado antes de validar
     applyCurrencyMask(servicePrice);
     const value_cents = getCentsFromCurrencyInput(servicePrice);
 
-    if (!date || !category || !title || !size) {
-      serviceError.textContent = 'Preencha data, categoria, título e porte.';
+    if (!date || !title || !category || !porte || !Number.isFinite(duration_min) || duration_min <= 0) {
+      serviceError.textContent = 'Preencha: data, categoria, título, porte e tempo (min).';
       serviceError.style.display = 'block';
       return;
     }
@@ -1647,14 +1658,9 @@ if (selectedServicesList) {
       serviceError.style.display = 'block';
       return;
     }
-    if (duration_minutes == null || !Number.isFinite(duration_minutes) || duration_minutes < 0) {
-      serviceError.textContent = 'Tempo inválido. Use minutos (ex: 60).';
-      serviceError.style.display = 'block';
-      return;
-    }
 
     try {
-      const body = { date, category, title, size, value_cents, duration_minutes };
+      const body = { date, category, title, porte, duration_min, value_cents };
       if (!id) await apiPost('/api/services', body);
       else await apiPut('/api/services/' + id, body);
 
@@ -1690,10 +1696,19 @@ if (selectedServicesList) {
       renderServices();
     });
   }
+  if (filtroCategoriaServicos) {
+    filtroCategoriaServicos.addEventListener('change', () => {
+      filtroCategoriaServicosVal = String(filtroCategoriaServicos.value || '').trim();
+      renderServices();
+    });
+  }
+
   if (btnLimparServicos) {
     btnLimparServicos.addEventListener('click', () => {
       if (filtroServicos) filtroServicos.value = '';
       filtroServicosTxt = '';
+      if (filtroCategoriaServicos) filtroCategoriaServicos.value = '';
+      filtroCategoriaServicosVal = '';
       renderServices();
     });
   }
