@@ -1029,8 +1029,6 @@ textarea {
 
 
 
-/* Serviços - campo Tempo (min) + filtro de categoria */
-
 /* ===== FIX: Campo Tempo (min) ===== */
 .input-tempo-min,
 input[name="duration_min"],
@@ -1045,7 +1043,6 @@ input[name="duration_min"],
 .form-group .input-tempo-min {
   justify-self: start;
 }
-
 .select-small{
   min-width: 170px;
   height: 38px;
