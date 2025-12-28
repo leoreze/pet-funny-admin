@@ -1047,3 +1047,36 @@ input[name="duration_min"],
   min-width: 170px;
   height: 38px;
 }
+
+
+/* ===== Campos somente leitura (auto-preenchidos) ===== */
+.readonly-field{
+  background: #F4FBFC;
+  color: #014C5F;
+  border: 1px solid rgba(1, 76, 95, 0.20);
+  cursor: default;
+}
+.readonly-field:focus{
+  outline: none;
+  box-shadow: none;
+}
+.readonly-field[readonly]{
+  pointer-events: none;
+}
+/* Remove setas em number (Chrome/Safari/Edge) */
+.readonly-field::-webkit-outer-spin-button,
+.readonly-field::-webkit-inner-spin-button{
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Remove setas em number (Firefox) */
+.readonly-field[type=number]{
+  -moz-appearance: textfield;
+}
+
+.service-meta-row{
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
