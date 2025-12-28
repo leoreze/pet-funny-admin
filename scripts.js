@@ -3407,3 +3407,51 @@ attachCepMaskToCrudIfPresent();
     const cap = parseInt(oh.max_per_half_hour, 10);
     return Number.isFinite(cap) && cap > 0 ? cap : 1;
   }
+
+
+
+
+function pfHint({ type = 'info', title = '', msg = '', time = 2500, focusId = null }) {
+  const overlay = document.getElementById('pfHintOverlay');
+  const box = document.getElementById('pfHintBox');
+  const t = document.getElementById('pfHintTitle');
+  const m = document.getElementById('pfHintMsg');
+  const timer = document.getElementById('pfHintTimer');
+
+  if (!overlay || !box || !t || !m || !timer) {
+    // fallback defensivo
+    console.log('[pfHint fallback]', type, title, msg);
+    return;
+  }
+
+  box.className = 'pf-hint ' + type;
+  t.textContent = title;
+  m.textContent = msg;
+
+  timer.style.animation = 'none';
+  timer.offsetHeight; // reflow
+  timer.style.animation = 'pfTimer linear forwards';
+  timer.style.animationDuration = time + 'ms';
+
+  overlay.style.display = 'flex';
+
+  const close = () => {
+    overlay.style.display = 'none';
+    if (focusId) {
+      const el = document.getElementById(focusId);
+      if (el) {
+        el.focus();
+        el.classList.add('pf-focus-error');
+        setTimeout(() => el.classList.remove('pf-focus-error'), 800);
+      }
+    }
+    overlay.onclick = null;
+    document.onkeydown = null;
+  };
+
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  document.onkeydown = (e) => { if (e.key === 'Escape') close(); };
+
+  setTimeout(close, time);
+}
+
