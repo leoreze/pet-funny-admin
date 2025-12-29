@@ -68,8 +68,8 @@
       align-items: center;
       justify-content: center;
       gap: 4px;
-      padding: 20px;
-      border-radius: 999px;
+      padding: 10px;
+      border-radius: 1000px;
       border: none;
       background: linear-gradient(135deg, var(--turquesa), var(--coral));
       color: white;
@@ -112,15 +112,8 @@
     /* ADMIN APP */
     #adminApp { flex: 1; display: none; padding: 12px 16px 16px; }
 
-    /*
-      Layout mais “full width” no Admin:
-      a listagem de agendamentos estava ocupando praticamente toda a tela,
-      enquanto o restante ficava limitado pelo max-width fixo.
-      Ajuste: permite que TODAS as abas usem quase 100% da largura da viewport,
-      mantendo padding/margens e responsividade.
-    */
     .container {
-      max-width: 96vw;
+      max-width: none;
       width: 100%;
       margin: 0 auto;
       background: var(--branco);
@@ -514,7 +507,7 @@ textarea {
       background: transparent;
     }
     .footer-inner {
-      max-width: 96vw;
+      max-width: none;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
@@ -1032,4 +1025,58 @@ textarea {
   outline: 3px solid rgba(26, 177, 187, .85);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+
+
+/* ===== FIX: Campo Tempo (min) ===== */
+.input-tempo-min,
+input[name="duration_min"],
+#serviceDuration,
+#duration_min {
+  max-width: 120px;
+  text-align: center;
+  font-weight: 700;
+}
+
+/* garante alinhamento visual no grid */
+.form-group .input-tempo-min {
+  justify-self: start;
+}
+.select-small{
+  min-width: 170px;
+  height: 38px;
+}
+
+
+/* ===== Campos somente leitura (auto-preenchidos) ===== */
+.readonly-field{
+  background: #F4FBFC;
+  color: #014C5F;
+  border: 1px solid rgba(1, 76, 95, 0.20);
+  cursor: default;
+}
+.readonly-field:focus{
+  outline: none;
+  box-shadow: none;
+}
+.readonly-field[readonly]{
+  pointer-events: none;
+}
+/* Remove setas em number (Chrome/Safari/Edge) */
+.readonly-field::-webkit-outer-spin-button,
+.readonly-field::-webkit-inner-spin-button{
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Remove setas em number (Firefox) */
+.readonly-field[type=number]{
+  -moz-appearance: textfield;
+}
+
+.service-meta-row{
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
