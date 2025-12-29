@@ -790,22 +790,50 @@ function normalizeHHMM(t) {
   /* ===== TABS ===== */
   const tabButtons = document.querySelectorAll('.tab-btn');
   const tabViews = document.querySelectorAll('.tab-view');
+
+  function showTab(tabId) {
+    // força esconder todas as abas (evita "vazamento" de layout quando algum HTML/CSS externo sobrescreve display)
+    tabViews.forEach(view => {
+      view.classList.remove('active');
+      view.style.display = 'none';
+    });
+
+    const target = document.getElementById(tabId);
+    if (target) {
+      target.classList.add('active');
+      target.style.display = 'block';
+    }
+
+    // destaca o botão ativo
+    tabButtons.forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tabId));
+
+    // carregamentos sob demanda (mantém comportamento atual)
+    if (tabId === 'tab-servicos') loadServices().catch(console.error);
+    if (tabId === 'tab-racas') loadBreeds().catch(console.error);
+    if (tabId === 'tab-horarios') loadOpeningHours().catch(console.error);
+    if (tabId === 'tab-dashboard') {
+      loadDashboard().finally(() => {
+        setTimeout(() => {
+          try { if (statusChart) statusChart.resize(); } catch (_) {}
+          try { if (prizeChart) prizeChart.resize(); } catch (_) {}
+        }, 60);
+      });
+    }
+    if (tabId === 'tab-agenda') {
+      try { renderAgendaByView(ultimaLista || []); } catch (_) {}
+    }
+  }
+
   tabButtons.forEach(btn => {
     btn.addEventListener('click', () => {
-      tabButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
       const tabId = btn.getAttribute('data-tab');
-      tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
-      if (tabId === 'tab-servicos') loadServices().catch(console.error);
-      if (tabId === 'tab-racas') loadBreeds().catch(console.error);
-      if (tabId === 'tab-horarios') loadOpeningHours().catch(console.error);
-      if (tabId === 'tab-dashboard') {
-        loadDashboard().finally(() => {
-          setTimeout(() => {
-            try { if (statusChart) statusChart.resize(); } catch (_) {}
-            try { if (prizeChart) prizeChart.resize(); } catch (_) {}
-          }, 60);
-        });
+      if (!tabId) return;
+      showTab(tabId);
+    });
+  });
+
+  // garante estado inicial consistente (evita múltiplas abas visíveis)
+  try { showTab(document.querySelector('.tab-btn.active')?.getAttribute('data-tab') || 'tab-agenda'); } catch (_) {}
       }
       // NOVO: quando voltar para agenda, renderiza conforme view atual
       if (tabId === 'tab-agenda') {

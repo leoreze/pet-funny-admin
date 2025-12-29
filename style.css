@@ -229,7 +229,19 @@ textarea {
       font-weight: 600;
     }
     .tab-view { display: none; }
-    .tab-view.active { display: block; }
+        .tab-view.active { display: block; }
+
+    /* PATCH: container visual das abas (mantém layout consistente em todas as telas) */
+    .tab-view {
+      background: #fff;
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+      border: 1px solid rgba(0,0,0,0.06);
+      margin-top: 12px;
+      overflow: hidden; /* evita elementos "vazarem" para outras áreas */
+    }
+
 
     .form-panel {
       margin-top: 8px;
@@ -1124,33 +1136,27 @@ input[name="duration_min"],
   display: block;
 }
 
-/* remove completamente visual de botão */
-.kebab-item{
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 6px 2px;
-  border-radius: 0;
+.kebab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
   font-size: 12px;
-  font-weight: 600;
-  color: #37474f;
   cursor: pointer;
-  display: block;
+  color: #37474f;
+  white-space: nowrap;
 }
 
-/* hover simples: sublinhado */
-.kebab-item:hover{
-  background: transparent !important;
-  text-decoration: underline;
+.kebab-item:hover {
+  background: #f0f7f9;
   color: #014c52;
 }
 
-/* item perigoso (excluir) */
-.kebab-item.danger{
+.kebab-item.danger {
   color: #c62828;
 }
 
-.kebab-item.danger:hover{
-  color: #b71c1c;
-  text-decoration: underline;
+.kebab-item.danger:hover {
+  background: #fdecea;
 }
