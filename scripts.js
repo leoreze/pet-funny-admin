@@ -2300,7 +2300,7 @@ async function salvarAgendamento() {
         const msg = buildStatusMessage(status, nome, petLabel, servicesLabel, dataBR, time, prizeLabel);
         let fullPhone = phone;
         if (!(fullPhone.startsWith('55') && fullPhone.length > 11)) fullPhone = '55' + fullPhone;
-        urlWhats = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
+        urlWhats = `https://api.whatsapp.com/send?phone=${fullPhone}&text=${encodeURIComponent(msg)}`;
         precisaWhats = true;
         body.last_notification_at = new Date().toISOString();
       }
