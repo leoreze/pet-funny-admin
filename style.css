@@ -1080,3 +1080,71 @@ input[name="duration_min"],
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+
+/* =========================
+   AÇÕES – MENU 3 PONTINHOS (KEBAB)
+========================= */
+
+.kebab-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #d0dde0;
+  background: #f3f7f8;
+  color: #37474f;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .12s ease;
+}
+
+.kebab-btn:hover {
+  background: #e6f4f6;
+  border-color: rgba(1, 173, 183, 0.6);
+  color: #014c52;
+  box-shadow: 0 6px 14px rgba(0,0,0,.12);
+}
+
+.kebab-menu {
+  position: fixed; /* garante ficar acima da tabela */
+  min-width: 140px;
+  background: #ffffff;
+  border: 1px solid #dde5e8;
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.18);
+  z-index: 99999;
+  padding: 6px;
+  display: none;
+}
+
+.kebab-menu.open {
+  display: block;
+}
+
+.kebab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #37474f;
+  white-space: nowrap;
+}
+
+.kebab-item:hover {
+  background: #f0f7f9;
+  color: #014c52;
+}
+
+.kebab-item.danger {
+  color: #c62828;
+}
+
+.kebab-item.danger:hover {
+  background: #fdecea;
+}
