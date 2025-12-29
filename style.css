@@ -1109,7 +1109,7 @@ input[name="duration_min"],
   border-radius: 12px;
   box-shadow: 0 10px 22px rgba(0,0,0,0.10);
   padding: 6px;
-  z-index: 50;
+  z-index: 999999;
 }
 .kebab-item {
   width: 100%;
@@ -1126,3 +1126,6 @@ input[name="duration_min"],
 .kebab-item-danger { color: #c62828; }
 .kebab-item-danger:hover { background: #ffebee; }
 .hidden { display: none !important; }
+
+/* Portal para menu kebab (evita corte por overflow da tabela) */
+.kebab-menu-portal { right: auto; top: auto; }

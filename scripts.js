@@ -1764,7 +1764,21 @@ if (selectedServicesList) {
   }
   function getServicesInfoFromBooking(a) {
     // Prefer lista vinda do backend (bookings.services_json -> alias services)
-    const list = Array.isArray(a && a.services) ? a.services : [];
+    let list = Array.isArray(a && a.services) ? a.services : [];
+    // Se vier como string JSON do backend, tenta parsear
+    if (!list.length && a && typeof a.services === 'string') {
+      try {
+        const parsed = JSON.parse(a.services);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch (_) {}
+    }
+    // Compat: alguns backends podem retornar 'services_json'
+    if (!list.length && a && typeof a.services_json === 'string') {
+      try {
+        const parsed = JSON.parse(a.services_json);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch (_) {}
+    }
     let titles = [];
     let values = [];
     let times = [];
@@ -1881,6 +1895,13 @@ const tdMimo = document.createElement('td');
       spanStatus.textContent = labelStatus;
       spanStatus.className = 'td-status ' + classStatus(labelStatus);
       tdStatus.appendChild(spanStatus);
+
+      const tdPayStatus = document.createElement('td');
+      tdPayStatus.textContent = (a.payment_status || a.paymentStatus || a.pagamento || a.payment || '-');
+
+      const tdPayMethod = document.createElement('td');
+      tdPayMethod.textContent = (a.payment_method || a.paymentMethod || a.forma_pagamento || a.payment_method || '-');
+
       const tdNotif = document.createElement('td');
       tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
       const tdObs = document.createElement('td');
@@ -1906,7 +1927,27 @@ const tdMimo = document.createElement('td');
         ev.stopPropagation();
         // fecha outros menus abertos
         document.querySelectorAll('.kebab-menu').forEach(m => { if (m !== kebabMenu) m.classList.add('hidden'); });
+
+        const willOpen = kebabMenu.classList.contains('hidden');
         kebabMenu.classList.toggle('hidden');
+
+        if (willOpen) {
+          // Renderiza o menu em "portal" (no <body>) para não ser cortado pelo overflow da tabela
+          try {
+            if (!kebabMenu.dataset.portalAttached) {
+              document.body.appendChild(kebabMenu);
+              kebabMenu.dataset.portalAttached = '1';
+              kebabMenu.classList.add('kebab-menu-portal');
+            }
+            const rect = kebabBtn.getBoundingClientRect();
+            const menuW = 180;
+            kebabMenu.style.position = 'fixed';
+            kebabMenu.style.minWidth = menuW + 'px';
+            kebabMenu.style.zIndex = '999999';
+            kebabMenu.style.top = Math.round(rect.bottom + 6) + 'px';
+            kebabMenu.style.left = Math.round(Math.max(8, rect.right - menuW)) + 'px';
+          } catch (_) {}
+        }
       });
       document.addEventListener('click', closeMenu);
 
@@ -1952,6 +1993,8 @@ const tdMimo = document.createElement('td');
       tr.appendChild(tdValTempo);
       tr.appendChild(tdMimo);
       tr.appendChild(tdStatus);
+      tr.appendChild(tdPayStatus);
+      tr.appendChild(tdPayMethod);
       tr.appendChild(tdNotif);
       tr.appendChild(tdObs);
       tr.appendChild(tdAcoes);
