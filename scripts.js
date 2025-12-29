@@ -1,7 +1,6 @@
 // PATCH: customer address fields + select-fill defaults - 2025-12-24
 /* PATCH: Fix global cacheMimos reference (admin bookings) — 2025-12-24 */
 const API_BASE_URL = '';
-
   /* ===== Helpers de normalização (corrige acentos/variações) ===== */
   function normStr(s) {
     return String(s || '')
@@ -10,7 +9,16 @@ const API_BASE_URL = '';
       .replace(/[\u0300-\u036f]/g, '')
       .trim();
   }
-
+  // Escapa texto para uso seguro em innerHTML (evita XSS e corrige ReferenceError em refreshSelectedServicesUI)
+  function escapeHtml(input) {
+    const s = String(input ?? '');
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
   /* =========================================================
    MIMOS (Admin) - CRUD + Emojis + Valor (cents) + Período
    Requisitos:
@@ -27,12 +35,10 @@ const API_BASE_URL = '';
 ========================================================= */
 (function () {
   'use strict';
-
   const $ = (id) => document.getElementById(id);
   // Mesmo que a aba de Mimos não exista no DOM (variações de layout),
   // ainda precisamos carregar os mimos para o select do agendamento (#formPrize).
   const elTab = $('tab-mimos');
-
   const els = {
     title: $('mimoTitle'),
     desc: $('mimoDesc'),
@@ -48,57 +54,48 @@ const API_BASE_URL = '';
     tbody: $('tbodyMimos'),
     empty: $('mimosEmpty'),
     prizeSelect: document.getElementById('formPrize') || null,
-
     // novos do layout
     search: $('mimosSearch'),
     btnNovo: $('btnNovoMimo'),
     formWrap: $('mimoFormWrap'),
     btnCloseForm: $('btnFecharMimoForm'),
   };
-
   let currentEditId = null;
   window.cacheMimos = Array.isArray(window.cacheMimos) ? window.cacheMimos : [];
   let cacheMimos = window.cacheMimos;
-
   // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
   // seja populado mesmo sem o usuário abrir a aba "Mimos".
   async function ensureMimosLoaded(force = false) {
     if (!force && Array.isArray(cacheMimos) && cacheMimos.length > 0) {
-      syncPrizeSelect();
+      syncPrizeSelect(cacheMimos);
       return;
     }
     await reloadMimos();
   }
-
   // Expor funções para o fluxo de agendamento (novo/edição)
   // sem depender do usuário abrir a aba "Mimos".
   window.PF_MIMOS = window.PF_MIMOS || {};
   window.PF_MIMOS.ensureLoaded = ensureMimosLoaded;
   window.PF_MIMOS.reload = reloadMimos;
   window.PF_MIMOS.syncSelect = syncPrizeSelect;
-
   function setMsg(text, isError) {
     if (!els.msg) return;
     els.msg.textContent = text || '';
     els.msg.style.color = isError ? '#c0392b' : '';
   }
-
   function pad2(n) { return String(n).padStart(2, '0'); }
-
   function toDatetimeLocalValue(isoOrTs) {
     if (!isoOrTs) return '';
     const d = new Date(isoOrTs);
     if (isNaN(d.getTime())) return '';
     return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
   }
-
   function fromDatetimeLocalValue(v) {
     if (!v) return null;
     const d = new Date(v);
     if (isNaN(d.getTime())) return null;
     return d.toISOString();
   }
-
   function parseBRLToCents(input) {
     if (input == null) return 0;
     const s = String(input).replace(/[^\d,.-]/g, '').trim();
@@ -108,12 +105,10 @@ const API_BASE_URL = '';
     if (!Number.isFinite(n)) return 0;
     return Math.max(0, Math.round(n * 100));
   }
-
   function formatCentsToBRL(cents) {
     const v = Number(cents || 0) / 100;
     return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-
   function moneyMaskAttach(inputEl) {
     if (!inputEl) return;
     inputEl.addEventListener('blur', () => {
@@ -121,12 +116,10 @@ const API_BASE_URL = '';
       inputEl.value = formatCentsToBRL(cents);
     });
   }
-
   const EMOJI_LIST = [
     '🎁','🎉','✨','⭐','💎','🏆','🥇','🎯','🔥','✅','🧡','💛','💚','💙','💜',
     '🐶','🐾','🛁','✂️','🧴','🧼','🫧','🦴','🍖','💸','🎟️','📣','📅','🔔','🎡','🎲'
   ];
-
   function insertAtCursor(textarea, text) {
     if (!textarea) return;
     const start = textarea.selectionStart ?? textarea.value.length;
@@ -137,7 +130,6 @@ const API_BASE_URL = '';
     const newPos = start + text.length;
     textarea.selectionStart = textarea.selectionEnd = newPos;
   }
-
   function buildEmojiPanel() {
     if (!els.emojiPanel || !els.desc) return;
     els.emojiPanel.innerHTML = '';
@@ -155,14 +147,12 @@ const API_BASE_URL = '';
       els.emojiPanel.appendChild(b);
     });
   }
-
   function openForm() {
     if (els.formWrap) els.formWrap.style.display = '';
   }
   function closeForm() {
     if (els.formWrap) els.formWrap.style.display = 'none';
   }
-
   function clearForm() {
     currentEditId = null;
     if (els.title) els.title.value = '';
@@ -173,7 +163,6 @@ const API_BASE_URL = '';
     if (els.active) els.active.checked = true;
     setMsg('', false);
   }
-
   /* ---------- API ---------- */
   async function apiGetMimos() {
     const r = await fetch('/api/mimos', { method: 'GET' });
@@ -181,7 +170,6 @@ const API_BASE_URL = '';
     if (!r.ok) throw new Error(data.error || 'Erro ao buscar mimos.');
     return data.mimos || [];
   }
-
   async function apiCreateMimo(payload) {
     const r = await fetch('/api/mimos', {
       method: 'POST',
@@ -192,7 +180,6 @@ const API_BASE_URL = '';
     if (!r.ok) throw new Error(data.error || 'Erro ao criar mimo.');
     return data.mimo;
   }
-
   async function apiUpdateMimo(id, payload) {
     const r = await fetch(`/api/mimos/${encodeURIComponent(id)}`, {
       method: 'PUT',
@@ -203,19 +190,16 @@ const API_BASE_URL = '';
     if (!r.ok) throw new Error(data.error || 'Erro ao atualizar mimo.');
     return data.mimo;
   }
-
   async function apiDeleteMimo(id) {
     const r = await fetch(`/api/mimos/${encodeURIComponent(id)}`, { method: 'DELETE' });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || 'Erro ao excluir mimo.');
     return true;
   }
-
   /* ---------- Render ---------- */
   function syncPrizeSelect(mimos) {
     const prizeSelect = document.getElementById('formPrize');
     if (!prizeSelect) return;
-
         // Usa a data do agendamento (formDate) como referência para filtrar os mimos por período.
     // Isso permite agendar para dias futuros e ainda assim mostrar apenas mimos válidos naquele dia.
     const ref = (() => {
@@ -230,7 +214,6 @@ const API_BASE_URL = '';
       } catch (_) {}
       return new Date();
     })();
-
     const isInPeriod = (m) => {
       if (!m.is_active) return false;
       const s = m.starts_at ? new Date(m.starts_at) : null;
@@ -239,16 +222,13 @@ const API_BASE_URL = '';
       if (e && !isNaN(e.getTime()) && ref > e) return false;
       return true;
     };
-
     const active = (mimos || []).filter(isInPeriod);
     const current = prizeSelect.value;
-
     prizeSelect.innerHTML = '';
     const opt0 = document.createElement('option');
     opt0.value = '';
     opt0.textContent = '— Sem mimo —';
     prizeSelect.appendChild(opt0);
-
     active.forEach((m) => {
       const opt = document.createElement('option');
       opt.value = m.title; // compat: booking.prize é texto
@@ -256,55 +236,51 @@ const API_BASE_URL = '';
       opt.setAttribute('data-mimo-id', String(m.id));
       prizeSelect.appendChild(opt);
     });
-
+    // Se o mimo gravado não estiver ativo no período, manter a seleção visível.
+    if (current && !Array.from(prizeSelect.options).some(o => o.value === current)) {
+      const optX = document.createElement('option');
+      optX.value = current;
+      optX.textContent = `${current} (indisponível)`;
+      optX.setAttribute('data-inactive', '1');
+      prizeSelect.appendChild(optX);
+    }
     if (current) prizeSelect.value = current;
   }
-
   function renderMimosTable(mimos) {
     if (!els.tbody) return;
     els.tbody.innerHTML = '';
-
     const q = (els.search?.value || '').trim().toLowerCase();
     const filtered = !q ? (mimos || []) : (mimos || []).filter(m =>
       String(m.title || '').toLowerCase().includes(q) ||
       String(m.description || '').toLowerCase().includes(q)
     );
-
     if (!filtered || filtered.length === 0) {
       if (els.empty) els.empty.style.display = '';
       return;
     }
     if (els.empty) els.empty.style.display = 'none';
-
     const fmt = (d) => {
       if (!d || isNaN(d.getTime())) return '—';
       return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
     };
-
     filtered.forEach((m) => {
       const tr = document.createElement('tr');
-
       const tdTitle = document.createElement('td');
       tdTitle.textContent = m.title || '';
       tr.appendChild(tdTitle);
-
       const tdValue = document.createElement('td');
       tdValue.textContent = `R$ ${formatCentsToBRL(m.value_cents)}`;
       tr.appendChild(tdValue);
-
       const tdPeriod = document.createElement('td');
       const s = m.starts_at ? new Date(m.starts_at) : null;
       const e = m.ends_at ? new Date(m.ends_at) : null;
       tdPeriod.textContent = `${fmt(s)} → ${fmt(e)}`;
       tr.appendChild(tdPeriod);
-
       const tdActive = document.createElement('td');
       tdActive.textContent = m.is_active ? 'Sim' : 'Não';
       tr.appendChild(tdActive);
-
       const tdActions = document.createElement('td');
       tdActions.style.whiteSpace = 'nowrap';
-
       const btnEdit = document.createElement('button');
       btnEdit.type = 'button';
       btnEdit.className = 'btn btn-small';
@@ -320,7 +296,6 @@ const API_BASE_URL = '';
         setMsg(`Editando ID ${m.id}`, false);
         openForm();
       });
-
       const btnDel = document.createElement('button');
       btnDel.type = 'button';
       btnDel.className = 'btn btn-small btn-danger';
@@ -338,15 +313,12 @@ const API_BASE_URL = '';
           setMsg(err.message || 'Erro ao excluir.', true);
         }
       });
-
       tdActions.appendChild(btnEdit);
       tdActions.appendChild(btnDel);
       tr.appendChild(tdActions);
-
       els.tbody.appendChild(tr);
     });
   }
-
   async function reloadMimos() {
     setMsg('Carregando...', false);
     const mimos = await apiGetMimos();
@@ -356,31 +328,25 @@ const API_BASE_URL = '';
     syncPrizeSelect(mimos);
     setMsg('', false);
   }
-
   async function handleSave() {
     try {
       setMsg('Salvando...', false);
-
       const title = (els.title?.value || '').trim();
       const description = (els.desc?.value || '').trim();
       const value_cents = parseBRLToCents(els.value?.value || '0');
       const starts_at = fromDatetimeLocalValue(els.start?.value || '');
       const ends_at = fromDatetimeLocalValue(els.end?.value || '');
       const is_active = !!els.active?.checked;
-
       if (!title) {
         setMsg('Informe o título.', true);
         els.title?.focus();
         return;
       }
-
       if (ends_at && starts_at && new Date(ends_at) < new Date(starts_at)) {
         setMsg('A data de término não pode ser menor que a data de início.', true);
         return;
       }
-
       const payload = { title, description, value_cents, starts_at, ends_at, is_active };
-
       if (currentEditId) {
         await apiUpdateMimo(currentEditId, payload);
         setMsg('Mimo atualizado.', false);
@@ -388,7 +354,6 @@ const API_BASE_URL = '';
         await apiCreateMimo(payload);
         setMsg('Mimo criado.', false);
       }
-
       await reloadMimos();
       clearForm();
       closeForm();
@@ -396,46 +361,37 @@ const API_BASE_URL = '';
       setMsg(err.message || 'Erro ao salvar.', true);
     }
   }
-
   function attachEvents() {
     moneyMaskAttach(els.value);
-
     if (els.save) els.save.addEventListener('click', handleSave);
     if (els.clear) els.clear.addEventListener('click', clearForm);
     if (els.reload) els.reload.addEventListener('click', () => reloadMimos().catch(e => setMsg(e.message || 'Erro.', true)));
-
     if (els.btnNovo) els.btnNovo.addEventListener('click', () => {
       clearForm();
       openForm();
       els.title?.focus();
     });
-
     if (els.btnCloseForm) els.btnCloseForm.addEventListener('click', () => {
       closeForm();
       setMsg('', false);
     });
-
     if (els.search) els.search.addEventListener('input', () => {
       renderMimosTable(cacheMimos);
     });
-
     document.addEventListener('click', (e) => {
       const btn = e.target?.closest?.('.tab-btn[data-tab="tab-mimos"]');
       if (!btn) return;
       reloadMimos().catch(err => setMsg(err.message || 'Erro ao carregar mimos.', true));
     });
   }
-
   buildEmojiPanel();
   attachEvents();
 })();
-
   /* ========= CONTROLE DE SESSÃO (30 MIN) ========= */
   const SESSION_KEY = 'pf_admin_session';
   const SESSION_DURATION_MS = 30 * 60 * 1000;
   let sessionTimerId = null;
   let appInitialized = false;
-
   function setSession() {
     const expiresAt = Date.now() + SESSION_DURATION_MS;
     const session = { user: 'adminpetfunny', expiresAt };
@@ -451,7 +407,6 @@ const API_BASE_URL = '';
       return data;
     } catch (_) { clearSession(); return null; }
   }
-
   function handleSessionExpired() {
     if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
     clearSession();
@@ -459,7 +414,6 @@ const API_BASE_URL = '';
     loginScreen.classList.remove('hidden');
     alert('Sua sessão expirou. Faça login novamente.');
   }
-
   function startSessionTimer() {
     if (sessionTimerId) clearInterval(sessionTimerId);
     sessionTimerId = setInterval(() => {
@@ -467,7 +421,6 @@ const API_BASE_URL = '';
       if (!s) handleSessionExpired();
     }, 30000);
   }
-
   async function initApp() {
     if (appInitialized) {
       try { await loadServices(); await renderTabela(); await loadDashboard(); } catch (_) {}
@@ -476,22 +429,19 @@ const API_BASE_URL = '';
     appInitialized = true;
     try {
       await loadServices();      // garante servicesCache e dropdown de serviços
+      // Garante que o select de mimos no agendamento esteja preenchido,
+      // e que o dashboard possa calcular os totais por mimo.
+      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
+        await window.PF_MIMOS.ensureLoaded(true);
+      }
       await renderTabela();
       await loadClientes();
       await loadBreeds();
       await loadOpeningHours();
-
-      // Garante que o select de mimos no agendamento esteja preenchido,
-      // mesmo sem navegar na aba "Mimos".
-      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
-        await window.PF_MIMOS.ensureLoaded(true);
-      }
-
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
   }
-
   function enterAdminMode() {
     loginError.classList.add('hidden');
     loginScreen.classList.add('hidden');
@@ -500,7 +450,6 @@ const API_BASE_URL = '';
     startSessionTimer();
     initApp();
   }
-
   function doLogout() {
     clearSession();
     if (sessionTimerId) { clearInterval(sessionTimerId); sessionTimerId = null; }
@@ -510,7 +459,6 @@ const API_BASE_URL = '';
     adminApp.style.display = 'none';
     loginScreen.classList.remove('hidden');
   }
-
   function tryAutoLogin() {
     const s = getSession();
     if (s) {
@@ -523,7 +471,6 @@ const API_BASE_URL = '';
       adminApp.style.display = 'none';
     }
   }
-
   // ===== LOGIN =====
   const loginScreen = document.getElementById('loginScreen');
   const adminApp = document.getElementById('adminApp');
@@ -532,22 +479,18 @@ const API_BASE_URL = '';
   const btnLogin = document.getElementById('btnLogin');
   const loginError = document.getElementById('loginError');
   const btnLogout = document.getElementById('btnLogout');
-
   btnLogin.addEventListener('click', () => {
     const u = loginUser.value.trim();
     const p = loginPass.value.trim();
     if (u === 'adminpetfunny' && p === 'admin2605') enterAdminMode();
     else loginError.classList.remove('hidden');
   });
-
   [loginUser, loginPass].forEach(el => {
     el.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnLogin.click(); });
   });
-
   btnLogout.addEventListener('click', () => {
     if (confirm('Deseja sair do painel?')) doLogout();
   });
-
   // ===== API HELPERS =====
   async function apiGet(path, params) {
     const url = new URL(API_BASE_URL + path, window.location.origin);
@@ -562,7 +505,6 @@ const API_BASE_URL = '';
     if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
     return data;
   }
-
   async function apiPost(path, body) {
     const resp = await fetch(API_BASE_URL + path, {
       method: 'POST',
@@ -573,7 +515,6 @@ const API_BASE_URL = '';
     if (!resp.ok) throw new Error(data.error || 'Erro ao salvar.');
     return data;
   }
-
   async function apiPut(path, body) {
     const resp = await fetch(API_BASE_URL + path, {
       method: 'PUT',
@@ -584,23 +525,19 @@ const API_BASE_URL = '';
     if (!resp.ok) throw new Error(data.error || 'Erro ao atualizar.');
     return data;
   }
-
   async function apiDelete(path) {
     const resp = await fetch(API_BASE_URL + path, { method: 'DELETE' });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.error || 'Erro ao apagar.');
     return data;
   }
-
   function sanitizePhone(phone) { return (phone || '').replace(/\D/g, ''); }
-
   function formatTelefone(phone) {
     const digits = (phone || '').replace(/\D/g, '');
     if (digits.length === 11) return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
     if (digits.length === 10) return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
     return phone || '-';
   }
-
   function applyPhoneMask(input) {
     if (!input) return;
     let value = input.value.replace(/\D/g, '');
@@ -612,13 +549,11 @@ const API_BASE_URL = '';
     if (value.length >= 8) formatted = `(${value.slice(0, 2)}) ${value.slice(2, 3)} ${value.slice(3, 7)}-${value.slice(7, 11)}`;
     input.value = formatted;
   }
-
   function formatDataBr(dataIso) {
     const parts = (dataIso || '').split('-');
     if (parts.length === 3) return parts[2] + '/' + parts[1] + '/' + parts[0];
     return dataIso || '-';
   }
-
   function formatDateTimeBr(iso) {
     if (!iso) return '-';
     const d = new Date(iso);
@@ -630,18 +565,15 @@ const API_BASE_URL = '';
     const min = String(d.getMinutes()).padStart(2, '0');
     return `${dia}/${mes}/${ano} ${hora}:${min}`;
   }
-
   function toISODateOnly(date) {
     const ano = date.getFullYear();
     const mes = String(date.getMonth() + 1).padStart(2, '0');
     const dia = String(date.getDate()).padStart(2, '0');
     return `${ano}-${mes}-${dia}`;
   }
-
   function getPeriodRange(periodValue) {
     const hoje = new Date();
     let start = null, end = null;
-
     if (periodValue === 'today') {
       start = toISODateOnly(hoje);
       end = toISODateOnly(hoje);
@@ -657,30 +589,22 @@ const API_BASE_URL = '';
     }
     return { start, end };
   }
-
   
   /* ===== Validação de Data/Horário (mesmas regras do index.html) ===== */
   const todayISO = new Date().toISOString().split('T')[0];
-
   function validarDiaHora(dateStr, timeStr) {
     if (!dateStr || !timeStr) return 'Informe a data e o horário.';
-
     const date = new Date(dateStr + 'T' + timeStr + ':00');
     if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
-
     const diaSemana = date.getDay();
     const parts = String(timeStr).split(':');
     const hh = parseInt(parts[0], 10);
     const mm = parseInt(parts[1] || '0', 10);
-
     if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
-
     // Admin também deve seguir a regra do cliente: somente 00 ou 30
     if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
-
     const minutos = hh * 60 + mm;
     const inicio = 7 * 60 + 30;
-
     if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
     if (diaSemana >= 1 && diaSemana <= 5) {
       const fim = 17 * 60 + 30;
@@ -690,30 +614,23 @@ const API_BASE_URL = '';
       const fim = 13 * 60;
       if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
     }
-
     // Não permite agendar no passado (comparando data/hora local)
     const now = new Date();
     if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
-
     return null;
   }
-
   function pad2(n) { return String(n).padStart(2, '0'); }
-
   function buildRangeForDate(dateStr) {
     if (!dateStr) return null;
-
     // IMPORTANT: interpret the selected date in America/Sao_Paulo regardless of server/browser timezone.
     // Using an explicit -03:00 offset avoids the common "weekday shifted" bug.
     const d = new Date(dateStr + 'T00:00:00-03:00');
     if (Number.isNaN(d.getTime())) return null;
     const dow = d.getUTCDay(); // 0=Sun..6=Sat (São Paulo)
-
     // Prefer configured Opening Hours (admin menu "Horário de Funcionamento")
     const oh = Array.isArray(openingHoursCache)
       ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
       : null;
-
     if (oh) {
       if (oh.is_closed) return { closed: true };
       const openMin = hhmmToMinutes(normalizeHHMM(String(oh.open_time || '')));
@@ -721,30 +638,25 @@ const API_BASE_URL = '';
       if (!Number.isFinite(openMin) || !Number.isFinite(closeMin) || closeMin <= openMin) return { closed: true };
       return { closed: false, startMin: openMin, endMin: closeMin };
     }
-
     // Fallback (if Opening Hours were not loaded)
     if (dow === 0) return { closed: true };
     const startMin = 7 * 60 + 30;
     const endMin = (dow === 6) ? (12 * 60) : (17 * 60 + 30);
     return { closed: false, startMin, endMin };
   }
-
   function getMaxPerHalfHourForDate(dateStr) {
     if (!dateStr) return 1;
     const d = new Date(dateStr + 'T00:00:00-03:00');
     if (Number.isNaN(d.getTime())) return 1;
     const dow = d.getUTCDay();
-
     const oh = Array.isArray(openingHoursCache)
       ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
       : null;
-
     if (!oh) return 1;
     if (oh.is_closed) return 0;
     const cap = parseInt(oh.max_per_half_hour, 10);
     return Number.isFinite(cap) && cap > 0 ? cap : 1;
   }
-
 function normalizeHHMM(t) {
     const s = String(t || '').trim();
     const m = s.match(/^(\d{1,2}):(\d{1,2})/);
@@ -753,18 +665,15 @@ function normalizeHHMM(t) {
     const mm = pad2(parseInt(m[2], 10));
     return `${hh}:${mm}`;
   }
-
   function isActiveBookingStatus(status) {
     const s = normStr(status);
     // status "cancelado" não ocupa slot
     return s !== 'cancelado';
   }
-
   async function loadOccupiedTimesForDate(dateStr, excludeBookingId) {
     const data = await apiGet('/api/bookings', { date: dateStr });
     const list = data.bookings || [];
     const map = new Map();
-
     list.forEach(b => {
       if (excludeBookingId != null && String(b.id) === String(excludeBookingId)) return;
       if (!isActiveBookingStatus(b.status)) return;
@@ -772,35 +681,26 @@ function normalizeHHMM(t) {
       if (!t) return;
       map.set(t, (map.get(t) || 0) + 1);
     });
-
     return map;
   }
-
   function minutesToHHMM(totalMin) {
     const hh = Math.floor(totalMin / 60);
     const mm = totalMin % 60;
     return `${pad2(hh)}:${pad2(mm)}`;
   }
-
   function clampToRange(timeStr, range) {
     const t = normalizeHHMM(timeStr);
     if (!t || !range || range.closed) return null;
     const [hh, mm] = t.split(':').map(n => parseInt(n, 10));
     let total = hh * 60 + mm;
-
     // arredonda para o slot mais próximo (00/30)
     total = Math.round(total / 30) * 30;
-
     if (total < range.startMin) total = range.startMin;
     if (total > range.endMin) total = range.endMin;
-
     // garante que não sai do padrão 00/30 depois do clamp
     total = Math.round(total / 30) * 30;
-
     return minutesToHHMM(total);
   }
-
-
   function classStatus(status) {
     const s = normStr(status);
     if (s === 'agendado') return 'status-agendado';
@@ -812,12 +712,10 @@ function normalizeHHMM(t) {
     if (s === 'cancelado') return 'status-cancelado';
     return 'status-agendado';
   }
-
   function buildStatusMessage(status, nome, petLabel, service, dataBR, time, prize) {
     const s = normStr(status);
     const cabecalho = `Oi ${nome}! Aqui é do Pet Funny!\n\n`;
     let corpo = '';
-
     switch (s) {
       case 'agendado':
         corpo = `Acabamos de registrar o agendamento de *${petLabel}* para *${service}* em *${dataBR} às ${time}*.\n\nMimo da campanha Roleta de Mimos: *${prize}*.\n\nQuando estiver próximo do dia, te avisamos por aqui.`;
@@ -845,46 +743,37 @@ function normalizeHHMM(t) {
     }
     return cabecalho + corpo;
   }
-
   /* ===== MOEDA: máscara e conversões (value_cents) ===== */
   function formatCentsToBRL(cents) {
     const n = Number(cents || 0) / 100;
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
-
   function applyCurrencyMask(input) {
     if (!input) return;
     let raw = String(input.value || '').replace(/\D/g, '');
-
     // se usuário apagou tudo, ok
     if (raw === '') {
       input.value = '';
       input.dataset.cents = '';
       return;
     }
-
     // permite zero
     raw = raw.replace(/^0+/, '');
     if (raw === '') raw = '0';
-
     input.dataset.cents = raw;
     input.value = formatCentsToBRL(raw);
   }
-
   function getCentsFromCurrencyInput(input) {
     if (!input) return null;
-
     // 1) tenta via dataset (máscara)
     let raw = String(input.dataset?.cents || '').replace(/\D/g, '');
     if (raw) {
       const cents = parseInt(raw, 10);
       return Number.isFinite(cents) ? cents : null;
     }
-
     // 2) fallback: tenta parsear pelo texto digitado/colado (ex: "85,00" ou "R$ 85,00" ou "85")
     const txt = String(input.value || '').trim();
     if (!txt) return null;
-
     const digits = txt.replace(/\s/g, '').replace(/[R$r$]/g, '');
     // se tiver vírgula, assume centavos; se não tiver, assume reais inteiros
     if (digits.includes(',')) {
@@ -898,24 +787,18 @@ function normalizeHHMM(t) {
       return parseInt(onlyDigits, 10) * 100;
     }
   }
-
   /* ===== TABS ===== */
   const tabButtons = document.querySelectorAll('.tab-btn');
   const tabViews = document.querySelectorAll('.tab-view');
-
   tabButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       tabButtons.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-
       const tabId = btn.getAttribute('data-tab');
       tabViews.forEach(view => view.classList.toggle('active', view.id === tabId));
-
       if (tabId === 'tab-servicos') loadServices().catch(console.error);
       if (tabId === 'tab-racas') loadBreeds().catch(console.error);
-
       if (tabId === 'tab-horarios') loadOpeningHours().catch(console.error);
-
       if (tabId === 'tab-dashboard') {
         loadDashboard().finally(() => {
           setTimeout(() => {
@@ -924,14 +807,12 @@ function normalizeHHMM(t) {
           }, 60);
         });
       }
-
       // NOVO: quando voltar para agenda, renderiza conforme view atual
       if (tabId === 'tab-agenda') {
         try { renderAgendaByView(ultimaLista || []); } catch (_) {}
       }
     });
   });
-
   // ===== CAMPOS AGENDA =====
   const filtroData = document.getElementById('filtroData');
   const filtroBusca = document.getElementById('filtroBusca');
@@ -939,10 +820,8 @@ function normalizeHHMM(t) {
   const btnLimparFiltro = document.getElementById('btnLimparFiltro');
   const btnExportarCSV = document.getElementById('btnExportarCSV');
   const btnNovoAgendamento = document.getElementById('btnNovoAgendamento');
-
   const tbodyAgenda = document.getElementById('tbodyAgenda');
   const estadoVazio = document.getElementById('estadoVazio');
-
   // NOVO: cards
   const agendaListWrapper = document.getElementById('agendaListWrapper');
   const agendaCardsWrapper = document.getElementById('agendaCardsWrapper');
@@ -950,49 +829,41 @@ function normalizeHHMM(t) {
   const estadoVazioCards = document.getElementById('estadoVazioCards');
   const btnViewList = document.getElementById('btnViewList');
   const btnViewCards = document.getElementById('btnViewCards');
-
   const statTotal = document.getElementById('statTotal');
   const statTosa = document.getElementById('statTosa');
   const statHidratacao = document.getElementById('statHidratacao');
   const statFotoVideo = document.getElementById('statFotoVideo');
   const statPatinhas = document.getElementById('statPatinhas');
-
   const formPanel = document.getElementById('formPanel');
-
   const bookingId = document.getElementById('bookingId');
   const bookingOriginalStatus = document.getElementById('bookingOriginalStatus');
-  const formPhone = document.getElementById('formPhone');
+  
+  const bookingIdInput = document.getElementById('bookingId');
+const formPhone = document.getElementById('formPhone');
   const formNome = document.getElementById('formNome');
-
   // PATCH: CEP mask + auto-lookup customer by WhatsApp phone on "Novo cliente" - 2025-12-24
 let modoNovoCliente = false;
 let _lookupPhoneTimer = null;
-
 function maskCepValue(raw) {
   const digits = String(raw || '').replace(/\D/g, '').slice(0, 8);
   if (digits.length <= 5) return digits;
   return digits.slice(0, 5) + '-' + digits.slice(5);
 }
-
 function attachCepMaskIfPresent() {
   const el =
     document.getElementById('formCep') ||
     document.querySelector('input[name="cep"]') ||
     document.querySelector('input[placeholder*="CEP" i]');
   if (!el) return;
-
   el.addEventListener('input', () => {
     const masked = maskCepValue(el.value);
     if (el.value !== masked) el.value = masked;
   });
-
   el.value = maskCepValue(el.value);
 }
-
 function setCustomerFormFromLookup(customer) {
   if (formPhone) formPhone.value = customer?.phone || formPhone.value || '';
   if (formNome) formNome.value = customer?.name || '';
-
   // Endereço (se existir no HTML atual)
   const map = [
     ['formCep', 'cep'],
@@ -1011,29 +882,23 @@ function setCustomerFormFromLookup(customer) {
     ['formUf', 'state'],
     ['formUF', 'state'],
   ];
-
   for (const [id, key] of map) {
     const el = document.getElementById(id);
     if (!el) continue;
     el.value = (customer && customer[key] != null) ? String(customer[key]) : '';
   }
 }
-
 async function tryAutofillCustomerByPhone() {
   if (!modoNovoCliente) return;
   if (!formPhone) return;
-
   const digits = String(formPhone.value || '').replace(/\D/g, '');
   if (digits.length < 10) return;
-
   try {
     const data = await apiPost('/api/customers/lookup', { phone: digits });
     const customer = data?.customer;
-
     if (customer?.id) {
       clienteSelecionadoId = customer.id;
       setCustomerFormFromLookup(customer);
-
       if (typeof toast === 'function') {
         toast('Cliente já cadastrado. Dados carregados automaticamente.');
       } else {
@@ -1044,7 +909,6 @@ async function tryAutofillCustomerByPhone() {
     console.warn('[PetFunny] Falha no lookup do cliente por telefone:', e);
   }
 }
-
 // Bindings
 if (formPhone) {
   formPhone.addEventListener('blur', () => {
@@ -1056,13 +920,12 @@ if (formPhone) {
     _lookupPhoneTimer = setTimeout(tryAutofillCustomerByPhone, 320);
   });
 }
-
 attachCepMaskIfPresent();
-
-
   const formPetSelect = document.getElementById('formPetSelect');
   const formPrize = document.getElementById('formPrize');
   const formService = document.getElementById('formService');
+  const formServiceValue = document.getElementById('formServiceValue');
+  const formServiceDuration = document.getElementById('formServiceDuration');
   const btnAddService = document.getElementById('btnAddService');
   const selectedServicesWrap = document.getElementById('selectedServicesWrap');
   const selectedServicesList = document.getElementById('selectedServicesList');
@@ -1070,18 +933,14 @@ attachCepMaskIfPresent();
   let selectedServiceIds = [];
   const formDate = document.getElementById('formDate');
   const formTime = document.getElementById('formTime');
-
   // Regras padrão (mesmas do cliente)
   if (formDate) formDate.min = todayISO;
   if (formTime) formTime.step = 1800; // 30 minutos
-
-
   // Revalida e aplica limites quando a data/horário mudam
   if (formDate) {
     const onDateChanged = async () => {
       const excludeId = bookingId && bookingId.value ? Number(bookingId.value) : null;
       await refreshBookingDateTimeState(excludeId);
-
       // Hardening: se a data é válida e o dia não é "fechado", o campo de horário deve estar habilitado.
       // Isso evita casos em que o evento "change" não chega a disparar como esperado.
       try {
@@ -1092,11 +951,9 @@ attachCepMaskIfPresent();
         }
       } catch (_) {}
     };
-
     formDate.addEventListener('change', onDateChanged);
     formDate.addEventListener('input', onDateChanged);
   }
-
   if (formTime) {
     // arredonda para 00/30 e aplica faixa do dia
     formTime.addEventListener('blur', () => {
@@ -1105,23 +962,35 @@ attachCepMaskIfPresent();
       if (clamped) formTime.value = clamped;
     });
   }
-  const formStatus = document.getElementById('formStatus');
+  
+  // Atualiza porte atual ao trocar o pet e refaz o select de serviços filtrando por porte
+  if (formPetSelect) {
+    formPetSelect.addEventListener('change', () => {
+      const pid = String(formPetSelect.value || '');
+      const pet = bookingPetsCache.find(x => String(x.id) === pid);
+      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
+      refreshServiceOptionsInAgenda();
+    });
+  }
+const formStatus = document.getElementById('formStatus');
+  const formPaymentStatus = document.getElementById('formPaymentStatus');
+  const formPaymentMethod = document.getElementById('formPaymentMethod');
+  // cache de pets carregados para o agendamento atual (para descobrir o porte)
+  let bookingPetsCache = [];
+  let currentPetSize = '';
   const formNotes = document.getElementById('formNotes');
   const formError = document.getElementById('formError');
   const btnSalvar = document.getElementById('btnSalvar');
   const btnCancelarEdicao = document.getElementById('btnCancelarEdicao');
-
   // ===== DASHBOARD =====
   const dashPeriod = document.getElementById('dashPeriod');
   const dashCustomRange = document.getElementById('dashCustomRange');
   const dashStart = document.getElementById('dashStart');
   const dashEnd = document.getElementById('dashEnd');
   const dashApply = document.getElementById('dashApply');
-
   const dashTotalBookings = document.getElementById('dashTotalBookings');
   const dashUniqueCustomers = document.getElementById('dashUniqueCustomers');
   const dashTotalCustomers = document.getElementById('dashTotalCustomers');
-
   const dashStatusAgendado = document.getElementById('dashStatusAgendado');
   const dashStatusConfirmado = document.getElementById('dashStatusConfirmado');
   const dashStatusRecebido = document.getElementById('dashStatusRecebido');
@@ -1129,23 +998,19 @@ attachCepMaskIfPresent();
   const dashStatusConcluido = document.getElementById('dashStatusConcluido');
   const dashStatusEntregue = document.getElementById('dashStatusEntregue');
   const dashStatusCancelado = document.getElementById('dashStatusCancelado');
-
   const dashPrizeTosa = document.getElementById('dashPrizeTosa');
   const dashPrizeHidratacao = document.getElementById('dashPrizeHidratacao');
   const dashPrizeFotoVideo = document.getElementById('dashPrizeFotoVideo');
   const dashPrizePatinhas = document.getElementById('dashPrizePatinhas');
-
   const tbodyDashServices = document.getElementById('tbodyDashServices');
   const dashServicesEmpty = document.getElementById('dashServicesEmpty');
   const dashRevenue = document.getElementById('dashRevenue');
   const dashAvgTicket = document.getElementById('dashAvgTicket');
-
   let ultimaLista = [];
   let clientesCache = [];
   let clienteSelecionadoId = null;
   let petsCache = [];
   let petEditIdLocal = null;
-
   function setEditMode(isEdit) {
     // Em edição: mantém Tutor/Telefone travados, mas permite editar Pet e Mimo
     formPhone.disabled = isEdit;
@@ -1153,16 +1018,12 @@ attachCepMaskIfPresent();
     formPetSelect.disabled = false;
     formPrize.disabled = false;
   }
-
   /* ===== Estado de disponibilidade (Admin) ===== */
   let occupiedTimesMap = new Map();
-
   async function refreshBookingDateTimeState(excludeBookingId) {
     if (!formDate || !formTime) return;
-
     const dateStr = formDate.value;
     if (!dateStr) return;
-
     const range = buildRangeForDate(dateStr);
     if (!range || range.closed) {
       formTime.disabled = true;
@@ -1170,13 +1031,10 @@ attachCepMaskIfPresent();
       occupiedTimesMap = new Map();
       return;
     }
-
     formTime.disabled = false;
     formTime.step = 1800; // 30 min
-
     formTime.min = minutesToHHMM(range.startMin);
     formTime.max = minutesToHHMM(range.endMin);
-
     // carrega horários ocupados do dia (exclui o próprio agendamento em edição)
     try {
       occupiedTimesMap = await loadOccupiedTimesForDate(dateStr, excludeBookingId);
@@ -1184,14 +1042,12 @@ attachCepMaskIfPresent();
       console.warn('Falha ao carregar horários ocupados:', e);
       occupiedTimesMap = new Map();
     }
-
     // ajusta (clamp) se estiver fora da faixa / minutos diferentes de 00/30
     if (formTime.value) {
       const clamped = clampToRange(formTime.value, range);
       if (clamped) formTime.value = clamped;
     }
   }
-
   function getCapacityForDate(dateStr) {
     const cache = (window.__pf_openingHoursCache || []);
     if (!dateStr) return 1;
@@ -1204,7 +1060,6 @@ attachCepMaskIfPresent();
     const cap = Number(row.max_per_half_hour);
     return Number.isFinite(cap) ? cap : 1;
   }
-
   function isTimeOccupied(timeStr) {
     const t = normalizeHHMM(timeStr);
     if (!t) return false;
@@ -1213,10 +1068,8 @@ attachCepMaskIfPresent();
     const used = occupiedTimesMap.get(t) || 0;
     return used >= cap;
   }
-
   function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
   function esconderFormAgenda() { formPanel.classList.add('hidden'); }
-
   async function fetchBookings() {
     const params = {};
     if (filtroData.value) params.date = filtroData.value;
@@ -1224,64 +1077,70 @@ attachCepMaskIfPresent();
     const data = await apiGet('/api/bookings', params);
     return data.bookings || [];
   }
-
   function atualizaEstatisticas(lista) {
     const total = lista.length;
-
     // Mantém contadores existentes (por serviço) para compatibilidade do painel
-    const contTosa = lista.filter(a => (a.service || '').toLowerCase().includes('tosa higiênica')).length;
-    const contHidra = lista.filter(a => (a.service || '').toLowerCase().includes('hidrata')).length;
-    const contFoto = lista.filter(a => (a.service || '').toLowerCase().includes('foto')).length;
-    const contPatinhas = lista.filter(a => (a.service || '').toLowerCase().includes('patinhas')).length;
-
+// Mantém contadores existentes (por mimo/prize) para compatibilidade do painel
+    // Importante: o painel "Tosa/Hidratação/Foto/Vídeo/Patinhas" é sobre o MIMO (campo prize),
+    // não sobre o(s) serviço(s). Antes ele contava por a.service e acabava inflando/errando quando
+    // existe serviço "Patinhas" mas o mimo do agendamento é outro.
+    const contTosa = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('tosa higiênica')).length;
+    const contHidra = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('hidrata')).length;
+    const contFoto = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('foto')).length;
+    const contPatinhas = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('patinhas')).length;
     statTotal.textContent = total;
     statTosa.textContent = contTosa;
     statHidratacao.textContent = contHidra;
     statFotoVideo.textContent = contFoto;
     statPatinhas.textContent = contPatinhas;
-
-    // ===== Mimos (dinâmico, respeita período do mimo X data do agendamento) =====
+    // ===== Mimos (dinâmico: lista em ordem de cadastro e contagem por agendamento filtrado) =====
     const mimosEl = document.getElementById('statMimosList');
     if (mimosEl) {
-      const counts = {};
-
-      const isActiveOnDate = (mimo, dateStr) => {
-        if (!mimo || !dateStr) return false;
-        const d = dateStr;
-        const start = (mimo.start_date || '').slice(0,10);
-        const end = (mimo.end_date || '').slice(0,10);
-        if (start && d < start) return false;
-        if (end && d > end) return false;
-        return true;
+      const list = Array.isArray(window.cacheMimos) ? window.cacheMimos.slice() : [];
+      // Ordena por cadastro (id asc) e filtra mimos ativos no período (se houver starts/ends)
+      list.sort((a,b) => Number(a.id||0) - Number(b.id||0));
+      const isActiveOnBookingDate = (m, bookingDateStr) => {
+        // Compat: mimos podem usar starts_at/ends_at ou start/end (ou null)
+        const s = m.starts_at || m.start || m.startsAt || null;
+        const e = m.ends_at || m.end || m.endsAt || null;
+        if (!bookingDateStr) return !!m.is_active;
+        // Se não houver período, considera apenas flag is_active
+        if (!s && !e) return !!m.is_active;
+        const bd = new Date(String(bookingDateStr) + "T00:00:00");
+        const sd = s ? new Date(s) : null;
+        const ed = e ? new Date(e) : null;
+        if (sd && bd < new Date(sd.toDateString())) return false;
+        if (ed && bd > new Date(ed.toDateString())) return false;
+        return !!m.is_active;
       };
-
-      lista.forEach((a) => {
-        const prize = (a.prize || '').trim();
-        if (!prize || prize.toLowerCase() === 'sem mimo') return;
-
-        const mimo = (window.cacheMimos || []).find(m => String(m.name || '').trim() === prize);
+      const countsByTitle = {};
+      (lista || []).forEach((a) => {
+        const prize = String(a.prize || "").trim();
+        if (!prize || prize.toLowerCase() === "sem mimo") return;
+        const mimo = list.find(m => String(m.title || m.name || "").trim() === prize);
         if (!mimo) return;
-
-        if (!isActiveOnDate(mimo, a.date)) return;
-        counts[prize] = (counts[prize] || 0) + 1;
+        if (!isActiveOnBookingDate(mimo, a.date)) return;
+        countsByTitle[prize] = (countsByTitle[prize] || 0) + 1;
       });
-
-      const lines = Object.entries(counts)
-        .sort((a,b) => (b[1]-a[1]) || a[0].localeCompare(b[0]))
-        .map(([name, count]) => `${name}: ${count}`);
-
-      mimosEl.textContent = lines.length ? lines.join('\n') : '—';
+      const refDate = (filtroData && filtroData.value) ? String(filtroData.value).slice(0,10) : (new Date()).toISOString().slice(0,10);
+      const lines = list
+        .filter(m => isActiveOnBookingDate(m, refDate))
+        .map(m => {
+          const title = String(m.title || m.name || "").trim();
+          const c = countsByTitle[title] || 0;
+          return `${title}: ${c}`;
+        })
+        .filter(Boolean);
+      // Exibe em linhas (usa newline para manter layout atual sem quebrar CSS)
+      mimosEl.textContent = lines.length ? lines.join("\n") : "—";
     }
   }
-
   // ===== GRÁFICOS =====
   let statusChart = null;
   let prizeChart = null;
-
   function renderCharts(bookings) {
     const statusCounts = { agendado:0, confirmado:0, recebido:0, em_servico:0, concluido:0, entregue:0, cancelado:0 };
     const prizeCounts = { 'Tosa Higiênica':0, 'Hidratação':0, 'Foto e Vídeo Profissional':0, 'Patinhas impecáveis':0 };
-
     bookings.forEach(b => {
       const s = normStr(b.status);
       if (s === 'agendado') statusCounts.agendado++;
@@ -1291,21 +1150,16 @@ attachCepMaskIfPresent();
       else if (s === 'concluido') statusCounts.concluido++;
       else if (s === 'entregue') statusCounts.entregue++;
       else if (s === 'cancelado') statusCounts.cancelado++;
-
       const p = b.prize || '';
       if (prizeCounts.hasOwnProperty(p)) prizeCounts[p]++;
     });
-
     const ctxStatusEl = document.getElementById('chartStatus');
     const ctxPrizesEl = document.getElementById('chartPrizes');
     if (!ctxStatusEl || !ctxPrizesEl) return;
-
     const ctxStatus = ctxStatusEl.getContext('2d');
     const ctxPrizes = ctxPrizesEl.getContext('2d');
-
     if (statusChart) statusChart.destroy();
     if (prizeChart) prizeChart.destroy();
-
     statusChart = new Chart(ctxStatus, {
       type: 'bar',
       data: {
@@ -1332,7 +1186,6 @@ attachCepMaskIfPresent();
         }
       }
     });
-
     prizeChart = new Chart(ctxPrizes, {
       type: 'doughnut',
       data: {
@@ -1345,11 +1198,11 @@ attachCepMaskIfPresent();
       }
     });
   }
-
   /* ===== PETS no SELECT (Agenda) ===== */
   async function loadPetsForCustomer(customerId) {
     const data = await apiGet('/api/pets', { customer_id: customerId });
     const pets = (data.pets || []);
+    bookingPetsCache = pets;
     formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
     pets.forEach(p => {
       const opt = document.createElement('option');
@@ -1357,160 +1210,185 @@ attachCepMaskIfPresent();
       opt.textContent = p.breed ? `${p.name} (${p.breed})` : p.name;
       formPetSelect.appendChild(opt);
     });
+    // tenta manter porte atual (caso esteja editando e o pet já esteja selecionado)
+    const currentPetId = formPetSelect ? String(formPetSelect.value || '') : '';
+    if (currentPetId) {
+      const pet = bookingPetsCache.find(x => String(x.id) === currentPetId);
+      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
+    } else {
+      currentPetSize = '';
+    }
+    refreshServiceOptionsInAgenda(); // refaz o select respeitando porte
     return pets;
   }
-
   function preencherFormEdicao(booking) {
   // ID do agendamento em edição
   const id = booking && booking.id ? String(booking.id) : '';
-  bookingIdInput.value = id;
-
+  // Compat: em alguns patches antigos, o ID era referenciado como bookingIdInput
+  const _bookingIdEl = (typeof bookingIdInput !== 'undefined' && bookingIdInput) ? bookingIdInput : (typeof bookingId !== 'undefined' ? bookingId : document.getElementById('bookingId'));
+  if (_bookingIdEl) _bookingIdEl.value = id;
   // Cliente/Telefone
   formPhone.value = booking && booking.phone ? booking.phone : '';
   applyPhoneMask(formPhone); // garante máscara também ao carregar
-
+  if (formNome) formNome.value = booking && (booking.customer_name || booking.name) ? (booking.customer_name || booking.name) : (formNome.value || '');
+  // Carrega pets do cliente para permitir selecionar/validar porte
+  const custId = booking && (booking.customer_id || booking.customerId) ? (booking.customer_id || booking.customerId) : null;
+  if (custId) {
+    loadPetsForCustomer(custId).then(() => {
+      if (booking && booking.pet_id) formPetSelect.value = String(booking.pet_id);
+      const pid = String(formPetSelect.value || '');
+      const pet = bookingPetsCache.find(x => String(x.id) === pid);
+      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
+      refreshServiceOptionsInAgenda();
+    }).catch(()=>{});
+  } else {
+    bookingPetsCache = [];
+    currentPetSize = '';
+    refreshServiceOptionsInAgenda();
+  }
   // Data / Horário
   formDate.value = booking && booking.date ? booking.date : '';
   formTime.value = booking && booking.time ? booking.time : '';
-
+  // Status + pagamento
+  formStatus.value = booking && booking.status ? booking.status : 'agendado';
+  bookingOriginalStatus.value = booking && booking.status ? booking.status : 'agendado';
+  if (formPaymentStatus) formPaymentStatus.value = booking && booking.payment_status ? booking.payment_status : 'Não Pago';
+  if (formPaymentMethod) formPaymentMethod.value = booking && booking.payment_method ? booking.payment_method : '';
   // Serviço(s)
   clearSelectedServices();
-
   let servicesJson = booking && booking.services_json ? booking.services_json : null;
   if (typeof servicesJson === 'string') {
     try { servicesJson = JSON.parse(servicesJson); } catch (_) { servicesJson = null; }
   }
-
   if (Array.isArray(servicesJson) && servicesJson.length) {
     selectedServiceIds = servicesJson.map(s => String(s.id)).filter(Boolean);
   } else if (booking && booking.service_id) {
     selectedServiceIds = [String(booking.service_id)];
   }
-
   // Ajusta select para o 1º serviço (para facilitar adicionar/alterar)
   formService.value = selectedServiceIds[0] || '';
   refreshSelectedServicesUI();
-
   // Mimo (pode ser nulo)
   const prizeVal = booking && booking.prize ? booking.prize : 'Sem mimo';
   formPrize.value = prizeVal;
-
   // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
   refreshBookingDateTimeState(id ? Number(id) : null);
 }
-
-
-
   /* ===== Serviços (cache, dropdown e CRUD) ===== */
   const btnNovoServico = document.getElementById('btnNovoServico');
   const serviceFormPanel = document.getElementById('serviceFormPanel');
   const serviceId = document.getElementById('serviceId');
   const serviceDate = document.getElementById('serviceDate');
   const serviceTitle = document.getElementById('serviceTitle');
+  const serviceCategory = document.getElementById('serviceCategory');
+  const servicePorte = document.getElementById('servicePorte');
+  const serviceTempo = document.getElementById('serviceTempo');
   const servicePrice = document.getElementById('servicePrice');
   const serviceError = document.getElementById('serviceError');
   const btnServiceCancel = document.getElementById('btnServiceCancel');
   const btnServiceSave = document.getElementById('btnServiceSave');
   const tbodyServices = document.getElementById('tbodyServices');
   const servicesEmpty = document.getElementById('servicesEmpty');
-
   // Filtro de busca (Serviços)
   const filtroServicos = document.getElementById('filtroServicos');
-  const btnLimparServicos = document.getElementById('btnLimparServicos');
+  
+  const filtroCategoriaServicos = document.getElementById('filtroCategoriaServicos');const btnLimparServicos = document.getElementById('btnLimparServicos');
   let filtroServicosTxt = '';
-
-
+  let filtroCategoriaServicosVal = '';
   let servicesCache = [];
 function getServiceById(id){
   return servicesCache.find(s => String(s.id) === String(id));
 }
-
 function centsToBRL(cents){
   const v = Number(cents || 0) / 100;
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
-
 function refreshSelectedServicesUI(){
   if (!selectedServicesList || !selectedServicesWrap || !servicesTotalEl) return;
-
   selectedServicesList.innerHTML = '';
   let total = 0;
-
+  let totalMin = 0;
   const unique = Array.from(new Set(selectedServiceIds.map(String)));
   selectedServiceIds = unique;
-
   unique.forEach((sid) => {
     const svc = getServiceById(sid);
     const name = svc ? svc.title : `Serviço #${sid}`;
     const value_cents = svc ? Number(svc.value_cents || 0) : 0;
+    const dur = svc ? Number(svc.duration_min || 0) : 0;
     total += value_cents;
-
+    totalMin += dur;
     const li = document.createElement('li');
     li.innerHTML = `
-      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)})</small></span>
+      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)} • ${escapeHtml(String(dur))} min)</small></span>
       <button type="button" class="btn btn-danger btn-xs" data-remove-sid="${escapeHtml(String(sid))}">Remover</button>
     `;
     selectedServicesList.appendChild(li);
   });
-
   servicesTotalEl.textContent = centsToBRL(total);
   selectedServicesWrap.style.display = unique.length ? 'block' : 'none';
+  // preenche campos (somatório) - não editáveis
+  if (formServiceValue) formServiceValue.value = unique.length ? centsToBRL(total) : '';
+  if (formServiceDuration) formServiceDuration.value = unique.length ? String(totalMin) : '';
 }
-
 function clearSelectedServices(){
   selectedServiceIds = [];
   refreshSelectedServicesUI();
 }
  // [{id,title,value_cents,...}]
-
   function showServiceForm() { serviceFormPanel.classList.remove('hidden'); }
   function hideServiceForm() { serviceFormPanel.classList.add('hidden'); }
-
   function clearServiceForm() {
     serviceId.value = '';
     serviceDate.value = toISODateOnly(new Date());
     serviceTitle.value = '';
+    if (serviceCategory) serviceCategory.value = '';
+    if (servicePorte) servicePorte.value = '';
+    if (serviceTempo) serviceTempo.value = '';
     servicePrice.value = '';
     servicePrice.dataset.cents = '';
     serviceError.style.display = 'none';
     serviceError.textContent = '';
   }
-
   function fillServiceForm(svc) {
     serviceId.value = svc.id;
     serviceDate.value = (svc.date || '').slice(0, 10);
     serviceTitle.value = svc.title || '';
+    if (serviceCategory) serviceCategory.value = svc.category || '';
+    if (servicePorte) servicePorte.value = svc.porte || '';
+    if (serviceTempo) serviceTempo.value = (svc.duration_min != null ? String(svc.duration_min) : '');
     servicePrice.dataset.cents = String(svc.value_cents ?? '');
     servicePrice.value = svc.value_cents != null ? formatCentsToBRL(svc.value_cents) : '';
     serviceError.style.display = 'none';
     serviceError.textContent = '';
   }
-
   function renderServices() {
     tbodyServices.innerHTML = '';
-
     const list = (servicesCache || []).filter(s => {
-      if (!filtroServicosTxt) return true;
-      const hay = normStr((s.title || ''));
-      return hay.includes(filtroServicosTxt);
+      // filtro por texto (título)
+      if (filtroServicosTxt) {
+        const hay = normStr((s.title || ''));
+        if (!hay.includes(filtroServicosTxt)) return false;
+      }
+      // filtro por categoria
+      if (filtroCategoriaServicosVal) {
+        if (String(s.category || '') !== String(filtroCategoriaServicosVal)) return false;
+      }
+      return true;
     });
-
     servicesEmpty.style.display = list.length ? 'none' : 'block';
-
     list.forEach(svc => {
       const tr = document.createElement('tr');
-
       const tdId = document.createElement('td'); tdId.textContent = svc.id;
       const tdDate = document.createElement('td'); tdDate.textContent = formatDataBr((svc.date || '').slice(0,10));
+      const tdCat = document.createElement('td'); tdCat.textContent = svc.category || '-';
       const tdTitle = document.createElement('td'); tdTitle.textContent = svc.title || '-';
+      const tdPorte = document.createElement('td'); tdPorte.textContent = svc.porte || '-';
+      const tdTempo = document.createElement('td'); tdTempo.textContent = (svc.duration_min != null ? String(svc.duration_min) + ' min' : '-');
       const tdPrice = document.createElement('td'); tdPrice.textContent = formatCentsToBRL(svc.value_cents || 0);
-
       const tdCreated = document.createElement('td'); tdCreated.textContent = svc.created_at ? formatDateTimeBr(svc.created_at) : '-';
       const tdUpdated = document.createElement('td'); tdUpdated.textContent = svc.updated_at ? formatDateTimeBr(svc.updated_at) : '-';
-
       const tdAcoes = document.createElement('td');
       const divActions = document.createElement('div'); divActions.className = 'actions';
-
       const btnEdit = document.createElement('button');
       btnEdit.textContent = 'Editar';
       btnEdit.className = 'btn btn-small btn-secondary';
@@ -1520,7 +1398,6 @@ function clearSelectedServices(){
         showServiceForm();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
-
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
       btnDel.className = 'btn btn-small btn-danger';
@@ -1533,41 +1410,70 @@ function clearSelectedServices(){
           await loadDashboard();
         } catch (e) { alert(e.message); }
       });
-
       divActions.appendChild(btnEdit);
       divActions.appendChild(btnDel);
       tdAcoes.appendChild(divActions);
-
       tr.appendChild(tdId);
       tr.appendChild(tdDate);
+      tr.appendChild(tdCat);
       tr.appendChild(tdTitle);
+      tr.appendChild(tdPorte);
+      tr.appendChild(tdTempo);
       tr.appendChild(tdPrice);
       tr.appendChild(tdCreated);
       tr.appendChild(tdUpdated);
       tr.appendChild(tdAcoes);
-
       tbodyServices.appendChild(tr);
     });
   }
-
   function refreshServiceOptionsInAgenda() {
     // mantém seleção atual se possível
     const current = formService.value || '';
     formService.innerHTML = '<option value="">Selecione...</option>';
-    servicesCache.forEach(s => {
+    const sizeFilter = (typeof currentPetSize === 'string') ? currentPetSize.trim() : '';
+    const sizeNorm = sizeFilter.toLowerCase();
+    const normalizeSize = (v) => String(v || '').trim().toLowerCase();
+    const list = servicesCache.filter(s => {
+      if (!sizeNorm) return true; // sem pet selecionado => mostra tudo
+      const sSize = normalizeSize(s.porte || s.size || s.pet_size);
+      if (!sSize) return true; // serviços sem porte cadastrado continuam aparecendo
+      return sSize === sizeNorm;
+    });
+    list.forEach(s => {
       const opt = document.createElement('option');
       opt.value = String(s.id);
-      opt.textContent = s.title;
+      const price = (s.value_cents != null) ? centsToBRL(s.value_cents) : '';
+      const dur = (s.duration_min != null ? s.duration_min
+        : (s.tempo_min != null ? s.tempo_min
+        : (s.duration != null ? s.duration
+        : (s.tempo != null ? s.tempo : null))));
+      const parts = [s.title];
+      if (price) parts.push(price);
+      if (dur != null && String(dur).trim() !== '') parts.push(`${dur} min`);
+      opt.textContent = parts.join(' • ');
       formService.appendChild(opt);
     });
     if (current) formService.value = current;
   }
-
+if (formService) {
+  formService.addEventListener('change', () => {
+    const sid = formService.value;
+    // Apenas atualiza os campos de apoio (valor/tempo) do serviço atualmente selecionado.
+    // A lista multi-serviços é controlada pelo botão "Adicionar".
+    const svc = sid ? getServiceById(sid) : null;
+    if (formServiceValue) formServiceValue.value = svc ? centsToBRL(Number(svc.value_cents || 0)) : '';
+    if (formServiceDuration) formServiceDuration.value = svc ? String(Number(svc.duration_min || 0)) : '';
+    // Se ainda não houver nenhum serviço selecionado, mantém compatibilidade: define o primeiro.
+    if ((!Array.isArray(selectedServiceIds) || !selectedServiceIds.length) && sid) {
+      selectedServiceIds = [String(sid)];
+      refreshSelectedServicesUI();
+    }
+  });
+}
 // Multi-serviços - adicionar/remover
 if (btnAddService) {
     // Multi-serviços desativado: botão oculto no HTML. Mantemos o handler por compatibilidade, mas forçamos 1 serviço.
     btnAddService.addEventListener('click', () => {
-
     const sid = formService.value;
     if (!sid) return;
     selectedServiceIds.push(String(sid));
@@ -1575,7 +1481,6 @@ if (btnAddService) {
   
     });
   }
-
 if (selectedServicesList) {
   selectedServicesList.addEventListener('click', (ev) => {
     const btn = ev.target && ev.target.closest ? ev.target.closest('[data-remove-sid]') : null;
@@ -1585,8 +1490,6 @@ if (selectedServicesList) {
     refreshSelectedServicesUI();
   });
 }
-
-
   async function loadServices() {
     try {
       const data = await apiGet('/api/services');
@@ -1601,21 +1504,21 @@ if (selectedServicesList) {
       servicesEmpty.textContent = 'Erro ao carregar serviços: ' + e.message;
     }
   }
-
   async function saveService() {
     serviceError.style.display = 'none';
     serviceError.textContent = '';
-
     const id = serviceId.value ? parseInt(serviceId.value, 10) : null;
     const date = serviceDate.value;
     const title = serviceTitle.value.trim();
-
-    // garante dataset.cents sempre atualizado antes de validar
+    
+    const category = serviceCategory ? String(serviceCategory.value || '').trim() : '';
+    const porte = servicePorte ? String(servicePorte.value || '').trim() : '';
+    const duration_min = serviceTempo ? Number(serviceTempo.value) : null;
+// garante dataset.cents sempre atualizado antes de validar
     applyCurrencyMask(servicePrice);
     const value_cents = getCentsFromCurrencyInput(servicePrice);
-
-    if (!date || !title) {
-      serviceError.textContent = 'Preencha data e título do serviço.';
+    if (!date || !title || !category || !porte || !Number.isFinite(duration_min) || duration_min <= 0) {
+      serviceError.textContent = 'Preencha: data, categoria, título, porte e tempo (min).';
       serviceError.style.display = 'block';
       return;
     }
@@ -1624,12 +1527,10 @@ if (selectedServicesList) {
       serviceError.style.display = 'block';
       return;
     }
-
     try {
-      const body = { date, title, value_cents };
+      const body = { date, category, title, porte, duration_min, value_cents };
       if (!id) await apiPost('/api/services', body);
       else await apiPut('/api/services/' + id, body);
-
       clearServiceForm();
       hideServiceForm();
       await loadServices();
@@ -1639,7 +1540,6 @@ if (selectedServicesList) {
       serviceError.style.display = 'block';
     }
   }
-
   if (btnNovoServico) {
     btnNovoServico.addEventListener('click', () => {
       clearServiceForm();
@@ -1649,16 +1549,19 @@ if (selectedServicesList) {
   }
   if (btnServiceCancel) btnServiceCancel.addEventListener('click', () => { clearServiceForm(); hideServiceForm(); });
   if (btnServiceSave) btnServiceSave.addEventListener('click', saveService);
-
   // Máscara do valor de serviço
   if (servicePrice) {
     servicePrice.addEventListener('input', () => applyCurrencyMask(servicePrice));
   }
-
-
   if (filtroServicos) {
     filtroServicos.addEventListener('input', () => {
       filtroServicosTxt = normStr(filtroServicos.value);
+      renderServices();
+    });
+  }
+  if (filtroCategoriaServicos) {
+    filtroCategoriaServicos.addEventListener('change', () => {
+      filtroCategoriaServicosVal = String(filtroCategoriaServicos.value || '').trim();
       renderServices();
     });
   }
@@ -1666,11 +1569,11 @@ if (selectedServicesList) {
     btnLimparServicos.addEventListener('click', () => {
       if (filtroServicos) filtroServicos.value = '';
       filtroServicosTxt = '';
+      if (filtroCategoriaServicos) filtroCategoriaServicos.value = '';
+      filtroCategoriaServicosVal = '';
       renderServices();
     });
   }
-
-
   /* ===== Raças de Cães (CRUD) ===== */
   const btnNovoBreed = document.getElementById('btnNovoBreed');
   const breedSearch = document.getElementById('breedSearch');
@@ -1685,12 +1588,9 @@ if (selectedServicesList) {
   const btnBreedSave = document.getElementById('btnBreedSave');
   const tbodyBreeds = document.getElementById('tbodyBreeds');
   const breedsEmpty = document.getElementById('breedsEmpty');
-
   let breedsCache = []; // [{id,name,size,coat,history,created_at,updated_at}]
-
   function showBreedForm() { breedFormPanel.classList.remove('hidden'); }
   function hideBreedForm() { breedFormPanel.classList.add('hidden'); }
-
   function clearBreedForm() {
     breedId.value = '';
     breedName.value = '';
@@ -1699,7 +1599,6 @@ if (selectedServicesList) {
     breedHistory.value = '';
     if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
   }
-
   function fillBreedForm(b) {
     breedId.value = b.id;
     breedName.value = b.name || '';
@@ -1708,7 +1607,6 @@ if (selectedServicesList) {
     breedHistory.value = b.history || '';
     if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
   }
-
   function humanSize(v) {
     const s = normStr(v);
     if (s === 'pequeno') return 'Pequeno';
@@ -1716,7 +1614,6 @@ if (selectedServicesList) {
     if (s === 'grande') return 'Grande';
     return v || '-';
   }
-
   function humanCoat(v) {
     const s = normStr(v);
     if (s === 'curta') return 'Curta';
@@ -1724,11 +1621,9 @@ if (selectedServicesList) {
     if (s === 'longa') return 'Longa';
     return v || '-';
   }
-
   function renderBreeds() {
     if (!tbodyBreeds) return;
     tbodyBreeds.innerHTML = '';
-
     const q = normStr(breedSearch?.value || '');
     const list = !q ? breedsCache : breedsCache.filter(b =>
       normStr(b.name).includes(q) ||
@@ -1736,29 +1631,22 @@ if (selectedServicesList) {
       normStr(b.coat).includes(q) ||
       normStr(b.history).includes(q)
     );
-
     if (breedsEmpty) breedsEmpty.style.display = list.length ? 'none' : 'block';
-
     list.forEach(b => {
       const tr = document.createElement('tr');
-
       const tdId = document.createElement('td'); tdId.textContent = b.id;
       const tdName = document.createElement('td'); tdName.textContent = b.name || '-';
       const tdSize = document.createElement('td'); tdSize.textContent = humanSize(b.size);
       const tdCoat = document.createElement('td'); tdCoat.textContent = humanCoat(b.coat);
-
       const tdHist = document.createElement('td');
       const full = (b.history || '').trim();
       tdHist.textContent = full.length > 140 ? (full.slice(0, 140) + '…') : (full || '-');
       tdHist.className = 'td-obs';
       tdHist.title = full;
-
       const tdCreated = document.createElement('td'); tdCreated.textContent = b.created_at ? formatDateTimeBr(b.created_at) : '-';
       const tdUpdated = document.createElement('td'); tdUpdated.textContent = b.updated_at ? formatDateTimeBr(b.updated_at) : '-';
-
       const tdAcoes = document.createElement('td');
       const divActions = document.createElement('div'); divActions.className = 'actions';
-
       const btnEdit = document.createElement('button');
       btnEdit.textContent = 'Editar';
       btnEdit.className = 'btn btn-small btn-secondary';
@@ -1768,7 +1656,6 @@ if (selectedServicesList) {
         showBreedForm();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
-
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
       btnDel.className = 'btn btn-small btn-danger';
@@ -1780,11 +1667,9 @@ if (selectedServicesList) {
           await loadBreeds();
         } catch (e) { alert(e.message); }
       });
-
       divActions.appendChild(btnEdit);
       divActions.appendChild(btnDel);
       tdAcoes.appendChild(divActions);
-
       tr.appendChild(tdId);
       tr.appendChild(tdName);
       tr.appendChild(tdSize);
@@ -1793,11 +1678,9 @@ if (selectedServicesList) {
       tr.appendChild(tdCreated);
       tr.appendChild(tdUpdated);
       tr.appendChild(tdAcoes);
-
       tbodyBreeds.appendChild(tr);
     });
   }
-
   async function loadBreeds() {
     try {
       const data = await apiGet('/api/breeds');
@@ -1812,16 +1695,13 @@ if (selectedServicesList) {
       }
     }
   }
-
   async function saveBreed() {
     if (breedError) { breedError.style.display = 'none'; breedError.textContent = ''; }
-
     const id = breedId.value ? parseInt(breedId.value, 10) : null;
     const name = (breedName.value || '').trim();
     const size = breedSize.value;
     const coat = breedCoat.value;
     const history = (breedHistory.value || '').trim();
-
     if (!name) {
       if (breedError) { breedError.textContent = 'Informe o nome da raça.'; breedError.style.display = 'block'; }
       return;
@@ -1830,12 +1710,10 @@ if (selectedServicesList) {
       if (breedError) { breedError.textContent = 'Informe porte e pelagem.'; breedError.style.display = 'block'; }
       return;
     }
-
     try {
       const body = { name, size, coat, history };
       if (!id) await apiPost('/api/breeds', body);
       else await apiPut('/api/breeds/' + id, body);
-
       clearBreedForm();
       hideBreedForm();
       await loadBreeds();
@@ -1843,7 +1721,6 @@ if (selectedServicesList) {
       if (breedError) { breedError.textContent = e.message; breedError.style.display = 'block'; }
     }
   }
-
   if (btnNovoBreed) {
     btnNovoBreed.addEventListener('click', () => {
       clearBreedForm();
@@ -1853,68 +1730,133 @@ if (selectedServicesList) {
   }
   if (btnBreedCancel) btnBreedCancel.addEventListener('click', () => { clearBreedForm(); hideBreedForm(); });
   if (btnBreedSave) btnBreedSave.addEventListener('click', saveBreed);
-
   if (breedSearch) {
     breedSearch.addEventListener('input', () => {
       clearTimeout(window.__breedTimer);
       window.__breedTimer = setTimeout(() => renderBreeds(), 120);
     });
   }
-
-
   /* ===== NOVO: Agenda - Toggle Lista/Cards ===== */
   const AGENDA_VIEW_KEY = 'pf_admin_agenda_view';
   let agendaView = 'list';
-
   function initAgendaViewToggle() {
     try {
       const saved = localStorage.getItem(AGENDA_VIEW_KEY);
       if (saved === 'cards' || saved === 'list') agendaView = saved;
     } catch (_) {}
-
     applyAgendaViewUI(agendaView);
-
     if (btnViewList) btnViewList.addEventListener('click', () => setAgendaView('list'));
     if (btnViewCards) btnViewCards.addEventListener('click', () => setAgendaView('cards'));
   }
-
   function setAgendaView(view) {
     agendaView = (view === 'cards') ? 'cards' : 'list';
     try { localStorage.setItem(AGENDA_VIEW_KEY, agendaView); } catch (_) {}
     applyAgendaViewUI(agendaView);
     renderAgendaByView(ultimaLista || []);
   }
-
   function applyAgendaViewUI(view) {
     if (!agendaListWrapper || !agendaCardsWrapper) return;
-
     const isCards = (view === 'cards');
-
     agendaListWrapper.classList.toggle('hidden', isCards);
     agendaCardsWrapper.classList.toggle('hidden', !isCards);
-
     if (btnViewList) btnViewList.classList.toggle('active', !isCards);
     if (btnViewCards) btnViewCards.classList.toggle('active', isCards);
   }
-
-  function getServiceLabelFromBooking(a) {
-    let serviceLabel = a.service || a.service_title || '-';
-    const sid = a.service_id ?? a.serviceId ?? null;
-
+  function getServicesInfoFromBooking(a) {
+    // Prefer lista vinda do backend (bookings.services_json -> alias services)
+    let list = Array.isArray(a && a.services) ? a.services : [];
+    // Se vier como string JSON do backend, tenta parsear
+    if (!list.length && a && typeof a.services === 'string') {
+      try {
+        const parsed = JSON.parse(a.services);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch (_) {}
+    }
+    // Compat: alguns backends podem retornar 'services_json'
+    if (!list.length && a && typeof a.services_json === 'string') {
+      try {
+        const parsed = JSON.parse(a.services_json);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch (_) {}
+    }
+    let titles = [];
+    let values = [];
+    let times = [];
+    let totalCents = null;
+    let totalMin = null;
+    if (list.length) {
+      list.forEach((it) => {
+        const t = it && it.title ? String(it.title) : (it && it.id != null ? `Serviço #${it.id}` : '-');
+        const vc = (it && it.value_cents != null) ? Number(it.value_cents) : 0;
+        const dm = (it && it.duration_min != null) ? Number(it.duration_min) : 0;
+        titles.push(t);
+        values.push(centsToBRL(Number.isFinite(vc) ? vc : 0));
+        times.push(String(Number.isFinite(dm) ? dm : 0) + ' min');
+      });
+      totalCents = (a && a.services_total_cents != null) ? Number(a.services_total_cents) : null;
+      totalMin = (a && a.services_total_min != null) ? Number(a.services_total_min) : null;
+      if (!Number.isFinite(totalCents)) {
+        totalCents = list.reduce((acc, it) => acc + (Number.isFinite(Number(it.value_cents)) ? Number(it.value_cents) : 0), 0);
+      }
+      if (!Number.isFinite(totalMin)) {
+        totalMin = list.reduce((acc, it) => acc + (Number.isFinite(Number(it.duration_min)) ? Number(it.duration_min) : 0), 0);
+      }
+      return {
+        labels: titles.join(' + '),
+        values: values.join(' + '),
+        times: times.join(' + '),
+        totalCents: totalCents,
+        totalMin: totalMin
+      };
+    }
+    // Fallback: modo antigo (um serviço)
+    let serviceLabel = (a && (a.service || a.service_title)) ? (a.service || a.service_title) : '-';
+    const sid = a && (a.service_id ?? a.serviceId ?? null);
     if (sid != null) {
       const svc = servicesCache.find(s => String(s.id) === String(sid));
-      if (svc) serviceLabel = svc.title;
+      if (svc) {
+        serviceLabel = svc.title;
+        totalCents = Number(svc.value_cents || 0);
+        totalMin = Number(svc.duration_min || 0);
+        return {
+          labels: serviceLabel,
+          values: centsToBRL(totalCents),
+          times: String(totalMin) + ' min',
+          totalCents,
+          totalMin
+        };
+      }
     } else {
       const match = servicesCache.find(s => normStr(s.title) === normStr(serviceLabel));
-      if (match) serviceLabel = match.title;
+      if (match) {
+        totalCents = Number(match.value_cents || 0);
+        totalMin = Number(match.duration_min || 0);
+        return {
+          labels: match.title,
+          values: centsToBRL(totalCents),
+          times: String(totalMin) + ' min',
+          totalCents,
+          totalMin
+        };
+      }
     }
-    return serviceLabel;
+    // Último fallback: tentar usar snapshot do booking
+    totalCents = (a && a.services_total_cents != null) ? Number(a.services_total_cents) : (a && a.service_value_cents != null ? Number(a.service_value_cents) : 0);
+    totalMin = (a && a.services_total_min != null) ? Number(a.services_total_min) : (a && a.service_duration_min != null ? Number(a.service_duration_min) : 0);
+    return {
+      labels: String(serviceLabel),
+      values: centsToBRL(Number.isFinite(totalCents) ? totalCents : 0),
+      times: String(Number.isFinite(totalMin) ? totalMin : 0) + ' min',
+      totalCents: Number.isFinite(totalCents) ? totalCents : 0,
+      totalMin: Number.isFinite(totalMin) ? totalMin : 0
+    };
   }
-
+  function getServiceLabelFromBooking(a) {
+    return getServicesInfoFromBooking(a).labels;
+  }
   function renderAgendaByView(lista) {
     // vazio: atualiza ambos estados para evitar inconsistências
     const isEmpty = !lista || !lista.length;
-
     if (agendaView === 'cards') {
       renderAgendaCards(lista || []);
       if (estadoVazio) estadoVazio.style.display = 'none';
@@ -1925,26 +1867,28 @@ if (selectedServicesList) {
       if (estadoVazio) estadoVazio.style.display = isEmpty ? 'block' : 'none';
     }
   }
-
   function renderAgendaList(lista) {
     tbodyAgenda.innerHTML = '';
     estadoVazio.style.display = lista.length ? 'none' : 'block';
-
     lista.forEach(a => {
       const tr = document.createElement('tr');
-
       const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
       const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
-
-      const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
-
-      const tdMimo = document.createElement('td');
+      const svcInfo = getServicesInfoFromBooking(a);
+      const tdServ = document.createElement('td'); tdServ.textContent = svcInfo.labels;
+      const tdValTempo = document.createElement('td');
+      // Exibe todos os valores + total e todos os tempos + total (em um único bloco)
+      const totalV = centsToBRL(Number(svcInfo.totalCents || 0));
+      const totalT = String(Number(svcInfo.totalMin || 0)) + ' min';
+      const vPart = svcInfo.values ? (svcInfo.values + ' (Total: ' + totalV + ')') : ('Total: ' + totalV);
+      const tPart = svcInfo.times ? (svcInfo.times + ' (Total: ' + totalT + ')') : ('Total: ' + totalT);
+      tdValTempo.textContent = vPart + ' | ' + tPart;
+const tdMimo = document.createElement('td');
       tdMimo.textContent = a.prize || '-';
       tdMimo.className = 'td-mimo';
-
       const tdStatus = document.createElement('td');
       const spanStatus = document.createElement('span');
       const labelStatus = (a.status || 'agendado');
@@ -1952,26 +1896,96 @@ if (selectedServicesList) {
       spanStatus.className = 'td-status ' + classStatus(labelStatus);
       tdStatus.appendChild(spanStatus);
 
+      const tdPayStatus = document.createElement('td');
+      tdPayStatus.textContent = (a.payment_status || a.paymentStatus || a.pagamento || a.payment || '-');
+
+      const tdPayMethod = document.createElement('td');
+      tdPayMethod.textContent = (a.payment_method || a.paymentMethod || a.forma_pagamento || a.payment_method || '-');
+
       const tdNotif = document.createElement('td');
       tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
-
       const tdObs = document.createElement('td');
       tdObs.textContent = a.notes || '';
       tdObs.className = 'td-obs';
-
       const tdAcoes = document.createElement('td');
+      // Menu de ações (kebab) — mantém as mesmas ações (Editar/Excluir) sem alterar lógica
       const divActions = document.createElement('div');
-      divActions.className = 'actions';
+      divActions.className = 'actions actions-kebab';
+
+      const kebabBtn = document.createElement('button');
+      kebabBtn.type = 'button';
+      kebabBtn.className = 'kebab-btn';
+      kebabBtn.setAttribute('aria-label', 'Ações');
+      kebabBtn.textContent = '⋮';
+
+      const kebabMenu = document.createElement('div');
+      kebabMenu.className = 'kebab-menu hidden';
+
+      // Fecha o menu ao clicar fora
+      const closeMenu = () => {
+        kebabMenu.classList.add('hidden');
+        kebabMenu.classList.remove('open');
+        kebabMenu.style.display = 'none';
+      };
+      kebabBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        // fecha outros menus abertos
+        document.querySelectorAll('.kebab-menu').forEach(m => {
+          if (m !== kebabMenu) {
+            m.classList.add('hidden');
+            m.classList.remove('open');
+          }
+        });
+
+        const willOpen = kebabMenu.classList.contains('hidden');
+
+        if (willOpen) {
+          kebabMenu.classList.remove('hidden');
+          kebabMenu.classList.add('open');
+          kebabMenu.style.display = 'block';
+        } else {
+          kebabMenu.classList.add('hidden');
+          kebabMenu.classList.remove('open');
+          kebabMenu.style.display = 'none';
+        }
+
+        if (willOpen) {
+          // Renderiza o menu em "portal" (no <body>) para não ser cortado pelo overflow da tabela
+          try {
+            if (!kebabMenu.dataset.portalAttached) {
+              document.body.appendChild(kebabMenu);
+              kebabMenu.dataset.portalAttached = '1';
+              kebabMenu.classList.add('kebab-menu-portal');
+            }
+            const rect = kebabBtn.getBoundingClientRect();
+            const menuW = 180;
+            kebabMenu.style.position = 'fixed';
+            kebabMenu.style.minWidth = menuW + 'px';
+            kebabMenu.style.zIndex = '999999';
+            kebabMenu.style.top = Math.round(rect.bottom + 6) + 'px';
+            kebabMenu.style.left = Math.round(Math.max(8, rect.right - menuW)) + 'px';
+          } catch (_) {}
+        }
+      });
+      document.addEventListener('click', closeMenu);
 
       const btnEditar = document.createElement('button');
       btnEditar.textContent = 'Editar';
-      btnEditar.className = 'btn btn-small btn-secondary';
+      btnEditar.className = 'kebab-item';
       btnEditar.type = 'button';
-      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
+      btnEditar.addEventListener('click', async () => {
+        // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
+        try { await loadOpeningHours(); } catch (e) {}
+        try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
+        mostrarFormAgenda();
+        setEditMode(true);
+        preencherFormEdicao(a);
+              closeMenu();
+      });
 
       const btnExcluir = document.createElement('button');
       btnExcluir.textContent = 'Excluir';
-      btnExcluir.className = 'btn btn-small btn-danger';
+      btnExcluir.className = 'kebab-item kebab-item-danger';
       btnExcluir.type = 'button';
       btnExcluir.addEventListener('click', async () => {
         if (!confirm('Deseja realmente excluir este agendamento?')) return;
@@ -1980,116 +1994,113 @@ if (selectedServicesList) {
           await renderTabela();
           await loadDashboard();
         } catch (e) { alert(e.message); }
+              closeMenu();
       });
 
-      divActions.appendChild(btnEditar);
-      divActions.appendChild(btnExcluir);
+      kebabMenu.appendChild(btnEditar);
+      kebabMenu.appendChild(btnExcluir);
+      divActions.appendChild(kebabBtn);
+      divActions.appendChild(kebabMenu);
       tdAcoes.appendChild(divActions);
-
       tr.appendChild(tdData);
       tr.appendChild(tdHora);
       tr.appendChild(tdTutor);
       tr.appendChild(tdPet);
       tr.appendChild(tdTel);
       tr.appendChild(tdServ);
+      tr.appendChild(tdValTempo);
       tr.appendChild(tdMimo);
       tr.appendChild(tdStatus);
+      tr.appendChild(tdPayStatus);
+      tr.appendChild(tdPayMethod);
       tr.appendChild(tdNotif);
       tr.appendChild(tdObs);
       tr.appendChild(tdAcoes);
-
       tbodyAgenda.appendChild(tr);
     });
   }
-
   function renderAgendaCards(lista) {
     if (!agendaCards) return;
-
     agendaCards.innerHTML = '';
     const isEmpty = !lista.length;
     if (estadoVazioCards) estadoVazioCards.classList.toggle('hidden', !isEmpty);
-
     lista.forEach(a => {
       const card = document.createElement('div');
       card.className = 'agenda-card';
-
       const top = document.createElement('div');
       top.className = 'agenda-card-top';
-
       const left = document.createElement('div');
       const timeWrap = document.createElement('div');
       timeWrap.className = 'agenda-card-time';
       timeWrap.textContent = `⏰ ${a.time || '-'}`;
-
       const dateWrap = document.createElement('div');
       dateWrap.className = 'agenda-card-date';
       dateWrap.textContent = `📅 ${formatDataBr(a.date)}`;
-
       left.appendChild(timeWrap);
       left.appendChild(dateWrap);
-
       const statusWrap = document.createElement('div');
       const spanStatus = document.createElement('span');
       const labelStatus = (a.status || 'agendado');
       spanStatus.textContent = labelStatus;
       spanStatus.className = 'td-status ' + classStatus(labelStatus);
       statusWrap.appendChild(spanStatus);
-
       top.appendChild(left);
       top.appendChild(statusWrap);
-
       const main = document.createElement('div');
       main.className = 'agenda-card-main';
-
-      const serviceLabel = getServiceLabelFromBooking(a);
-
+      const svcInfo = getServicesInfoFromBooking(a);
+      const serviceLabel = svcInfo.labels;
       const l1 = document.createElement('div');
       l1.className = 'agenda-line';
       l1.innerHTML = `<span class="agenda-key">Tutor:</span> <span class="agenda-val">${(a.customer_name || '-')}</span>`;
-
       const l2 = document.createElement('div');
       l2.className = 'agenda-line';
       l2.innerHTML = `<span class="agenda-key">Pet:</span> <span class="agenda-muted">${(a.pet_name || '-')}</span>`;
-
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
       l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.phone)}</span>`;
-
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
-      l4.innerHTML = `<span class="agenda-key">Serviço:</span> <span class="agenda-val">${serviceLabel}</span>`;
-
+      l4.innerHTML = `<span class="agenda-key">Serviço(s):</span> <span class="agenda-val">${serviceLabel}</span>`;
+      const l4b = document.createElement('div');
+      l4b.className = 'agenda-line';
+      l4b.innerHTML = `<span class="agenda-key">Valores:</span> <span class="agenda-val">${escapeHtml(svcInfo.values)}</span> <span class="agenda-muted">(Total: ${centsToBRL(Number(svcInfo.totalCents || 0))})</span>`;
+      const l4c = document.createElement('div');
+      l4c.className = 'agenda-line';
+      l4c.innerHTML = `<span class="agenda-key">Tempo(s):</span> <span class="agenda-val">${escapeHtml(svcInfo.times)}</span> <span class="agenda-muted">(Total: ${escapeHtml(String(Number(svcInfo.totalMin || 0)))} min)</span>`;
       const l5 = document.createElement('div');
       l5.className = 'agenda-line';
       l5.innerHTML = `<span class="agenda-key">Mimo:</span> <span class="agenda-val" style="color:var(--turquesa)">${(a.prize || '-')}</span>`;
-
       const l6 = document.createElement('div');
       l6.className = 'agenda-line';
       l6.innerHTML = `<span class="agenda-key">Notif:</span> <span class="agenda-muted">${a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-'}</span>`;
-
       main.appendChild(l1);
       main.appendChild(l2);
       main.appendChild(l3);
       main.appendChild(l4);
+      main.appendChild(l4b);
+      main.appendChild(l4c);
       main.appendChild(l5);
       main.appendChild(l6);
-
       const notes = document.createElement('div');
       notes.className = 'agenda-card-notes';
       notes.textContent = (a.notes || '').trim() ? a.notes : 'Sem observações.';
-
       const bottom = document.createElement('div');
       bottom.className = 'agenda-card-bottom';
-
       const actions = document.createElement('div');
       actions.className = 'actions';
-
       const btnEditar = document.createElement('button');
       btnEditar.textContent = 'Editar';
       btnEditar.className = 'btn btn-small btn-secondary';
       btnEditar.type = 'button';
-      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
-
+      btnEditar.addEventListener('click', async () => {
+        // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
+        try { await loadOpeningHours(); } catch (e) {}
+        try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
+        mostrarFormAgenda();
+        setEditMode(true);
+        preencherFormEdicao(a);
+      });
       const btnExcluir = document.createElement('button');
       btnExcluir.textContent = 'Excluir';
       btnExcluir.className = 'btn btn-small btn-danger';
@@ -2102,27 +2113,21 @@ if (selectedServicesList) {
           await loadDashboard();
         } catch (e) { alert(e.message); }
       });
-
       actions.appendChild(btnEditar);
       actions.appendChild(btnExcluir);
-
       bottom.appendChild(actions);
-
       card.appendChild(top);
       card.appendChild(main);
       card.appendChild(notes);
       card.appendChild(bottom);
-
       agendaCards.appendChild(card);
     });
   }
-
   /* ===== Agenda: render e salvar ===== */
   async function renderTabela() {
     try {
       const lista = await fetchBookings();
       ultimaLista = lista;
-
       // renderiza conforme view selecionada
       renderAgendaByView(lista);
       atualizaEstatisticas(lista);
@@ -2131,7 +2136,6 @@ if (selectedServicesList) {
       ultimaLista = [];
       tbodyAgenda.innerHTML = '';
       if (agendaCards) agendaCards.innerHTML = '';
-
       if (estadoVazio) {
         estadoVazio.style.display = 'block';
         estadoVazio.textContent = 'Erro ao carregar agendamentos: ' + e.message;
@@ -2140,7 +2144,6 @@ if (selectedServicesList) {
         estadoVazioCards.classList.remove('hidden');
         estadoVazioCards.textContent = 'Erro ao carregar agendamentos: ' + e.message;
       }
-
       statTotal.textContent = '0';
       statTosa.textContent = '0';
       statHidratacao.textContent = '0';
@@ -2148,7 +2151,6 @@ if (selectedServicesList) {
       statPatinhas.textContent = '0';
     }
   }
-
   function limparForm() {
   bookingId.value = '';
   bookingOriginalStatus.value = 'agendado';
@@ -2156,47 +2158,56 @@ if (selectedServicesList) {
   applyPhoneMask(formPhone);
   formNome.value = '';
   formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
-
   // Mimo default
   formPrize.value = 'Sem mimo';
-
   // Multi-serviços
   formService.value = '';
   clearSelectedServices();
-
+  if (formServiceValue) formServiceValue.value = '';
+  if (formServiceDuration) formServiceDuration.value = '';
   formDate.value = '';
   formTime.value = '';
   formStatus.value = 'agendado';
+  if (formPaymentStatus) formPaymentStatus.value = 'Não Pago';
+  if (formPaymentMethod) formPaymentMethod.value = '';
   formNotes.value = '';
   formError.style.display = 'none';
   formError.textContent = '';
   setEditMode(false);
 }
-
 async function salvarAgendamento() {
     formError.style.display = 'none';
     formError.textContent = '';
-
     const id = bookingId.value || null;
     const originalStatus = bookingOriginalStatus.value || 'agendado';
-
     const rawPhone = formPhone.value.trim();
     const phone = sanitizePhone(rawPhone);
     const nome = formNome.value.trim();
-
     const petIdRaw = formPetSelect.value;
     const petIdNum = petIdRaw ? parseInt(petIdRaw, 10) : null;
-
     const prize = formPrize.value;
-
     // serviço selecionado do banco (id)
     const serviceIdSelected = formService.value ? parseInt(formService.value, 10) : null;
     const serviceObj = serviceIdSelected ? servicesCache.find(s => String(s.id) === String(serviceIdSelected)) : null;
     const servicesLabel = serviceObj ? serviceObj.title : '';
-
+    // Normaliza seleção (mantém compatibilidade com modo multi-serviços)
+    let selectedServices = [];
+    if (Array.isArray(selectedServiceIds) && selectedServiceIds.length) {
+      selectedServices = selectedServiceIds
+        .map((sid) => getServiceById(sid))
+        .filter(Boolean);
+    } else if (serviceObj) {
+      selectedServices = [serviceObj];
+      selectedServiceIds = [String(serviceObj.id)];
+      refreshSelectedServicesUI();
+    }
+    const firstServiceId = selectedServices.length ? Number(selectedServices[0].id) : (serviceIdSelected || null);
+    const servicesLabelAgg = selectedServices.length ? selectedServices.map(s => s.title).join(' + ') : servicesLabel;
+    const totalServicesCents = selectedServices.reduce((acc, s) => acc + Number(s.value_cents || 0), 0);
+    const totalServicesMin = selectedServices.reduce((acc, s) => acc + Number(s.duration_min || 0), 0);
     const date = formDate.value;
-    const time = formTime.value;
-
+    const time = normalizeHHMM(formTime.value);
+    if (time) formTime.value = time;
     // Validação de data/horário (mesmas regras do cliente)
     const dtMsg = validarDiaHora(date, time);
     if (dtMsg) {
@@ -2204,7 +2215,6 @@ async function salvarAgendamento() {
       formError.style.display = 'block';
       return;
     }
-
     // Carrega horários ocupados do dia e bloqueia conflito
     await refreshBookingDateTimeState(id);
     if (isTimeOccupied(time)) {
@@ -2212,10 +2222,8 @@ async function salvarAgendamento() {
       formError.style.display = 'block';
       return;
     }
-
     const status = formStatus.value;
     const notes = formNotes.value.trim();
-
     if (!date || !time || !serviceIdSelected) {
       formError.textContent = 'Data, horário e serviço são obrigatórios.';
       formError.style.display = 'block';
@@ -2232,57 +2240,52 @@ async function salvarAgendamento() {
       formError.style.display = 'block';
       return;
     }
-
     try {
       let customer = null;
       try {
         const lookup = await apiPost('/api/customers/lookup', { phone });
         if (lookup.exists && lookup.customer) customer = lookup.customer;
       } catch (_) {}
-
       if (!customer) {
         formError.textContent = 'Cliente não cadastrado. Cadastre o tutor e os pets na aba "Clientes & Pets" antes de criar o agendamento.';
         formError.style.display = 'block';
         return;
       }
-
       const body = {
         customer_id: customer.id,
         pet_id: petIdNum,
         date, time,
-        // envia multi-serviços (novo) + compatibilidade (service_id/service)
+        // Pagamento
+        payment_status: formPaymentStatus ? String(formPaymentStatus.value || '').trim() : '',
+        payment_method: formPaymentMethod ? String(formPaymentMethod.value || '').trim() : '',
+        // Serviços (compatível com modo multi-serviços)
+        services: selectedServices.map(s => ({ id: s.id, title: s.title, value_cents: s.value_cents, duration_min: s.duration_min })),
         service_ids: selectedServices.map(s => s.id),
         service_id: firstServiceId,
-        service: servicesLabel,
+        service: servicesLabelAgg,
+        // Snapshot do total (valor/tempo) no próprio agendamento
+        service_value_cents: totalServicesCents,
+        service_duration_min: totalServicesMin,
         prize, notes, status
       };
-
       let precisaWhats = false;
       let urlWhats = null;
-
       if (id && normStr(status) !== normStr(originalStatus)) {
         const dataBR = formatDataBr(date);
         const petLabel = petIdNum
           ? (formPetSelect.options[formPetSelect.selectedIndex]?.textContent || 'seu pet')
           : 'seu pet';
-
                 const prizeLabel = prize ? prize : 'Sem mimo';
         const msg = buildStatusMessage(status, nome, petLabel, servicesLabel, dataBR, time, prizeLabel);
-
         let fullPhone = phone;
         if (!(fullPhone.startsWith('55') && fullPhone.length > 11)) fullPhone = '55' + fullPhone;
-
         urlWhats = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
         precisaWhats = true;
-
         body.last_notification_at = new Date().toISOString();
       }
-
       if (!id) await apiPost('/api/bookings', body);
       else await apiPut('/api/bookings/' + id, body);
-
       if (precisaWhats && urlWhats) window.open(urlWhats, '_blank');
-
       limparForm();
       esconderFormAgenda();
       await renderTabela();
@@ -2292,19 +2295,16 @@ async function salvarAgendamento() {
       formError.style.display = 'block';
     }
   }
-
   function exportarCSV() {
     if (!ultimaLista.length) {
       alert('Não há agendamentos para exportar no filtro atual.');
       return;
     }
-
     const linhas = [];
     linhas.push(['ID','Data','Hora','Tutor','Pet','Telefone','Serviço','Mimo','Status','Última Notificação','Observações'].join(';'));
-
     ultimaLista.forEach(a => {
-      const serviceLabel = getServiceLabelFromBooking(a);
-
+      const svcInfo = getServicesInfoFromBooking(a);
+      const serviceLabel = svcInfo.labels;
       const cols = [
         a.id,
         formatDataBr(a.date),
@@ -2320,27 +2320,22 @@ async function salvarAgendamento() {
       ];
       linhas.push(cols.join(';'));
     });
-
     const csv = linhas.join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-
     const hoje = new Date();
     const ano = hoje.getFullYear();
     const mes = String(hoje.getMonth() + 1).padStart(2, '0');
     const dia = String(hoje.getDate()).padStart(2, '0');
     a.download = `agenda_petfunny_${ano}-${mes}-${dia}.csv`;
-
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
-
   filtroData.addEventListener('change', async () => { await renderTabela(); await loadDashboard(); });
-
   filtroBusca.addEventListener('input', () => {
     clearTimeout(window.__filtroTimer);
     window.__filtroTimer = setTimeout(async () => {
@@ -2348,24 +2343,20 @@ async function salvarAgendamento() {
       await loadDashboard();
     }, 150);
   });
-
   btnHoje.addEventListener('click', async () => {
     filtroData.value = toISODateOnly(new Date());
     await renderTabela();
     await loadDashboard();
   });
-
   btnLimparFiltro.addEventListener('click', async () => {
     filtroData.value = '';
     filtroBusca.value = '';
     await renderTabela();
     await loadDashboard();
   });
-
   btnExportarCSV.addEventListener('click', exportarCSV);
   btnSalvar.addEventListener('click', salvarAgendamento);
   btnCancelarEdicao.addEventListener('click', () => { limparForm(); esconderFormAgenda(); });
-
   if (dashPeriod) {
     dashPeriod.addEventListener('change', () => {
       const val = dashPeriod.value;
@@ -2374,14 +2365,14 @@ async function salvarAgendamento() {
     });
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
-
   btnNovoAgendamento.addEventListener('click', async () => {
     limparForm();
     // Garantir caches carregados (horários e mimos) para o NOVO agendamento
     try { await loadOpeningHours(); } catch (e) {}
     try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
-
     formDate.value = toISODateOnly(new Date());
+    if (formPaymentStatus) formPaymentStatus.value = 'Não Pago';
+    if (formPaymentMethod) formPaymentMethod.value = '';
     // dispara change porque set programtico no dispara evento
     try { formDate.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente
@@ -2395,7 +2386,6 @@ async function salvarAgendamento() {
     } catch (e) {
       console.warn('Falha ao carregar mimos:', e);
     }
-
     mostrarFormAgenda();
     // Garante que o estado do horário seja recalculado após o form ficar visível.
     // (Alguns browsers podem não aplicar corretamente enable/disable quando o elemento ainda está oculto.)
@@ -2409,22 +2399,17 @@ async function salvarAgendamento() {
     }, 0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
-
   formPhone.addEventListener('input', () => applyPhoneMask(formPhone));
-
   formPhone.addEventListener('blur', async () => {
     const phoneDigits = sanitizePhone(formPhone.value.trim());
     if (!phoneDigits) return;
-
     try {
       const lookup = await apiPost('/api/customers/lookup', { phone: phoneDigits });
-
       if (lookup.exists && lookup.customer) {
         // Cliente existe: preenche nome e carrega pets para seleção
         formNome.value = lookup.customer.name || '';
         formPetSelect.disabled = false;
         await loadPetsForCustomer(lookup.customer.id);
-
         // Se o cliente não tem pets, força cadastro antes de agendar
         if (formPetSelect.options.length <= 1) {
           formPetSelect.disabled = true;
@@ -2440,7 +2425,6 @@ async function salvarAgendamento() {
         formNome.value = '';
         formPetSelect.disabled = true;
         formPetSelect.innerHTML = '<option value="">(Cadastre o cliente e os pets primeiro)</option>';
-
         formError.textContent = 'Cliente não cadastrado. Vá na aba "Clientes & Pets" para cadastrar o tutor e os pets antes de criar o agendamento.';
         formError.style.display = 'block';
       }
@@ -2452,18 +2436,15 @@ async function salvarAgendamento() {
       formError.style.display = 'block';
     }
   });
-
   // ===== CLIENTES & PETS =====
   const cliPhone = document.getElementById('cliPhone');
   const cliName = document.getElementById('cliName');
   // PATCH: auto-lookup no CRUD de Clientes ao digitar Telefone (WhatsApp) em "Novo cliente" - 2025-12-24
 let modoNovoClienteCRUD = false;
 let _lookupCrudTimer = null;
-
 function setCrudCustomerFormFromLookup(customer) {
   if (cliPhone) cliPhone.value = customer?.phone || cliPhone.value || '';
   if (cliName) cliName.value = customer?.name || '';
-
   // Endereço (se existir no HTML atual)
   const map = [
     ['cliCep', 'cep'],
@@ -2482,29 +2463,23 @@ function setCrudCustomerFormFromLookup(customer) {
     ['cliUf', 'state'],
     ['cliUF', 'state'],
   ];
-
   for (const [id, key] of map) {
     const el = document.getElementById(id);
     if (!el) continue;
     el.value = (customer && customer[key] != null) ? String(customer[key]) : '';
   }
 }
-
 async function tryAutofillCrudCustomerByPhone() {
   if (!modoNovoClienteCRUD) return;
   if (!cliPhone) return;
-
   const digits = String(cliPhone.value || '').replace(/\D/g, '');
   if (digits.length < 10) return;
-
   try {
     const data = await apiPost('/api/customers/lookup', { phone: digits });
     const customer = data?.customer;
-
     if (customer?.id) {
       clienteSelecionadoId = customer.id;
       setCrudCustomerFormFromLookup(customer);
-
       if (typeof toast === 'function') {
         toast('Cliente já cadastrado. Dados carregados automaticamente.');
       } else {
@@ -2515,59 +2490,46 @@ async function tryAutofillCrudCustomerByPhone() {
     console.warn('[PetFunny] CRUD: falha no lookup por telefone:', e);
   }
 }
-
 function attachCepMaskToCrudIfPresent() {
   const el =
     document.getElementById('cliCep') ||
     document.querySelector('#tabClientes input[name="cep"]') ||
     document.querySelector('#tabClientes input[placeholder*="CEP" i]');
   if (!el) return;
-
   el.addEventListener('input', () => {
     const masked = maskCepValue(el.value);
     if (el.value !== masked) el.value = masked;
   });
-
   el.value = maskCepValue(el.value);
 }
-
 function initCepAutofillToCrudIfPresent() {
   const cepInput = document.getElementById('cliCep');
   if (!cepInput) return;
-
   // evita múltiplos listeners duplicados
   if (cepInput.dataset.cepBound === '1') return;
   cepInput.dataset.cepBound = '1';
-
   cepInput.addEventListener('blur', async () => {
     const raw = (cepInput.value || '').replace(/\D/g, '');
     if (raw.length !== 8) return;
-
     try {
       const resp = await fetch(`https://viacep.com.br/ws/${raw}/json/`);
       const data = await resp.json();
       if (data.erro) return;
-
       const street = document.getElementById('cliStreet');
       const neighborhood = document.getElementById('cliNeighborhood');
       const city = document.getElementById('cliCity');
       const state = document.getElementById('cliState');
       const complement = document.getElementById('cliComplement');
-
       if (street && !street.value) street.value = data.logradouro || '';
       if (neighborhood && !neighborhood.value) neighborhood.value = data.bairro || '';
       if (city && !city.value) city.value = data.localidade || '';
       if (state && !state.value) state.value = data.uf || '';
       if (complement && !complement.value) complement.value = data.complemento || '';
-
     } catch (e) {
       console.warn('Falha ao consultar CEP:', e);
     }
   });
 }
-
-
-
 if (cliPhone) {
   cliPhone.addEventListener('blur', () => {
     clearTimeout(_lookupCrudTimer);
@@ -2578,9 +2540,7 @@ if (cliPhone) {
     _lookupCrudTimer = setTimeout(tryAutofillCrudCustomerByPhone, 320);
   });
 }
-
 attachCepMaskToCrudIfPresent();
-
 initCepAutofillToCrudIfPresent();
 // PATCH: select customer fills address fields when present; defaults to empty when missing - 2025-12-24
 const cliCep = document.getElementById('cliCep') || document.getElementById('customerCep') || document.getElementById('cep') || null;
@@ -2590,20 +2550,15 @@ const cliComplement = document.getElementById('cliComplement') || document.getEl
 const cliNeighborhood = document.getElementById('cliNeighborhood') || document.getElementById('customerNeighborhood') || document.getElementById('neighborhood') || null;
 const cliCity = document.getElementById('cliCity') || document.getElementById('customerCity') || document.getElementById('city') || null;
 const cliState = document.getElementById('cliState') || document.getElementById('customerState') || document.getElementById('state') || null;
-
   const cliError = document.getElementById('cliError');
   const btnCliLimpar = document.getElementById('btnCliLimpar');
   const btnCliSalvar = document.getElementById('btnCliSalvar');
-
   // Filtro de busca (Clientes & Pets)
   const filtroClientes = document.getElementById('filtroClientes');
   const btnLimparClientes = document.getElementById('btnLimparClientes');
   let filtroClientesTxt = '';
-
-
   const clienteFormBlock = document.getElementById('clienteFormBlock');
   const btnNovoCliente = document.getElementById('btnNovoCliente');
-
   const petName = document.getElementById('petName');
   const petBreed = document.getElementById('petBreed');
   const petSize = document.getElementById('petSize');
@@ -2616,16 +2571,13 @@ const cliState = document.getElementById('cliState') || document.getElementById(
   const tbodyPets = document.getElementById('tbodyPets');
   const badgeClienteSelecionado = document.getElementById('badgeClienteSelecionado');
   const petsCard = document.getElementById('petsCard');
-
   const racas = [
     'SRD (Sem Raça Definida)','Poodle','Shih Tzu','Lhasa Apso','Labrador Retriever','Golden Retriever',
     'Yorkshire Terrier','Bulldog Francês','Bulldog Inglês','Spitz Alemão (Lulu da Pomerânia)','Beagle',
     'Border Collie','Boxer','Dachshund (Salsicha)','Maltês','Pinscher','Pastor Alemão','Rottweiler',
     'Pitbull','Pug','Cocker Spaniel','Schnauzer','Husky Siberiano','Akita','Chihuahua','Outro (informar nas observações)'
   ];
-
   cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
-
   if (filtroClientes) {
     filtroClientes.addEventListener('input', () => {
       filtroClientesTxt = normStr(filtroClientes.value);
@@ -2639,43 +2591,35 @@ const cliState = document.getElementById('cliState') || document.getElementById(
       renderClientes();
     });
   }
-
   racas.forEach(r => {
     const opt = document.createElement('option');
     opt.value = r;
     opt.textContent = r;
     petBreed.appendChild(opt);
   });
-
   async function loadClientes() {
     const data = await apiGet('/api/customers');
     clientesCache = data.customers || [];
     renderClientes();
   }
-
   function renderClientes() {
     const tbodyClientesEl = document.getElementById('tbodyClientes');
     if (!tbodyClientesEl) return;
     tbodyClientesEl.innerHTML = '';
-
     const list = (clientesCache || []).filter(c => {
       if (!filtroClientesTxt) return true;
       const hay = normStr((c.name || '') + ' ' + (c.phone || ''));
       return hay.includes(filtroClientesTxt);
     });
-
     list.forEach(c => {
       const tr = document.createElement('tr');
-
       const tdId = document.createElement('td'); tdId.textContent = c.id;
       const tdNome = document.createElement('td'); tdNome.textContent = c.name || '-';
       const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(c.phone);
       const tdPetsCount = document.createElement('td');
       tdPetsCount.innerHTML = c.pets_count ? `<span class="badge-mini">${c.pets_count} pet(s)</span>` : '-';
-
       const tdAcoes = document.createElement('td');
       const divActions = document.createElement('div'); divActions.className = 'actions';
-
       const btnSel = document.createElement('button');
       btnSel.textContent = 'Selecionar';
       btnSel.className = 'btn btn-small btn-secondary';
@@ -2686,10 +2630,8 @@ initCepAutofillToCrudIfPresent();
         badgeClienteSelecionado.classList.remove('hidden');
         clienteFormBlock.classList.remove('hidden');
         petsCard.classList.remove('hidden');
-
         cliPhone.value = formatTelefone(c.phone);
         cliName.value = c.name || '';
-
         
         // Endereço: se não existir no cadastro, deve vir vazio (não "undefined"/"null")
    if (cliCep) cliCep.value = c.cep || '';
@@ -2702,7 +2644,6 @@ if (cliState) cliState.value = c.state || '';
 limparPetsForm();
         await loadPetsForClienteTab(c.id);
       });
-
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
       btnDel.className = 'btn btn-small btn-danger';
@@ -2724,21 +2665,17 @@ limparPetsForm();
           await renderTabela();
         } catch (e) { alert(e.message); }
       });
-
       divActions.appendChild(btnSel);
       divActions.appendChild(btnDel);
       tdAcoes.appendChild(divActions);
-
       tr.appendChild(tdId);
       tr.appendChild(tdNome);
       tr.appendChild(tdTel);
       tr.appendChild(tdPetsCount);
       tr.appendChild(tdAcoes);
-
       tbodyClientesEl.appendChild(tr);
     });
   }
-
   function limparClienteForm() {
     cliPhone.value = '';
     cliName.value = '';
@@ -2750,29 +2687,22 @@ limparPetsForm();
     if (typeof cliCity !== 'undefined' && cliCity) cliCity.value = '';
     if (typeof cliState !== 'undefined' && cliState) cliState.value = '';
     cliError.style.display = 'none';
-
     clienteSelecionadoId = null;
     badgeClienteSelecionado.classList.add('hidden');
-
     clienteFormBlock.classList.add('hidden');
     petsCard.classList.add('hidden');
-
     tbodyPets.innerHTML = '';
     limparPetsForm();
   }
-
     async function salvarCliente() {
     cliError.style.display = 'none';
-
     const phoneDigits = sanitizePhone(cliPhone.value.trim());
     const name = cliName.value.trim();
-
     // Endereço (inputs podem existir ou não, então lemos de forma defensiva)
     const getVal = (id) => {
       const el = document.getElementById(id);
       return el ? String(el.value || '').trim() : '';
     };
-
     const payload = {
       phone: phoneDigits,
       name,
@@ -2784,16 +2714,13 @@ limparPetsForm();
       city: getVal('cliCity'),
       state: getVal('cliState'),
     };
-
     if (!payload.phone || payload.phone.length < 10 || !payload.name) {
       cliError.textContent = 'Preencha telefone (com DDD) e nome do tutor.';
       cliError.style.display = 'block';
       return;
     }
-
     try {
       let data;
-
       // Se já existe cliente selecionado, tentamos atualizar.
       if (clienteSelecionadoId) {
         try {
@@ -2807,56 +2734,45 @@ limparPetsForm();
         data = await apiPost('/api/customers', payload);
         if (data?.customer?.id) clienteSelecionadoId = data.customer.id;
       }
-
       // Backend pode responder como {customer:{...}} ou {...}
       const customer = data?.customer || data;
       if (customer?.id) clienteSelecionadoId = customer.id;
-
       badgeClienteSelecionado.classList.remove('hidden');
       petsCard.classList.remove('hidden');
-
       await loadClientes();
       if (clienteSelecionadoId) await loadPetsForClienteTab(clienteSelecionadoId);
-
       // feedback visual (modal se existir)
       if (typeof window.pfHint === 'function') {
         window.pfHint({ type: 'success', title: 'Cliente salvo', msg: 'Cadastro atualizado com sucesso.', time: 2200 });
       }
-
       await loadDashboard();
       await renderTabela();
     } catch (e) {
       const msg = (e && e.message) ? e.message : 'Erro ao salvar cliente.';
       cliError.textContent = msg;
       cliError.style.display = 'block';
-
       if (typeof window.pfHint === 'function') {
         window.pfHint({ type: 'error', title: 'Erro ao salvar', msg, time: 3200 });
       }
     }
   }
-
   async function loadPetsForClienteTab(customerId) {
     const data = await apiGet('/api/pets', { customer_id: customerId });
     petsCache = data.pets || [];
     renderPets();
   }
-
   function renderPets() {
     tbodyPets.innerHTML = '';
     petsCache.forEach(p => {
       const tr = document.createElement('tr');
-
       const tdId = document.createElement('td'); tdId.textContent = p.id;
       const tdNome = document.createElement('td'); tdNome.textContent = p.name;
       const tdRaca = document.createElement('td'); tdRaca.textContent = p.breed || '-';
       const tdPorte = document.createElement('td'); tdPorte.textContent = p.size || '-';
       const tdPelagem = document.createElement('td'); tdPelagem.textContent = p.coat || '-';
       const tdInfo = document.createElement('td'); tdInfo.textContent = (p.notes || p.info) || '-';
-
       const tdAcoes = document.createElement('td');
       const divActions = document.createElement('div'); divActions.className = 'actions';
-
       const btnEdit = document.createElement('button');
       btnEdit.textContent = 'Editar';
       btnEdit.className = 'btn btn-small btn-secondary';
@@ -2869,7 +2785,6 @@ limparPetsForm();
         if (petCoat) petCoat.value = p.coat || '';
         petInfo.value = (p.notes || p.info) || '';
       });
-
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
       btnDel.className = 'btn btn-small btn-danger';
@@ -2884,11 +2799,9 @@ limparPetsForm();
           await renderTabela();
         } catch (e) { alert(e.message); }
       });
-
       divActions.appendChild(btnEdit);
       divActions.appendChild(btnDel);
       tdAcoes.appendChild(divActions);
-
       tr.appendChild(tdId);
       tr.appendChild(tdNome);
       tr.appendChild(tdRaca);
@@ -2896,11 +2809,9 @@ limparPetsForm();
       tr.appendChild(tdPelagem);
       tr.appendChild(tdInfo);
       tr.appendChild(tdAcoes);
-
       tbodyPets.appendChild(tr);
     });
   }
-
   function limparPetsForm() {
     petEditIdLocal = null;
     petName.value = '';
@@ -2910,7 +2821,6 @@ limparPetsForm();
     petInfo.value = '';
     petError.style.display = 'none';
   }
-
   async function salvarPet() {
     petError.style.display = 'none';
     if (!clienteSelecionadoId) {
@@ -2918,7 +2828,6 @@ limparPetsForm();
       petError.style.display = 'block';
       return;
     }
-
     const name = petName.value.trim();
     const breed = petBreed.value;
     const size = petSize ? petSize.value : '';
@@ -2929,7 +2838,6 @@ if (!name || !breed) {
       petError.style.display = 'block';
       return;
     }
-
     try {
       if (!petEditIdLocal) {
         await apiPost('/api/pets', { customer_id: clienteSelecionadoId, name, breed, size, coat, notes });
@@ -2947,13 +2855,10 @@ if (!name || !breed) {
       petError.style.display = 'block';
     }
   }
-
   btnCliLimpar.addEventListener('click', limparClienteForm);
   btnCliSalvar.addEventListener('click', salvarCliente);
-
   btnPetLimpar.addEventListener('click', limparPetsForm);
   btnPetSalvar.addEventListener('click', salvarPet);
-
   btnNovoPet.addEventListener('click', () => {
     // garante que o painel de pets está visível e prepara formulário para novo cadastro
     petsCard.classList.remove('hidden');
@@ -2961,44 +2866,34 @@ if (!name || !breed) {
     try { petName.focus(); } catch(e) {}
     try { petsCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
   });
-
   btnNovoCliente.addEventListener('click', () => {
-
     initCepAutofillToCrudIfPresent();
     modoNovoCliente = true;
 modoNovoClienteCRUD = true;
 attachCepMaskIfPresent();
 attachCepMaskToCrudIfPresent();
-
     clienteSelecionadoId = null;
     badgeClienteSelecionado.classList.add('hidden');
-
     cliPhone.value = '';
     cliName.value = '';
     cliError.style.display = 'none';
     clienteFormBlock.classList.remove('hidden');
-
     petsCard.classList.add('hidden');
     tbodyPets.innerHTML = '';
     limparPetsForm();
   });
-
   if (dashPeriod && dashPeriod.value === 'custom') dashCustomRange.classList.remove('hidden');
-
   /* ===== DASHBOARD: inclui financeiro por serviço ===== */
   async function loadDashboard() {
     let period = dashPeriod ? dashPeriod.value : 'today';
     let { start, end } = getPeriodRange(period);
-
     if (period === 'custom') {
       start = dashStart.value || null;
       end = dashEnd.value || null;
       if (!start || !end) return;
     }
-
     let bookings = [];
     let totalCustomers = 0;
-
     try {
       const data = await apiGet('/api/bookings');
       bookings = data.bookings || [];
@@ -3006,7 +2901,6 @@ attachCepMaskToCrudIfPresent();
       console.error('Erro ao carregar bookings para dashboard:', e);
       bookings = [];
     }
-
     // aplica range por date (YYYY-MM-DD)
     if (start || end) {
       bookings = bookings.filter(b => {
@@ -3017,7 +2911,6 @@ attachCepMaskToCrudIfPresent();
         return true;
       });
     }
-
     try {
       const cData = await apiGet('/api/customers');
       totalCustomers = (cData.customers || []).length;
@@ -3025,20 +2918,16 @@ attachCepMaskToCrudIfPresent();
       console.error('Erro ao carregar customers para dashboard:', e);
       totalCustomers = 0;
     }
-
     const uniqueCustomersSet = new Set();
     bookings.forEach(b => {
       const cid = b.customer_id || b.customerId;
       if (cid != null) uniqueCustomersSet.add(cid);
     });
-
     dashTotalBookings.textContent = bookings.length;
     dashUniqueCustomers.textContent = uniqueCustomersSet.size;
     dashTotalCustomers.textContent = totalCustomers;
-
     const statusCounts = { agendado:0, confirmado:0, recebido:0, em_servico:0, concluido:0, entregue:0, cancelado:0 };
     const prizeCounts = { 'Tosa Higiênica':0, 'Hidratação':0, 'Foto e Vídeo Profissional':0, 'Patinhas impecáveis':0 };
-
     bookings.forEach(b => {
       const s = normStr(b.status);
       if (s === 'agendado') statusCounts.agendado++;
@@ -3048,11 +2937,9 @@ attachCepMaskToCrudIfPresent();
       else if (s === 'concluido') statusCounts.concluido++;
       else if (s === 'entregue') statusCounts.entregue++;
       else if (s === 'cancelado') statusCounts.cancelado++;
-
       const p = b.prize || '';
       if (prizeCounts.hasOwnProperty(p)) prizeCounts[p]++;
     });
-
     dashStatusAgendado.textContent = statusCounts.agendado;
     dashStatusConfirmado.textContent = statusCounts.confirmado;
     dashStatusRecebido.textContent = statusCounts.recebido;
@@ -3060,16 +2947,13 @@ attachCepMaskToCrudIfPresent();
     dashStatusConcluido.textContent = statusCounts.concluido;
     dashStatusEntregue.textContent = statusCounts.entregue;
     dashStatusCancelado.textContent = statusCounts.cancelado;
-
     dashPrizeTosa.textContent = prizeCounts['Tosa Higiênica'];
     dashPrizeHidratacao.textContent = prizeCounts['Hidratação'];
     dashPrizeFotoVideo.textContent = prizeCounts['Foto e Vídeo Profissional'];
     dashPrizePatinhas.textContent = prizeCounts['Patinhas impecáveis'];
-
     // financeiro por serviço
     const usage = new Map(); // serviceId -> {title, qty, value_cents}
     let revenueCents = 0;
-
     bookings.forEach(b => {
       // determinar serviceId
       let sid = b.service_id ?? b.serviceId ?? null;
@@ -3078,12 +2962,9 @@ attachCepMaskToCrudIfPresent();
         const match = servicesCache.find(s => normStr(s.title) === normStr(txt));
         sid = match ? match.id : null;
       }
-
       if (sid == null) return;
-
       const svc = servicesCache.find(s => String(s.id) === String(sid));
       if (!svc) return;
-
       const key = String(svc.id);
       if (!usage.has(key)) usage.set(key, { title: svc.title, qty: 0, value_cents: Number(svc.value_cents || 0) });
       const row = usage.get(key);
@@ -3091,18 +2972,14 @@ attachCepMaskToCrudIfPresent();
       const add = row.value_cents;
       revenueCents += add;
     });
-
     dashRevenue.textContent = formatCentsToBRL(revenueCents);
     const avg = bookings.length ? Math.round(revenueCents / bookings.length) : 0;
     dashAvgTicket.textContent = formatCentsToBRL(avg);
-
     tbodyDashServices.innerHTML = '';
     const rows = Array.from(usage.values())
       .map(r => ({...r, total_cents: r.qty * r.value_cents}))
       .sort((a,b) => b.total_cents - a.total_cents);
-
     dashServicesEmpty.style.display = rows.length ? 'none' : 'block';
-
     rows.forEach(r => {
       const tr = document.createElement('tr');
       const tdTitle = document.createElement('td'); tdTitle.textContent = r.title;
@@ -3115,10 +2992,8 @@ attachCepMaskToCrudIfPresent();
       tr.appendChild(tdTotal);
       tbodyDashServices.appendChild(tr);
     });
-
     renderCharts(bookings);
   }
-
   
   /* =========================
      HORÁRIO DE FUNCIONAMENTO (Admin)
@@ -3129,7 +3004,6 @@ attachCepMaskToCrudIfPresent();
   const btnHoursReload = document.getElementById('btnHoursReload');
   const btnHoursResetDefault = document.getElementById('btnHoursResetDefault');
   const hoursMsg = document.getElementById('hoursMsg');
-
   const DOW_LABEL = {
     0: 'Domingo',
     1: 'Segunda',
@@ -3139,15 +3013,12 @@ attachCepMaskToCrudIfPresent();
     5: 'Sexta',
     6: 'Sábado'
   };
-
   let openingHoursCache = []; // [{dow,is_closed,open_time,close_time,max_per_half_hour,updated_at}]
-
   function normalizeHHMM_OH(v, fallback) {
     const s = String(v || '').trim();
     if (/^([01]\d|2[0-3]):[0-5]\d$/.test(s)) return s;
     return fallback;
   }
-
   function getDefaultOpeningHours() {
     return [
       { dow: 1, is_closed: false, open_time: '07:30', close_time: '17:30', max_per_half_hour: 1 },
@@ -3159,21 +3030,15 @@ attachCepMaskToCrudIfPresent();
       { dow: 0, is_closed: true,  open_time: null,   close_time: null,   max_per_half_hour: 0 },
     ];
   }
-
   function renderOpeningHoursTable() {
     if (!tbodyHours) return;
-
     tbodyHours.innerHTML = '';
     const rowsByDow = new Map((openingHoursCache || []).map(r => [Number(r.dow), r]));
-
     for (const dow of [1,2,3,4,5,6,0]) {
       const r = rowsByDow.get(dow) || { dow, is_closed: true, open_time: null, close_time: null, max_per_half_hour: 0, updated_at: null };
-
       const tr = document.createElement('tr');
-
       const tdDay = document.createElement('td');
       tdDay.textContent = DOW_LABEL[dow] || String(dow);
-
       const tdClosed = document.createElement('td');
       const chk = document.createElement('input');
       chk.type = 'checkbox';
@@ -3194,7 +3059,6 @@ attachCepMaskToCrudIfPresent();
         }
       });
       tdClosed.appendChild(chk);
-
       const tdOpen = document.createElement('td');
       const open = document.createElement('input');
       open.type = 'time';
@@ -3202,7 +3066,6 @@ attachCepMaskToCrudIfPresent();
       open.value = r.open_time ? String(r.open_time).slice(0,5) : '07:30';
       open.disabled = !!r.is_closed;
       tdOpen.appendChild(open);
-
       const tdClose = document.createElement('td');
       const close = document.createElement('input');
       close.type = 'time';
@@ -3210,7 +3073,6 @@ attachCepMaskToCrudIfPresent();
       close.value = r.close_time ? String(r.close_time).slice(0,5) : '17:30';
       close.disabled = !!r.is_closed;
       tdClose.appendChild(close);
-
       const tdCap = document.createElement('td');
       const cap = document.createElement('input');
       cap.type = 'number';
@@ -3221,27 +3083,21 @@ attachCepMaskToCrudIfPresent();
       cap.disabled = !!r.is_closed;
       cap.style.maxWidth = '110px';
       tdCap.appendChild(cap);
-
       const tdUpd = document.createElement('td');
       tdUpd.textContent = r.updated_at ? formatDateTimeBr(r.updated_at) : '-';
-
       tr.appendChild(tdDay);
       tr.appendChild(tdClosed);
       tr.appendChild(tdOpen);
       tr.appendChild(tdClose);
       tr.appendChild(tdCap);
       tr.appendChild(tdUpd);
-
       tbodyHours.appendChild(tr);
     }
-
     if (hoursEmpty) hoursEmpty.style.display = 'none';
   }
-
   async function loadOpeningHours() {
     if (!tbodyHours) return;
     if (hoursMsg) hoursMsg.textContent = '';
-
     try {
       const data = await apiGet('/api/opening-hours');
       openingHoursCache = data.opening_hours || [];
@@ -3257,23 +3113,18 @@ attachCepMaskToCrudIfPresent();
       }
     }
   }
-
   function collectOpeningHoursFromUI() {
     const out = [];
     for (const dow of [0,1,2,3,4,5,6]) {
       const chk = document.querySelector(`input[type="checkbox"][data-dow="${dow}"]`);
       const is_closed = !!chk?.checked;
-
       const openEl = document.getElementById('oh_open_' + dow);
       const closeEl = document.getElementById('oh_close_' + dow);
       const capEl = document.getElementById('oh_cap_' + dow);
-
       let open_time = openEl ? normalizeHHMM_OH(openEl.value, '07:30') : '07:30';
       let close_time = closeEl ? normalizeHHMM_OH(closeEl.value, '17:30') : '17:30';
       let max_per_half_hour = capEl ? Number(capEl.value) : 1;
-
       if (!Number.isFinite(max_per_half_hour) || max_per_half_hour < 0) max_per_half_hour = 0;
-
       if (is_closed) {
         open_time = null;
         close_time = null;
@@ -3281,12 +3132,10 @@ attachCepMaskToCrudIfPresent();
       } else {
         if (max_per_half_hour === 0) max_per_half_hour = 1;
       }
-
       out.push({ dow, is_closed, open_time, close_time, max_per_half_hour });
     }
     return out;
   }
-
   async function saveOpeningHours(rows) {
     if (hoursMsg) hoursMsg.textContent = '';
     try {
@@ -3301,7 +3150,6 @@ attachCepMaskToCrudIfPresent();
       if (hoursMsg) hoursMsg.textContent = 'Erro ao salvar: ' + e.message;
     }
   }
-
   if (btnHoursReload) btnHoursReload.addEventListener('click', loadOpeningHours);
   if (btnHoursSave) btnHoursSave.addEventListener('click', () => saveOpeningHours(collectOpeningHoursFromUI()));
   if (btnHoursResetDefault) btnHoursResetDefault.addEventListener('click', () => {
@@ -3309,10 +3157,8 @@ attachCepMaskToCrudIfPresent();
     renderOpeningHoursTable();
     if (hoursMsg) hoursMsg.textContent = 'Padrão carregado (clique em Salvar para gravar).';
   });
-
 // ===== Início =====
   tryAutoLogin();
-
   /* =========================
    SIDEBAR (MENU HAMBURGUER)
 ========================= */
@@ -3321,16 +3167,13 @@ attachCepMaskToCrudIfPresent();
   const btnMenuClose = document.getElementById('btnMenuClose');
   const sidebar = document.getElementById('sidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
-
   if (!btnMenu || !sidebar || !backdrop) return;
-
   function openMenu(){
     backdrop.classList.remove('hidden');
     sidebar.classList.remove('hidden');
     requestAnimationFrame(() => sidebar.classList.add('open'));
     btnMenu.setAttribute('aria-expanded', 'true');
   }
-
   function closeMenu(){
     sidebar.classList.remove('open');
     btnMenu.setAttribute('aria-expanded', 'false');
@@ -3339,22 +3182,17 @@ attachCepMaskToCrudIfPresent();
       backdrop.classList.add('hidden');
     }, 180);
   }
-
   
-
   btnMenu.addEventListener('click', () => {
     const isOpen = sidebar.classList.contains('open');
     if (isOpen) closeMenu();
     else openMenu();
   });
-
   if (btnMenuClose) btnMenuClose.addEventListener('click', closeMenu);
   backdrop.addEventListener('click', closeMenu);
-
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && sidebar.classList.contains('open')) closeMenu();
   });
-
   // Fecha o menu ao clicar em qualquer item do menu (tab-btn)
   sidebar.addEventListener('click', (e) => {
     const btn = e.target.closest('.tab-btn');
@@ -3369,21 +3207,17 @@ attachCepMaskToCrudIfPresent();
     if (h < 0 || h > 23 || min < 0 || min > 59) return NaN;
     return h * 60 + min;
   }
-
   function buildRangeForDate(dateStr) {
     if (!dateStr) return null;
-
     // IMPORTANT: interpret the selected date in America/Sao_Paulo regardless of server/browser timezone.
     // Using an explicit -03:00 offset avoids the common "weekday shifted" bug.
     const d = new Date(dateStr + 'T00:00:00-03:00');
     if (Number.isNaN(d.getTime())) return null;
     const dow = d.getUTCDay(); // 0=Sun..6=Sat (São Paulo)
-
     // Prefer configured Opening Hours (admin menu "Horário de Funcionamento")
     const oh = Array.isArray(openingHoursCache)
       ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
       : null;
-
     if (oh) {
       if (oh.is_closed) return { closed: true };
       const openMin = hhmmToMinutes(normalizeHHMM(String(oh.open_time || '')));
@@ -3391,24 +3225,20 @@ attachCepMaskToCrudIfPresent();
       if (!Number.isFinite(openMin) || !Number.isFinite(closeMin) || closeMin <= openMin) return { closed: true };
       return { closed: false, startMin: openMin, endMin: closeMin };
     }
-
     // Fallback (if Opening Hours were not loaded)
     if (dow === 0) return { closed: true };
     const startMin = 7 * 60 + 30;
     const endMin = (dow === 6) ? (12 * 60) : (17 * 60 + 30);
     return { closed: false, startMin, endMin };
   }
-
   function getMaxPerHalfHourForDate(dateStr) {
     if (!dateStr) return 1;
     const d = new Date(dateStr + 'T00:00:00-03:00');
     if (Number.isNaN(d.getTime())) return 1;
     const dow = d.getUTCDay();
-
     const oh = Array.isArray(openingHoursCache)
       ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
       : null;
-
     if (!oh) return 1;
     if (oh.is_closed) return 0;
     const cap = parseInt(oh.max_per_half_hour, 10);
