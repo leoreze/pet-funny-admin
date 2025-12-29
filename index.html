@@ -2166,7 +2166,8 @@ Oi, Pet Funny, meu nome é ${currentCustomer.name || ''}, realizei um novo agend
 
 Aguardo o retorno de confirmação do agendamento.`).trim();
 
-      const url = `https://wa.me/5516981535338?text=${encodeURIComponent(texto)}`;
+      const url = `https://api.whatsapp.com/send?phone=5516981535338&text=${encodeURIComponent(texto)}`;
+
 
       successScreen.classList.remove('hidden');
 
@@ -2215,6 +2216,28 @@ Aguardo o retorno de confirmação do agendamento.`).trim();
     "https://www.instagram.com/petfunny"
   ]
 }
+
+      successScreen.classList.remove('hidden');
+
+      // Toast visual
+      pfToast(
+        'Agendamento enviado com sucesso! Te chamamos no WhatsApp 🐾',
+        'success',
+        2200
+      );
+
+      // Aguarda mais tempo antes de abrir o WhatsApp
+      setTimeout(() => {
+        window.open(url, '_blank');
+      }, 2000); // ⬅️ tempo maior aqui (2s)
+
+      // Aguarda mais um pouco e volta para o início
+      setTimeout(() => {
+        successScreen.classList.add('hidden');
+        try { localStorage.removeItem('petfunny_prize'); } catch {}
+        window.location.href = '/';
+      }, 3500); // ⬅️ retorno após WhatsApp
+
 </script>
 
 </body>
