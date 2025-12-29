@@ -842,12 +842,17 @@
   let openingHoursMap = new Map();
   let servicesCache = [];
 
-  const prizes = [
+  const DEFAULT_PRIZES = [
     { key: 'Tosa Higiênica', icon: '✂️', subtitle: 'Seu pet vai sair ainda mais confortável e limpinho.' },
     { key: 'Hidratação', icon: '💧', subtitle: 'Pelos mais macios, cheirosos e saudáveis.' },
     { key: 'Foto e Vídeo Profissional', icon: '📸', subtitle: 'Um registro lindo pra você guardar e postar.' },
     { key: 'Patinhas impecáveis', icon: '🐾', subtitle: 'Acabamento perfeito para o próximo passeio.' }
   ];
+
+  // Será carregado dinamicamente do Admin (tab Mimos). Se a API falhar, cai no DEFAULT_PRIZES.
+  let prizes = [...DEFAULT_PRIZES];
+  let prizesSource = 'default'; // 'api' | 'default'
+
 
   const onboardingSection = document.getElementById('onboarding');
   const app = document.getElementById('app');
@@ -947,6 +952,113 @@
     if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
     return data;
   }
+
+
+  // ======= MIMOS (dinâmico - vindo do Admin) =======
+  function extractFirstEmoji(text) {
+    const s = String(text || '');
+    try {
+      const m = s.match(/[\p{Extended_Pictographic}]/u);
+      return m ? m[0] : '';
+    } catch {
+      // fallback simples (sem unicode property support)
+      const m = s.match(/[\u2190-\u2BFF\uD83C-\uDBFF\uDC00-\uDFFF]/);
+      return m ? m[0] : '';
+    }
+  }
+
+  function buildConicGradient(n) {
+    const colors = [
+      'var(--turquesa)',
+      'var(--coral)',
+      '#ffddc5',
+      '#7fdde4',
+      '#b6f2d6',
+      '#ffe6a6',
+      '#d6c7ff',
+      '#ffd1dc'
+    ];
+    const seg = 360 / Math.max(1, n);
+    const parts = [];
+    for (let i = 0; i < n; i++) {
+      const c = colors[i % colors.length];
+      const start = (seg * i).toFixed(2);
+      const end = (seg * (i + 1)).toFixed(2);
+      parts.push(`${c} ${start}deg ${end}deg`);
+    }
+    return `conic-gradient(${parts.join(', ')})`;
+  }
+
+  function renderMimosSidebar(list) {
+    const ul = document.querySelector('.side-list');
+    if (!ul) return;
+
+    ul.innerHTML = '';
+
+    (list || []).forEach(item => {
+      const li = document.createElement('li');
+
+      const bullet = document.createElement('div');
+      bullet.className = 'side-bullet';
+      bullet.textContent = item.icon || '🎁';
+
+      const body = document.createElement('div');
+      const strong = document.createElement('strong');
+      strong.textContent = item.key || 'Mimo';
+      body.appendChild(strong);
+      body.appendChild(document.createElement('br'));
+
+      const desc = document.createTextNode(item.subtitle || '');
+      body.appendChild(desc);
+
+      li.appendChild(bullet);
+      li.appendChild(body);
+      ul.appendChild(li);
+    });
+  }
+
+  function applyMimosToWheel(list) {
+    // Atualiza o gradiente do wheel e do overlay, mantendo o layout intacto
+    const n = (list && list.length) ? list.length : 1;
+    const gradient = buildConicGradient(n);
+
+    if (wheel) wheel.style.background = gradient;
+
+    const overlayWheel = document.querySelector('.overlay-wheel');
+    if (overlayWheel) overlayWheel.style.background = gradient;
+  }
+
+  async function loadMimosForRoleta() {
+    try {
+      const resp = await apiGet('/api/mimos', { active: 1, at: new Date().toISOString() });
+      const mimos = Array.isArray(resp.mimos) ? resp.mimos : [];
+
+      if (mimos.length) {
+        prizes = mimos.map(m => {
+          const icon = extractFirstEmoji(m.title) || extractFirstEmoji(m.description) || '🎁';
+          return {
+            key: String(m.title || '').trim() || 'Mimo',
+            icon,
+            subtitle: String(m.description || '').trim(),
+            mimo_id: m.id,
+            value_cents: m.value_cents
+          };
+        });
+        prizesSource = 'api';
+      } else {
+        prizes = [...DEFAULT_PRIZES];
+        prizesSource = 'default';
+      }
+    } catch (e) {
+      prizes = [...DEFAULT_PRIZES];
+      prizesSource = 'default';
+    }
+
+    // Sidebar + wheel
+    renderMimosSidebar(prizes);
+    applyMimosToWheel(prizes);
+  }
+
 
   // ======= SERVICES (dinâmico) =======
   function formatCentsBRL(cents) {
@@ -1348,6 +1460,7 @@
     try {
       await loadOpeningHours();
       await loadServicesForSelect();
+      await loadMimosForRoleta();
     } catch (e) {
       console.error('Erro ao carregar serviços:', e);
       serviceSelect.disabled = true;

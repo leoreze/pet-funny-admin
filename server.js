@@ -789,27 +789,28 @@ app.delete('/api/breeds/:id', async (req, res) => {
 
 app.get('/api/mimos', async (req, res) => {
   try {
+    const q = String(req.query.q || '').trim().toLowerCase();
     const onlyActive = String(req.query.active || '').trim() === '1';
-    const at = req.query.at ? String(req.query.at) : null; // ISO opcional
+    const at = req.query.at ? String(req.query.at) : null; // ISO opcional (timestamptz)
 
-    if (onlyActive) {
-      const rows = await db.all(
-        `SELECT id, title, description, value_cents, starts_at, ends_at, is_active, updated_at
-         FROM mimos
-         WHERE is_active = TRUE
-           AND (starts_at IS NULL OR starts_at <= COALESCE($1::timestamptz, NOW()))
-           AND (ends_at   IS NULL OR ends_at   >= COALESCE($1::timestamptz, NOW()))
-         ORDER BY COALESCE(starts_at, NOW()) DESC, id DESC`,
-        [at]
-      );
-      return res.json({ mimos: rows });
-    }
+    // - active=1 => apenas mimos ativos e dentro do período (starts_at/ends_at)
+    // - q=...    => filtra por título/descrição (pode ser combinado com active=1)
+    const like = q ? `%${q}%` : '';
 
     const rows = await db.all(
-      `SELECT id, title, description, value_cents, starts_at, ends_at, is_active, updated_at
+      `SELECT id, title, description, value_cents, starts_at, ends_at, is_active, created_at, updated_at
        FROM mimos
-       ORDER BY id DESC`
+       WHERE
+         ($1::text = '' OR LOWER(title) LIKE $2 OR LOWER(description) LIKE $2)
+         AND ($3::boolean = FALSE OR (
+           is_active = TRUE
+           AND (starts_at IS NULL OR starts_at <= COALESCE($4::timestamptz, NOW()))
+           AND (ends_at   IS NULL OR ends_at   >= COALESCE($4::timestamptz, NOW()))
+         ))
+       ORDER BY is_active DESC, COALESCE(starts_at, '1970-01-01') DESC, id DESC`,
+      [q, like, onlyActive, at]
     );
+
     res.json({ mimos: rows });
   } catch (err) {
     console.error('Erro ao listar mimos:', err);
@@ -977,99 +978,6 @@ app.put('/api/opening-hours', async (req, res) => {
   }
 });
 
-/* =========================
-   MIMOS (roleta) - CRUD
-========================= */
-
-app.get('/api/mimos', async (req, res) => {
-  try {
-    const q = String(req.query.q || '').trim().toLowerCase();
-    const rows = await db.all(
-      `SELECT id, title, description, value_cents, starts_at, ends_at, is_active, created_at, updated_at
-       FROM mimos
-       WHERE ($1 = '' OR LOWER(title) LIKE $2 OR LOWER(description) LIKE $2)
-       ORDER BY is_active DESC, COALESCE(starts_at, '1970-01-01') DESC, id DESC`,
-      [q, q ? `%${q}%` : '']
-    );
-    res.json({ mimos: rows });
-  } catch (err) {
-    console.error('Erro ao listar mimos:', err);
-    res.status(500).json({ error: 'Erro interno ao buscar mimos.' });
-  }
-});
-
-app.post('/api/mimos', async (req, res) => {
-  try {
-    const title = String(req.body.title || '').trim();
-    const description = req.body.description != null ? String(req.body.description) : '';
-    const value_cents = Number(req.body.value_cents || 0) || 0;
-    const starts_at = req.body.starts_at ? String(req.body.starts_at) : null;
-    const ends_at = req.body.ends_at ? String(req.body.ends_at) : null;
-    const is_active = req.body.is_active === false ? false : true;
-
-    if (!title) return res.status(400).json({ error: 'title é obrigatório.' });
-    if (ends_at && starts_at && new Date(ends_at) < new Date(starts_at)) {
-      return res.status(400).json({ error: 'ends_at não pode ser menor que starts_at.' });
-    }
-
-    const row = await db.get(
-      `INSERT INTO mimos (title, description, value_cents, starts_at, ends_at, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6)
-       RETURNING *`,
-      [title, description, value_cents, starts_at, ends_at, is_active]
-    );
-    res.json({ mimo: row });
-  } catch (err) {
-    console.error('Erro ao criar mimo:', err);
-    res.status(500).json({ error: 'Erro interno ao criar mimo.' });
-  }
-});
-
-app.put('/api/mimos/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: 'ID inválido.' });
-
-    const title = String(req.body.title || '').trim();
-    const description = req.body.description != null ? String(req.body.description) : '';
-    const value_cents = Number(req.body.value_cents || 0) || 0;
-    const starts_at = req.body.starts_at ? String(req.body.starts_at) : null;
-    const ends_at = req.body.ends_at ? String(req.body.ends_at) : null;
-    const is_active = req.body.is_active === false ? false : true;
-
-    if (!title) return res.status(400).json({ error: 'title é obrigatório.' });
-    if (ends_at && starts_at && new Date(ends_at) < new Date(starts_at)) {
-      return res.status(400).json({ error: 'ends_at não pode ser menor que starts_at.' });
-    }
-
-    const row = await db.get(
-      `UPDATE mimos
-       SET title=$1, description=$2, value_cents=$3, starts_at=$4, ends_at=$5, is_active=$6, updated_at=NOW()
-       WHERE id=$7
-       RETURNING *`,
-      [title, description, value_cents, starts_at, ends_at, is_active, id]
-    );
-
-    if (!row) return res.status(404).json({ error: 'Mimo não encontrado.' });
-    res.json({ mimo: row });
-  } catch (err) {
-    console.error('Erro ao atualizar mimo:', err);
-    res.status(500).json({ error: 'Erro interno ao atualizar mimo.' });
-  }
-});
-
-app.delete('/api/mimos/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: 'ID inválido.' });
-
-    await db.run(`DELETE FROM mimos WHERE id=$1`, [id]);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Erro ao deletar mimo:', err);
-    res.status(500).json({ error: 'Erro interno ao excluir mimo.' });
-  }
-});
 
 
 /* =========================
