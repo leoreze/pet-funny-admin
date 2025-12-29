@@ -25,7 +25,7 @@ function sanitizePhone(phone) {
 }
 
 function timeToMinutes(hhmm) {
-  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(hhmm || '').trim());
+  const m = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(String(hhmm || '').trim());
   if (!m) return NaN;
   return Number(m[1]) * 60 + Number(m[2]);
 }
@@ -57,7 +57,7 @@ async function validateBookingSlot({ date, time, excludeBookingId = null }) {
   if (!Number.isFinite(t) || !Number.isFinite(open) || !Number.isFinite(close)) {
     return { ok: false, error: 'Horário inválido.' };
   }
-  if (t < open || t >= close) {
+  if (t < open || t > close) {
     return { ok: false, error: 'Horário fora do funcionamento.' };
   }
   if ((t - open) % 30 !== 0) {
@@ -294,49 +294,74 @@ app.get('/api/services', async (req, res) => {
 
 app.post('/api/services', async (req, res) => {
   try {
-    const date = String(req.body.date || '').slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const date = String(req.body.date || today).slice(0, 10);
     const title = String(req.body.title || '').trim();
     const value_cents = Number(req.body.value_cents);
 
-    if (!date || !title || !Number.isFinite(value_cents)) {
-      return res.status(400).json({ error: 'date, title e value_cents são obrigatórios.' });
+    const category = String(req.body.category || 'Banho').trim();
+    const porte = String(req.body.porte || '').trim();
+    const duration_min = Number(req.body.duration_min ?? req.body.tempo_min ?? 0);
+
+    if (!title || !Number.isFinite(value_cents)) {
+      return res.status(400).json({ error: 'title e value_cents são obrigatórios.' });
+    }
+    if (!Number.isFinite(duration_min) || duration_min < 0) {
+      return res.status(400).json({ error: 'duration_min inválido.' });
     }
 
     const row = await db.get(
       `
-      INSERT INTO services (date, title, value_cents, updated_at)
-      VALUES ($1,$2,$3,NOW())
+      INSERT INTO services (date, category, title, porte, value_cents, duration_min, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,NOW())
       RETURNING *
       `,
-      [date, title, value_cents]
+      [date, category, title, porte || null, value_cents, duration_min]
     );
     res.json({ service: row });
   } catch (err) {
     console.error('Erro ao criar service:', err);
-    res.status(500).json({ error: 'Erro interno ao salvar serviço.' });
+    res.status(500).json({ error: 'Erro interno ao criar serviço.' });
   }
 });
 
 app.put('/api/services/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const date = String(req.body.date || '').slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const date = String(req.body.date || today).slice(0, 10);
     const title = String(req.body.title || '').trim();
     const value_cents = Number(req.body.value_cents);
 
-    if (!id || !date || !title || !Number.isFinite(value_cents)) {
-      return res.status(400).json({ error: 'id, date, title e value_cents são obrigatórios.' });
+    const category = String(req.body.category || 'Banho').trim();
+    const porte = String(req.body.porte || '').trim();
+    const duration_min = Number(req.body.duration_min ?? req.body.tempo_min ?? 0);
+
+    if (!id || !title || !Number.isFinite(value_cents)) {
+      return res.status(400).json({ error: 'id, title e value_cents são obrigatórios.' });
+    }
+    if (!Number.isFinite(duration_min) || duration_min < 0) {
+      return res.status(400).json({ error: 'duration_min inválido.' });
     }
 
     const row = await db.get(
       `
       UPDATE services
-      SET date=$2, title=$3, value_cents=$4, updated_at=NOW()
+      SET date=$2,
+          category=$3,
+          title=$4,
+          porte=$5,
+          value_cents=$6,
+          duration_min=$7,
+          updated_at=NOW()
       WHERE id=$1
       RETURNING *
       `,
-      [id, date, title, value_cents]
+      [id, date, category, title, porte || null, value_cents, duration_min]
     );
+
     res.json({ service: row });
   } catch (err) {
     console.error('Erro ao atualizar service:', err);
@@ -432,13 +457,15 @@ app.get('/api/bookings', async (req, res) => {
         c.phone AS phone,
         pet.name AS pet_name,
 
-        -- serviço único (multi-serviços removido)
-        s.title AS service_title,
-        s.value_cents AS service_value_cents,
+        -- serviço único (compatível com snapshot no booking)
+        COALESCE((b.services_json->0->>'title'), s.title) AS service_title,
+        COALESCE((b.services_json->0->>'value_cents')::int, b.service_value_cents, s.value_cents, 0) AS service_value_cents,
+        COALESCE((b.services_json->0->>'duration_min')::int, b.service_duration_min, s.duration_min, 0) AS service_duration_min,
 
-        -- compatibilidade: manter campos esperados pelo front
-        '[]'::json AS services,
-        COALESCE(s.value_cents, 0) AS services_total_cents
+        -- múltiplos serviços (novo): armazenado em bookings.services_json
+        COALESCE(b.services_json, '[]'::jsonb) AS services,
+        COALESCE(b.service_value_cents, 0) AS services_total_cents,
+        COALESCE(b.service_duration_min, 0) AS services_total_min
       FROM bookings b
       JOIN customers c ON c.id = b.customer_id
       LEFT JOIN pets pet ON pet.id = b.pet_id
@@ -470,8 +497,45 @@ app.post('/api/bookings', async (req, res) => {
     const status = req.body.status ? String(req.body.status).trim() : 'agendado';
     const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
-    if (!customer_id || !date || !time || !prize) {
-      return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
+    const payment_status = req.body.payment_status ? String(req.body.payment_status).trim() : 'Não Pago';
+    const payment_method = req.body.payment_method ? String(req.body.payment_method).trim() : '';
+
+    const service_value_cents = (req.body.service_value_cents != null && String(req.body.service_value_cents).trim() !== '')
+      ? Number(req.body.service_value_cents)
+      : null;
+    const service_duration_min = (req.body.service_duration_min != null && String(req.body.service_duration_min).trim() !== '')
+      ? Number(req.body.service_duration_min)
+      : null;
+
+    // Múltiplos serviços (novo): array de objetos {id,title,value_cents,duration_min}
+    let services_json = Array.isArray(req.body.services) ? req.body.services : (Array.isArray(req.body.services_json) ? req.body.services_json : null);
+    if (!services_json && service_id != null) {
+      // compat: serviço único vira lista
+      services_json = [{ id: service_id }];
+    }
+    if (!services_json) services_json = [];
+    // normaliza e calcula totais
+    services_json = services_json.map(s => ({
+      id: s && s.id != null ? Number(s.id) : null,
+      title: s && s.title != null ? String(s.title) : null,
+      value_cents: s && s.value_cents != null ? Number(s.value_cents) : null,
+      duration_min: s && s.duration_min != null ? Number(s.duration_min) : null
+    })).filter(s => s.id != null || s.title);
+    const total_cents_from_list = services_json.reduce((acc, s) => acc + (Number.isFinite(s.value_cents) ? s.value_cents : 0), 0);
+    const total_min_from_list = services_json.reduce((acc, s) => acc + (Number.isFinite(s.duration_min) ? s.duration_min : 0), 0);
+    const svcTotalsCents = (service_value_cents != null) ? service_value_cents : (services_json.length ? total_cents_from_list : null);
+    const svcTotalsMin = (service_duration_min != null) ? service_duration_min : (services_json.length ? total_min_from_list : null);
+
+    // `prize` (mimo) pode ser vazio.
+    if (!customer_id || !date || !time) {
+      return res.status(400).json({ error: 'customer_id, date e time são obrigatórios.' });
+    }
+
+    if (service_value_cents != null && (!Number.isFinite(service_value_cents) || service_value_cents < 0)) {
+      return res.status(400).json({ error: 'service_value_cents inválido.' });
+    }
+    if (service_duration_min != null && (!Number.isFinite(service_duration_min) || service_duration_min < 0)) {
+      return res.status(400).json({ error: 'service_duration_min inválido.' });
     }
 
     // Horário de funcionamento + capacidade por meia hora (evita overbooking)
@@ -480,11 +544,23 @@ app.post('/api/bookings', async (req, res) => {
 
     const row = await db.get(
       `
-      INSERT INTO bookings (customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      INSERT INTO bookings (
+        customer_id, pet_id, service_id, service,
+        date, time, prize, notes, status, last_notification_at,
+        payment_status, payment_method,
+        service_value_cents, service_duration_min,
+        services_json
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       RETURNING *
       `,
-      [customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at]
+      [
+        customer_id, pet_id, service_id, service,
+        date, time, prize, notes, status, last_notification_at,
+        payment_status, payment_method,
+        svcTotalsCents, svcTotalsMin,
+        JSON.stringify(services_json)
+      ]
     );
     res.json({ booking: row });
   } catch (err) {
@@ -508,8 +584,48 @@ app.put('/api/bookings/:id', async (req, res) => {
     const status = req.body.status ? String(req.body.status).trim() : 'agendado';
     const last_notification_at = req.body.last_notification_at ? String(req.body.last_notification_at) : null;
 
-    if (!id || !customer_id || !date || !time || !prize) {
-      return res.status(400).json({ error: 'id, customer_id, date, time e prize são obrigatórios.' });
+    const payment_status = req.body.payment_status ? String(req.body.payment_status).trim() : 'Não Pago';
+    const payment_method = req.body.payment_method ? String(req.body.payment_method).trim() : '';
+
+    const service_value_cents = (req.body.service_value_cents != null && String(req.body.service_value_cents).trim() !== '')
+      ? Number(req.body.service_value_cents)
+      : null;
+    const service_duration_min = (req.body.service_duration_min != null && String(req.body.service_duration_min).trim() !== '')
+      ? Number(req.body.service_duration_min)
+      : null;
+
+// Múltiplos serviços (novo): array de objetos {id,title,value_cents,duration_min}
+let services_json = Array.isArray(req.body.services) ? req.body.services
+  : (Array.isArray(req.body.services_json) ? req.body.services_json : null);
+if (!services_json && service_id != null) {
+  // compat: serviço único vira lista
+  services_json = [{ id: service_id }];
+}
+if (!services_json) services_json = [];
+// normaliza e calcula totais
+services_json = services_json.map(s => ({
+  id: s && s.id != null ? Number(s.id) : null,
+  title: s && s.title != null ? String(s.title) : null,
+  value_cents: s && s.value_cents != null ? Number(s.value_cents) : null,
+  duration_min: s && s.duration_min != null ? Number(s.duration_min) : null
+})).filter(s => s.id != null || s.title);
+
+const total_cents_from_list = services_json.reduce((acc, s) => acc + (Number.isFinite(s.value_cents) ? s.value_cents : 0), 0);
+const total_min_from_list = services_json.reduce((acc, s) => acc + (Number.isFinite(s.duration_min) ? s.duration_min : 0), 0);
+const svcTotalsCents = (service_value_cents != null) ? service_value_cents : (services_json.length ? total_cents_from_list : null);
+const svcTotalsMin = (service_duration_min != null) ? service_duration_min : (services_json.length ? total_min_from_list : null);
+
+
+    // `id` vem da URL (/api/bookings/:id). `prize` (mimo) pode ser vazio.
+    if (!id || !customer_id || !date || !time) {
+      return res.status(400).json({ error: 'customer_id, date e time são obrigatórios.' });
+    }
+
+    if (service_value_cents != null && (!Number.isFinite(service_value_cents) || service_value_cents < 0)) {
+      return res.status(400).json({ error: 'service_value_cents inválido.' });
+    }
+    if (service_duration_min != null && (!Number.isFinite(service_duration_min) || service_duration_min < 0)) {
+      return res.status(400).json({ error: 'service_duration_min inválido.' });
     }
 
     // Horário de funcionamento + capacidade por meia hora (exclui o próprio agendamento)
@@ -519,11 +635,32 @@ app.put('/api/bookings/:id', async (req, res) => {
     const row = await db.get(
       `
       UPDATE bookings
-      SET customer_id=$2, pet_id=$3, service_id=$4, service=$5, date=$6, time=$7, prize=$8, notes=$9, status=$10, last_notification_at=$11
+      SET
+        customer_id=$2,
+        pet_id=$3,
+        service_id=$4,
+        service=$5,
+        date=$6,
+        time=$7,
+        prize=$8,
+        notes=$9,
+        status=$10,
+        last_notification_at=$11,
+        payment_status=$12,
+        payment_method=$13,
+        service_value_cents=$14,
+        service_duration_min=$15,
+        services_json=$16
       WHERE id=$1
       RETURNING *
       `,
-      [id, customer_id, pet_id, service_id, service, date, time, prize, notes, status, last_notification_at]
+      [
+        id, customer_id, pet_id, service_id, service,
+        date, time, prize, notes, status, last_notification_at,
+        payment_status, payment_method,
+        svcTotalsCents, svcTotalsMin,
+        JSON.stringify(services_json)
+      ]
     );
     res.json({ booking: row });
   } catch (err) {
