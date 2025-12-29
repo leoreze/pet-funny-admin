@@ -890,6 +890,10 @@
   const serviceSelect = document.getElementById('serviceSelect');
   const serviceHelp = document.getElementById('serviceHelp');
 
+  // ===== Multi-serviços (cliente) =====
+  let selectedServiceIds = [];
+  let servicesUIReady = false;
+
   const dateInput = document.getElementById('dateInput');
 
   const hourSelect = document.getElementById('hourSelect');
@@ -1067,6 +1071,38 @@
     return (n / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
+  function normalizeKey(v) {
+    return String(v || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function getSelectedPetObj() {
+    const pid = petSelect ? String(petSelect.value || '') : '';
+    if (!pid) return null;
+    return (currentPets || []).find(p => String(p.id) === pid) || null;
+  }
+
+  function getPetPorteKey(pet) {
+    if (!pet) return '';
+    const raw = pet.size || pet.porte || '';
+    const k = normalizeKey(raw);
+    if (k === 'medio') return 'medio';
+    return k;
+  }
+
+  function filterServicesForPet(pet) {
+    const porteKey = getPetPorteKey(pet);
+    if (!porteKey) return servicesCache || [];
+    return (servicesCache || []).filter(s => {
+      const sk = normalizeKey(s.porte || s.size || '');
+      return sk === porteKey;
+    });
+  }
+
+
   function renderServiceSelect(services) {
     serviceSelect.innerHTML = '';
 
@@ -1096,6 +1132,89 @@
     } else {
       serviceSelect.disabled = false;
     }
+
+
+  function initMultiServicesUI() {
+    if (servicesUIReady) return;
+    if (!serviceSelect) return;
+    const wrap = serviceSelect.parentElement;
+    if (!wrap) return;
+
+    const list = document.createElement('div');
+    list.id = 'selectedServicesList';
+    list.style.marginTop = '8px';
+    list.style.display = 'none';
+    wrap.appendChild(list);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'btnAddServiceClient';
+    btn.className = 'btn btn-secondary btn-inline';
+    btn.textContent = '+ Adicionar serviço';
+    btn.style.marginTop = '8px';
+    wrap.appendChild(btn);
+
+    btn.addEventListener('click', () => {
+      const sid = String(serviceSelect.value || '');
+      if (!sid) return;
+      if (!selectedServiceIds.includes(sid)) selectedServiceIds.push(sid);
+      refreshSelectedServicesUI();
+    });
+
+    servicesUIReady = true;
+  }
+
+  function refreshSelectedServicesUI() {
+    const box = document.getElementById('selectedServicesList');
+    if (!box) return;
+
+    if (!selectedServiceIds.length) {
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+
+    const items = selectedServiceIds
+      .map(id => (servicesCache || []).find(s => String(s.id) === String(id)))
+      .filter(Boolean);
+
+    const totalCents = items.reduce((acc, s) => acc + (Number.isFinite(Number(s.value_cents)) ? Number(s.value_cents) : 0), 0);
+
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div style="font-size:12px; font-weight:700; margin-bottom:6px;">Serviços selecionados</div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        ${items.map(s => `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border:1px solid rgba(0,0,0,0.08); border-radius:12px; background:#fff;">
+            <div style="font-size:12px; font-weight:600;">
+              ${String(s.title || '')}
+              <span style="font-weight:500; color:#607d8b;">${(s.value_cents!=null)?(' • '+formatCentsBRL(s.value_cents)) : ''}</span>
+            </div>
+            <button type="button" class="btn btn-secondary btn-inline" style="padding:6px 10px; font-size:11px;" data-remove-sid="${String(s.id)}">Remover</button>
+          </div>
+        `).join('')}
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:#455a64;">
+        <strong>Total:</strong> ${formatCentsBRL(totalCents)}
+      </div>
+    `;
+
+    box.querySelectorAll('[data-remove-sid]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sid = btn.getAttribute('data-remove-sid');
+        selectedServiceIds = selectedServiceIds.filter(x => String(x) !== String(sid));
+        refreshSelectedServicesUI();
+      });
+    });
+  }
+
+  function setSingleServiceFromSelectIfEmpty() {
+    const sid = String(serviceSelect.value || '');
+    if (!selectedServiceIds.length && sid) {
+      selectedServiceIds = [sid];
+      refreshSelectedServicesUI();
+    }
+  }
   }
 
   async function loadServicesForSelect() {
@@ -1104,7 +1223,11 @@
 
     const resp = await apiGet('/api/services', {});
     servicesCache = resp.services || [];
-    renderServiceSelect(servicesCache);
+    initMultiServicesUI();
+    const pet = getSelectedPetObj();
+    const filtered = filterServicesForPet(pet);
+    renderServiceSelect(filtered);
+    setSingleServiceFromSelectIfEmpty();
   }
 
   function showStep(stepNumber) {
@@ -1231,6 +1354,30 @@
       });
     }
   }
+
+  function onPetSelectChange() {
+    try {
+      selectedServiceIds = [];
+      refreshSelectedServicesUI();
+      const pet = getSelectedPetObj();
+      const filtered = filterServicesForPet(pet);
+      renderServiceSelect(filtered);
+      setSingleServiceFromSelectIfEmpty();
+
+      const porteKey = getPetPorteKey(pet);
+      if (serviceHelp) {
+        if (porteKey) serviceHelp.textContent = 'Serviços filtrados pelo porte do pet selecionado.';
+        else serviceHelp.textContent = 'Selecione um pet para ver os serviços compatíveis.';
+      }
+    } catch (e) {
+      console.error('Falha ao filtrar serviços por pet:', e);
+    }
+  }
+
+  if (petSelect) {
+    petSelect.addEventListener('change', onPetSelectChange);
+  }
+
 
   function setPrize(prize) {
     selectedPrize = prize;
@@ -1472,6 +1619,44 @@
     return `${hh}:${mm}`;
   }
 
+  function findNextAvailableTime(dateStr, fromTimeHHMM) {
+    const range = buildRangeForDate(dateStr);
+    if (!range || range.closed) return null;
+
+    const fromMin = timeToMinutes(fromTimeHHMM);
+    const startMin = Number.isFinite(fromMin) ? (fromMin + 30) : range.startMin;
+
+    for (let m = startMin; m < range.endMin; m += 30) {
+      const hh = Math.floor(m / 60);
+      const mm = m % 60;
+      const t = `${pad2(hh)}:${pad2(mm)}`;
+      const used = occupiedCounts.get(t) || 0;
+      if (used < (range.cap || 1)) return t;
+    }
+    return null;
+  }
+
+  function showSlotFullMessage(dateStr, timeHHMM) {
+    if (!availabilityMsg) return;
+    const next = findNextAvailableTime(dateStr, timeHHMM);
+    if (next) availabilityMsg.textContent = `Horário lotado. Próximo disponível: ${next}.`;
+    else availabilityMsg.textContent = 'Horário lotado e não há mais horários disponíveis nesse dia. Escolha outra data.';
+  }
+
+  if (minuteSelect) {
+    minuteSelect.addEventListener('change', () => {
+      const dateStr = dateInput.value;
+      const t = getSelectedTimeHHMM();
+      if (!dateStr || !t) return;
+      const range = buildRangeForDate(dateStr);
+      if (!range || range.closed) return;
+      const used = occupiedCounts.get(t) || 0;
+      if (used >= (range.cap || 1)) showSlotFullMessage(dateStr, t);
+      else setAvailabilityMessage(dateStr);
+    });
+  }
+
+
   // ======= EVENTOS =======
   btnIniciar.addEventListener('click', async () => {
     onboardingSection.style.display = 'none';
@@ -1482,7 +1667,14 @@
     try {
       await loadOpeningHours();
       await loadServicesForSelect();
-      await loadMimosForRoleta();
+
+  if (serviceSelect) {
+    serviceSelect.addEventListener('change', () => {
+      setSingleServiceFromSelectIfEmpty();
+    });
+  }
+
+  await loadMimosForRoleta();
     } catch (e) {
       console.error('Erro ao carregar serviços:', e);
       serviceSelect.disabled = true;
@@ -1674,12 +1866,30 @@
 
     const petId = petSelect.value;
 
-    const serviceId = serviceSelect.value;
+    // serviços (multi)
     const selectedOpt = serviceSelect.options[serviceSelect.selectedIndex];
-    const serviceTitle = selectedOpt?.dataset?.title || selectedOpt?.textContent || '';
+    const pickedServiceId = String(serviceSelect.value || '');
+    if (!selectedServiceIds.length && pickedServiceId) selectedServiceIds = [pickedServiceId];
 
-    const serviceValueCents = Number(selectedOpt?.dataset?.valueCents);
-    const serviceValueBRL = Number.isFinite(serviceValueCents) ? formatCentsBRL(serviceValueCents) : '—';
+    const pickedServices = selectedServiceIds
+      .map(id => (servicesCache || []).find(s => String(s.id) === String(id)))
+      .filter(Boolean);
+
+    const primaryServiceId = pickedServices.length ? Number(pickedServices[0].id) : (pickedServiceId ? Number(pickedServiceId) : null);
+
+    const servicesJson = pickedServices.map(s => ({
+      id: Number(s.id),
+      title: String(s.title || ''),
+      value_cents: (s.value_cents != null ? Number(s.value_cents) : null),
+      duration_min: (s.duration_min != null ? Number(s.duration_min) : null)
+    }));
+
+    const servicesText = pickedServices.length
+      ? pickedServices.map(s => String(s.title || '')).join(' + ')
+      : (selectedOpt?.dataset?.title || selectedOpt?.textContent || '');
+
+    const totalCents = pickedServices.reduce((acc, s) => acc + (Number.isFinite(Number(s.value_cents)) ? Number(s.value_cents) : 0), 0);
+    const serviceValueBRL = pickedServices.length ? formatCentsBRL(totalCents) : '—';
 
     const date = dateInput.value;
     const time = getSelectedTimeHHMM();
@@ -1690,7 +1900,7 @@
       step4Error.classList.remove('hidden');
       return;
     }
-    if (!serviceId) {
+    if (!selectedServiceIds.length) {
       step4Error.textContent = 'Selecione o serviço do agendamento.';
       step4Error.classList.remove('hidden');
       return;
@@ -1724,13 +1934,29 @@
       return;
     }
 
+    // valida capacidade do slot (antes de bater no backend)
+    const range = buildRangeForDate(date);
+    if (range && !range.closed) {
+      const used = occupiedCounts.get(time) || 0;
+      if (used >= (range.cap || 1)) {
+        showSlotFullMessage(date, time);
+        step4Error.textContent = 'Esse horário já está lotado. Escolha outro horário.';
+        step4Error.classList.remove('hidden');
+        return;
+      }
+    }
+
+
+
     try {
       await apiPost('/api/bookings', {
         customer_id: currentCustomer.id,
         pet_id: parseInt(petId, 10),
         date,
         time,
-        service: serviceTitle, // mantém compatível com seu backend atual
+        service: servicesText,
+        service_id: primaryServiceId,
+        services: servicesJson,
         prize: selectedPrize.key,
         notes,
         status: 'agendado'
@@ -1755,8 +1981,8 @@ Oi, Pet Funny, meu nome é ${currentCustomer.name || ''}, realizei um novo agend
 • Tutor(a): ${currentCustomer.name || ''}
 • WhatsApp do tutor: ${phoneInput.value.trim() || ''}
 • Pet: ${petName}
-• Serviço: ${serviceTitle}
-• Valor do serviço: ${serviceValueBRL}
+• Serviço(s): ${servicesText}
+• Valor total: ${serviceValueBRL}
 • Mimo da Roleta: ${selectedPrize.key}
 • Data: ${dataBr}
 • Horário: ${time}
