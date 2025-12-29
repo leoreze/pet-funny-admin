@@ -1922,14 +1922,32 @@ const tdMimo = document.createElement('td');
       kebabMenu.className = 'kebab-menu hidden';
 
       // Fecha o menu ao clicar fora
-      const closeMenu = () => kebabMenu.classList.add('hidden');
+      const closeMenu = () => {
+        kebabMenu.classList.add('hidden');
+        kebabMenu.classList.remove('open');
+        kebabMenu.style.display = 'none';
+      };
       kebabBtn.addEventListener('click', (ev) => {
         ev.stopPropagation();
         // fecha outros menus abertos
-        document.querySelectorAll('.kebab-menu').forEach(m => { if (m !== kebabMenu) m.classList.add('hidden'); });
+        document.querySelectorAll('.kebab-menu').forEach(m => {
+          if (m !== kebabMenu) {
+            m.classList.add('hidden');
+            m.classList.remove('open');
+          }
+        });
 
         const willOpen = kebabMenu.classList.contains('hidden');
-        kebabMenu.classList.toggle('hidden');
+
+        if (willOpen) {
+          kebabMenu.classList.remove('hidden');
+          kebabMenu.classList.add('open');
+          kebabMenu.style.display = 'block';
+        } else {
+          kebabMenu.classList.add('hidden');
+          kebabMenu.classList.remove('open');
+          kebabMenu.style.display = 'none';
+        }
 
         if (willOpen) {
           // Renderiza o menu em "portal" (no <body>) para não ser cortado pelo overflow da tabela
