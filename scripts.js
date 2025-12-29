@@ -11,19 +11,6 @@ const API_BASE_URL = '';
       .trim();
   }
 
-
-  // Escapa texto para uso seguro em innerHTML (evita XSS e corrige ReferenceError em refreshSelectedServicesUI)
-  function escapeHtml(input) {
-    const s = String(input ?? '');
-    return s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-
   /* =========================================================
    MIMOS (Admin) - CRUD + Emojis + Valor (cents) + Período
    Requisitos:
@@ -77,7 +64,7 @@ const API_BASE_URL = '';
   // seja populado mesmo sem o usuário abrir a aba "Mimos".
   async function ensureMimosLoaded(force = false) {
     if (!force && Array.isArray(cacheMimos) && cacheMimos.length > 0) {
-      syncPrizeSelect(cacheMimos);
+      syncPrizeSelect();
       return;
     }
     await reloadMimos();
@@ -269,15 +256,6 @@ const API_BASE_URL = '';
       opt.setAttribute('data-mimo-id', String(m.id));
       prizeSelect.appendChild(opt);
     });
-
-    // Se o mimo gravado não estiver ativo no período, manter a seleção visível.
-    if (current && !Array.from(prizeSelect.options).some(o => o.value === current)) {
-      const optX = document.createElement('option');
-      optX.value = current;
-      optX.textContent = `${current} (indisponível)`;
-      optX.setAttribute('data-inactive', '1');
-      prizeSelect.appendChild(optX);
-    }
 
     if (current) prizeSelect.value = current;
   }
@@ -511,6 +489,14 @@ const API_BASE_URL = '';
 
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
+
+      // Fecha menus de ações (3 pontinhos) ao clicar fora
+      if (!window.__pfKebabCloseBound) {
+        window.__pfKebabCloseBound = true;
+        document.addEventListener('click', () => {
+          document.querySelectorAll('.kebab-menu').forEach(el => el.classList.add('hidden'));
+        });
+      }
     } catch (e) { console.error(e); }
   }
 
@@ -983,9 +969,7 @@ function normalizeHHMM(t) {
 
   const bookingId = document.getElementById('bookingId');
   const bookingOriginalStatus = document.getElementById('bookingOriginalStatus');
-  
-  const bookingIdInput = document.getElementById('bookingId');
-const formPhone = document.getElementById('formPhone');
+  const formPhone = document.getElementById('formPhone');
   const formNome = document.getElementById('formNome');
 
   // PATCH: CEP mask + auto-lookup customer by WhatsApp phone on "Novo cliente" - 2025-12-24
@@ -1087,8 +1071,6 @@ attachCepMaskIfPresent();
   const formPetSelect = document.getElementById('formPetSelect');
   const formPrize = document.getElementById('formPrize');
   const formService = document.getElementById('formService');
-  const formServiceValue = document.getElementById('formServiceValue');
-  const formServiceDuration = document.getElementById('formServiceDuration');
   const btnAddService = document.getElementById('btnAddService');
   const selectedServicesWrap = document.getElementById('selectedServicesWrap');
   const selectedServicesList = document.getElementById('selectedServicesList');
@@ -1131,23 +1113,7 @@ attachCepMaskIfPresent();
       if (clamped) formTime.value = clamped;
     });
   }
-  
-  // Atualiza porte atual ao trocar o pet e refaz o select de serviços filtrando por porte
-  if (formPetSelect) {
-    formPetSelect.addEventListener('change', () => {
-      const pid = String(formPetSelect.value || '');
-      const pet = bookingPetsCache.find(x => String(x.id) === pid);
-      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
-      refreshServiceOptionsInAgenda();
-    });
-  }
-const formStatus = document.getElementById('formStatus');
-  const formPaymentStatus = document.getElementById('formPaymentStatus');
-  const formPaymentMethod = document.getElementById('formPaymentMethod');
-
-  // cache de pets carregados para o agendamento atual (para descobrir o porte)
-  let bookingPetsCache = [];
-  let currentPetSize = '';
+  const formStatus = document.getElementById('formStatus');
   const formNotes = document.getElementById('formNotes');
   const formError = document.getElementById('formError');
   const btnSalvar = document.getElementById('btnSalvar');
@@ -1282,37 +1248,31 @@ const formStatus = document.getElementById('formStatus');
     statFotoVideo.textContent = contFoto;
     statPatinhas.textContent = contPatinhas;
 
-    // ===== Mimos (dinâmico, respeita período do mimo X data do agendamento) =====
+    // ===== Mimos (ativos no período) =====
+    // O card do dashboard deve listar os mimos cadastrados no CRUD de Mimos
+    // (e não apenas os mimos usados em agendamentos).
     const mimosEl = document.getElementById('statMimosList');
     if (mimosEl) {
-      const counts = {};
+      const refDate = (filtroData && filtroData.value)
+        ? String(filtroData.value).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
 
-      const isActiveOnDate = (mimo, dateStr) => {
-        if (!mimo || !dateStr) return false;
-        const d = dateStr;
-        const start = (mimo.start_date || '').slice(0,10);
-        const end = (mimo.end_date || '').slice(0,10);
-        if (start && d < start) return false;
-        if (end && d > end) return false;
+      const isMimoActiveOnDate = (m) => {
+        if (!m) return false;
+        if (m.is_active === false) return false;
+        const start = (m.starts_at || '').slice(0, 10);
+        const end = (m.ends_at || '').slice(0, 10);
+        if (start && refDate < start) return false;
+        if (end && refDate > end) return false;
         return true;
       };
 
-      lista.forEach((a) => {
-        const prize = (a.prize || '').trim();
-        if (!prize || prize.toLowerCase() === 'sem mimo') return;
+      const active = (window.cacheMimos || [])
+        .filter(isMimoActiveOnDate)
+        .map(m => String(m.title || '').trim())
+        .filter(Boolean);
 
-        const mimo = (window.cacheMimos || []).find(m => String(m.name || '').trim() === prize);
-        if (!mimo) return;
-
-        if (!isActiveOnDate(mimo, a.date)) return;
-        counts[prize] = (counts[prize] || 0) + 1;
-      });
-
-      const lines = Object.entries(counts)
-        .sort((a,b) => (b[1]-a[1]) || a[0].localeCompare(b[0]))
-        .map(([name, count]) => `${name}: ${count}`);
-
-      mimosEl.textContent = lines.length ? lines.join('\n') : '—';
+      mimosEl.textContent = active.length ? active.join('\n') : '—';
     }
   }
 
@@ -1392,8 +1352,6 @@ const formStatus = document.getElementById('formStatus');
   async function loadPetsForCustomer(customerId) {
     const data = await apiGet('/api/pets', { customer_id: customerId });
     const pets = (data.pets || []);
-    bookingPetsCache = pets;
-
     formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
     pets.forEach(p => {
       const opt = document.createElement('option');
@@ -1401,56 +1359,21 @@ const formStatus = document.getElementById('formStatus');
       opt.textContent = p.breed ? `${p.name} (${p.breed})` : p.name;
       formPetSelect.appendChild(opt);
     });
-
-    // tenta manter porte atual (caso esteja editando e o pet já esteja selecionado)
-    const currentPetId = formPetSelect ? String(formPetSelect.value || '') : '';
-    if (currentPetId) {
-      const pet = bookingPetsCache.find(x => String(x.id) === currentPetId);
-      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
-    } else {
-      currentPetSize = '';
-    }
-
-    refreshServiceOptionsInAgenda(); // refaz o select respeitando porte
     return pets;
   }
 
   function preencherFormEdicao(booking) {
   // ID do agendamento em edição
   const id = booking && booking.id ? String(booking.id) : '';
-  bookingId.value = id;
+  bookingIdInput.value = id;
 
   // Cliente/Telefone
   formPhone.value = booking && booking.phone ? booking.phone : '';
   applyPhoneMask(formPhone); // garante máscara também ao carregar
 
-  if (formNome) formNome.value = booking && (booking.customer_name || booking.name) ? (booking.customer_name || booking.name) : (formNome.value || '');
-
-  // Carrega pets do cliente para permitir selecionar/validar porte
-  const custId = booking && (booking.customer_id || booking.customerId) ? (booking.customer_id || booking.customerId) : null;
-  if (custId) {
-    loadPetsForCustomer(custId).then(() => {
-      if (booking && booking.pet_id) formPetSelect.value = String(booking.pet_id);
-      const pid = String(formPetSelect.value || '');
-      const pet = bookingPetsCache.find(x => String(x.id) === pid);
-      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
-      refreshServiceOptionsInAgenda();
-    }).catch(()=>{});
-  } else {
-    bookingPetsCache = [];
-    currentPetSize = '';
-    refreshServiceOptionsInAgenda();
-  }
-
   // Data / Horário
   formDate.value = booking && booking.date ? booking.date : '';
   formTime.value = booking && booking.time ? booking.time : '';
-  // Status + pagamento
-  formStatus.value = booking && booking.status ? booking.status : 'agendado';
-  bookingOriginalStatus.value = booking && booking.status ? booking.status : 'agendado';
-  if (formPaymentStatus) formPaymentStatus.value = booking && booking.payment_status ? booking.payment_status : 'Não Pago';
-  if (formPaymentMethod) formPaymentMethod.value = booking && booking.payment_method ? booking.payment_method : '';
-
 
   // Serviço(s)
   clearSelectedServices();
@@ -1486,10 +1409,6 @@ const formStatus = document.getElementById('formStatus');
   const serviceId = document.getElementById('serviceId');
   const serviceDate = document.getElementById('serviceDate');
   const serviceTitle = document.getElementById('serviceTitle');
-  const serviceCategory = document.getElementById('serviceCategory');
-  const servicePorte = document.getElementById('servicePorte');
-  const serviceTempo = document.getElementById('serviceTempo');
-
   const servicePrice = document.getElementById('servicePrice');
   const serviceError = document.getElementById('serviceError');
   const btnServiceCancel = document.getElementById('btnServiceCancel');
@@ -1499,10 +1418,8 @@ const formStatus = document.getElementById('formStatus');
 
   // Filtro de busca (Serviços)
   const filtroServicos = document.getElementById('filtroServicos');
-  
-  const filtroCategoriaServicos = document.getElementById('filtroCategoriaServicos');const btnLimparServicos = document.getElementById('btnLimparServicos');
+  const btnLimparServicos = document.getElementById('btnLimparServicos');
   let filtroServicosTxt = '';
-  let filtroCategoriaServicosVal = '';
 
 
   let servicesCache = [];
@@ -1520,7 +1437,6 @@ function refreshSelectedServicesUI(){
 
   selectedServicesList.innerHTML = '';
   let total = 0;
-  let totalMin = 0;
 
   const unique = Array.from(new Set(selectedServiceIds.map(String)));
   selectedServiceIds = unique;
@@ -1529,14 +1445,11 @@ function refreshSelectedServicesUI(){
     const svc = getServiceById(sid);
     const name = svc ? svc.title : `Serviço #${sid}`;
     const value_cents = svc ? Number(svc.value_cents || 0) : 0;
-    const dur = svc ? Number(svc.duration_min || 0) : 0;
-
     total += value_cents;
-    totalMin += dur;
 
     const li = document.createElement('li');
     li.innerHTML = `
-      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)} • ${escapeHtml(String(dur))} min)</small></span>
+      <span>${escapeHtml(name)} <small style="opacity:.75;">(${centsToBRL(value_cents)})</small></span>
       <button type="button" class="btn btn-danger btn-xs" data-remove-sid="${escapeHtml(String(sid))}">Remover</button>
     `;
     selectedServicesList.appendChild(li);
@@ -1544,10 +1457,6 @@ function refreshSelectedServicesUI(){
 
   servicesTotalEl.textContent = centsToBRL(total);
   selectedServicesWrap.style.display = unique.length ? 'block' : 'none';
-
-  // preenche campos (somatório) - não editáveis
-  if (formServiceValue) formServiceValue.value = unique.length ? centsToBRL(total) : '';
-  if (formServiceDuration) formServiceDuration.value = unique.length ? String(totalMin) : '';
 }
 
 function clearSelectedServices(){
@@ -1563,10 +1472,6 @@ function clearSelectedServices(){
     serviceId.value = '';
     serviceDate.value = toISODateOnly(new Date());
     serviceTitle.value = '';
-    if (serviceCategory) serviceCategory.value = '';
-    if (servicePorte) servicePorte.value = '';
-    if (serviceTempo) serviceTempo.value = '';
-
     servicePrice.value = '';
     servicePrice.dataset.cents = '';
     serviceError.style.display = 'none';
@@ -1577,10 +1482,6 @@ function clearSelectedServices(){
     serviceId.value = svc.id;
     serviceDate.value = (svc.date || '').slice(0, 10);
     serviceTitle.value = svc.title || '';
-    if (serviceCategory) serviceCategory.value = svc.category || '';
-    if (servicePorte) servicePorte.value = svc.porte || '';
-    if (serviceTempo) serviceTempo.value = (svc.duration_min != null ? String(svc.duration_min) : '');
-
     servicePrice.dataset.cents = String(svc.value_cents ?? '');
     servicePrice.value = svc.value_cents != null ? formatCentsToBRL(svc.value_cents) : '';
     serviceError.style.display = 'none';
@@ -1591,18 +1492,9 @@ function clearSelectedServices(){
     tbodyServices.innerHTML = '';
 
     const list = (servicesCache || []).filter(s => {
-      // filtro por texto (título)
-      if (filtroServicosTxt) {
-        const hay = normStr((s.title || ''));
-        if (!hay.includes(filtroServicosTxt)) return false;
-      }
-
-      // filtro por categoria
-      if (filtroCategoriaServicosVal) {
-        if (String(s.category || '') !== String(filtroCategoriaServicosVal)) return false;
-      }
-
-      return true;
+      if (!filtroServicosTxt) return true;
+      const hay = normStr((s.title || ''));
+      return hay.includes(filtroServicosTxt);
     });
 
     servicesEmpty.style.display = list.length ? 'none' : 'block';
@@ -1612,10 +1504,7 @@ function clearSelectedServices(){
 
       const tdId = document.createElement('td'); tdId.textContent = svc.id;
       const tdDate = document.createElement('td'); tdDate.textContent = formatDataBr((svc.date || '').slice(0,10));
-      const tdCat = document.createElement('td'); tdCat.textContent = svc.category || '-';
       const tdTitle = document.createElement('td'); tdTitle.textContent = svc.title || '-';
-      const tdPorte = document.createElement('td'); tdPorte.textContent = svc.porte || '-';
-      const tdTempo = document.createElement('td'); tdTempo.textContent = (svc.duration_min != null ? String(svc.duration_min) + ' min' : '-');
       const tdPrice = document.createElement('td'); tdPrice.textContent = formatCentsToBRL(svc.value_cents || 0);
 
       const tdCreated = document.createElement('td'); tdCreated.textContent = svc.created_at ? formatDateTimeBr(svc.created_at) : '-';
@@ -1653,10 +1542,7 @@ function clearSelectedServices(){
 
       tr.appendChild(tdId);
       tr.appendChild(tdDate);
-      tr.appendChild(tdCat);
       tr.appendChild(tdTitle);
-      tr.appendChild(tdPorte);
-      tr.appendChild(tdTempo);
       tr.appendChild(tdPrice);
       tr.appendChild(tdCreated);
       tr.appendChild(tdUpdated);
@@ -1670,56 +1556,15 @@ function clearSelectedServices(){
     // mantém seleção atual se possível
     const current = formService.value || '';
     formService.innerHTML = '<option value="">Selecione...</option>';
-
-    const sizeFilter = (typeof currentPetSize === 'string') ? currentPetSize.trim() : '';
-    const sizeNorm = sizeFilter.toLowerCase();
-
-    const normalizeSize = (v) => String(v || '').trim().toLowerCase();
-
-    const list = servicesCache.filter(s => {
-      if (!sizeNorm) return true; // sem pet selecionado => mostra tudo
-      const sSize = normalizeSize(s.porte || s.size || s.pet_size);
-      if (!sSize) return true; // serviços sem porte cadastrado continuam aparecendo
-      return sSize === sizeNorm;
-    });
-
-    list.forEach(s => {
+    servicesCache.forEach(s => {
       const opt = document.createElement('option');
       opt.value = String(s.id);
-
-      const price = (s.value_cents != null) ? centsToBRL(s.value_cents) : '';
-      const dur = (s.duration_min != null ? s.duration_min
-        : (s.tempo_min != null ? s.tempo_min
-        : (s.duration != null ? s.duration
-        : (s.tempo != null ? s.tempo : null))));
-
-      const parts = [s.title];
-      if (price) parts.push(price);
-      if (dur != null && String(dur).trim() !== '') parts.push(`${dur} min`);
-      opt.textContent = parts.join(' • ');
+      opt.textContent = s.title;
       formService.appendChild(opt);
     });
-
     if (current) formService.value = current;
   }
 
-if (formService) {
-  formService.addEventListener('change', () => {
-    const sid = formService.value;
-
-    // Apenas atualiza os campos de apoio (valor/tempo) do serviço atualmente selecionado.
-    // A lista multi-serviços é controlada pelo botão "Adicionar".
-    const svc = sid ? getServiceById(sid) : null;
-    if (formServiceValue) formServiceValue.value = svc ? centsToBRL(Number(svc.value_cents || 0)) : '';
-    if (formServiceDuration) formServiceDuration.value = svc ? String(Number(svc.duration_min || 0)) : '';
-
-    // Se ainda não houver nenhum serviço selecionado, mantém compatibilidade: define o primeiro.
-    if ((!Array.isArray(selectedServiceIds) || !selectedServiceIds.length) && sid) {
-      selectedServiceIds = [String(sid)];
-      refreshSelectedServicesUI();
-    }
-  });
-}
 // Multi-serviços - adicionar/remover
 if (btnAddService) {
     // Multi-serviços desativado: botão oculto no HTML. Mantemos o handler por compatibilidade, mas forçamos 1 serviço.
@@ -1767,17 +1612,12 @@ if (selectedServicesList) {
     const date = serviceDate.value;
     const title = serviceTitle.value.trim();
 
-    
-
-    const category = serviceCategory ? String(serviceCategory.value || '').trim() : '';
-    const porte = servicePorte ? String(servicePorte.value || '').trim() : '';
-    const duration_min = serviceTempo ? Number(serviceTempo.value) : null;
-// garante dataset.cents sempre atualizado antes de validar
+    // garante dataset.cents sempre atualizado antes de validar
     applyCurrencyMask(servicePrice);
     const value_cents = getCentsFromCurrencyInput(servicePrice);
 
-    if (!date || !title || !category || !porte || !Number.isFinite(duration_min) || duration_min <= 0) {
-      serviceError.textContent = 'Preencha: data, categoria, título, porte e tempo (min).';
+    if (!date || !title) {
+      serviceError.textContent = 'Preencha data e título do serviço.';
       serviceError.style.display = 'block';
       return;
     }
@@ -1788,7 +1628,7 @@ if (selectedServicesList) {
     }
 
     try {
-      const body = { date, category, title, porte, duration_min, value_cents };
+      const body = { date, title, value_cents };
       if (!id) await apiPost('/api/services', body);
       else await apiPut('/api/services/' + id, body);
 
@@ -1824,19 +1664,10 @@ if (selectedServicesList) {
       renderServices();
     });
   }
-  if (filtroCategoriaServicos) {
-    filtroCategoriaServicos.addEventListener('change', () => {
-      filtroCategoriaServicosVal = String(filtroCategoriaServicos.value || '').trim();
-      renderServices();
-    });
-  }
-
   if (btnLimparServicos) {
     btnLimparServicos.addEventListener('click', () => {
       if (filtroServicos) filtroServicos.value = '';
       filtroServicosTxt = '';
-      if (filtroCategoriaServicos) filtroCategoriaServicos.value = '';
-      filtroCategoriaServicosVal = '';
       renderServices();
     });
   }
@@ -2068,88 +1899,18 @@ if (selectedServicesList) {
     if (btnViewCards) btnViewCards.classList.toggle('active', isCards);
   }
 
-  function getServicesInfoFromBooking(a) {
-    // Prefer lista vinda do backend (bookings.services_json -> alias services)
-    const list = Array.isArray(a && a.services) ? a.services : [];
-    let titles = [];
-    let values = [];
-    let times = [];
-    let totalCents = null;
-    let totalMin = null;
-
-    if (list.length) {
-      list.forEach((it) => {
-        const t = it && it.title ? String(it.title) : (it && it.id != null ? `Serviço #${it.id}` : '-');
-        const vc = (it && it.value_cents != null) ? Number(it.value_cents) : 0;
-        const dm = (it && it.duration_min != null) ? Number(it.duration_min) : 0;
-        titles.push(t);
-        values.push(centsToBRL(Number.isFinite(vc) ? vc : 0));
-        times.push(String(Number.isFinite(dm) ? dm : 0) + ' min');
-      });
-      totalCents = (a && a.services_total_cents != null) ? Number(a.services_total_cents) : null;
-      totalMin = (a && a.services_total_min != null) ? Number(a.services_total_min) : null;
-      if (!Number.isFinite(totalCents)) {
-        totalCents = list.reduce((acc, it) => acc + (Number.isFinite(Number(it.value_cents)) ? Number(it.value_cents) : 0), 0);
-      }
-      if (!Number.isFinite(totalMin)) {
-        totalMin = list.reduce((acc, it) => acc + (Number.isFinite(Number(it.duration_min)) ? Number(it.duration_min) : 0), 0);
-      }
-      return {
-        labels: titles.join(' + '),
-        values: values.join(' + '),
-        times: times.join(' + '),
-        totalCents: totalCents,
-        totalMin: totalMin
-      };
-    }
-
-    // Fallback: modo antigo (um serviço)
-    let serviceLabel = (a && (a.service || a.service_title)) ? (a.service || a.service_title) : '-';
-    const sid = a && (a.service_id ?? a.serviceId ?? null);
+  function getServiceLabelFromBooking(a) {
+    let serviceLabel = a.service || a.service_title || '-';
+    const sid = a.service_id ?? a.serviceId ?? null;
 
     if (sid != null) {
       const svc = servicesCache.find(s => String(s.id) === String(sid));
-      if (svc) {
-        serviceLabel = svc.title;
-        totalCents = Number(svc.value_cents || 0);
-        totalMin = Number(svc.duration_min || 0);
-        return {
-          labels: serviceLabel,
-          values: centsToBRL(totalCents),
-          times: String(totalMin) + ' min',
-          totalCents,
-          totalMin
-        };
-      }
+      if (svc) serviceLabel = svc.title;
     } else {
       const match = servicesCache.find(s => normStr(s.title) === normStr(serviceLabel));
-      if (match) {
-        totalCents = Number(match.value_cents || 0);
-        totalMin = Number(match.duration_min || 0);
-        return {
-          labels: match.title,
-          values: centsToBRL(totalCents),
-          times: String(totalMin) + ' min',
-          totalCents,
-          totalMin
-        };
-      }
+      if (match) serviceLabel = match.title;
     }
-
-    // Último fallback: tentar usar snapshot do booking
-    totalCents = (a && a.services_total_cents != null) ? Number(a.services_total_cents) : (a && a.service_value_cents != null ? Number(a.service_value_cents) : 0);
-    totalMin = (a && a.services_total_min != null) ? Number(a.services_total_min) : (a && a.service_duration_min != null ? Number(a.service_duration_min) : 0);
-    return {
-      labels: String(serviceLabel),
-      values: centsToBRL(Number.isFinite(totalCents) ? totalCents : 0),
-      times: String(Number.isFinite(totalMin) ? totalMin : 0) + ' min',
-      totalCents: Number.isFinite(totalCents) ? totalCents : 0,
-      totalMin: Number.isFinite(totalMin) ? totalMin : 0
-    };
-  }
-
-  function getServiceLabelFromBooking(a) {
-    return getServicesInfoFromBooking(a).labels;
+    return serviceLabel;
   }
 
   function renderAgendaByView(lista) {
@@ -2180,17 +1941,47 @@ if (selectedServicesList) {
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
       const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
 
-      const svcInfo = getServicesInfoFromBooking(a);
+      // Serviços (lista)
+      const tdServ = document.createElement('td');
+      tdServ.className = 'td-services';
 
-      const tdServ = document.createElement('td'); tdServ.textContent = svcInfo.labels;
+      const rawServices = (a.services != null ? a.services : (a.services_json != null ? a.services_json : []));
+      let servicesArr = [];
+      try {
+        if (Array.isArray(rawServices)) servicesArr = rawServices;
+        else if (typeof rawServices === 'string' && rawServices.trim()) servicesArr = JSON.parse(rawServices);
+      } catch (_) {
+        servicesArr = [];
+      }
 
-      const tdVals = document.createElement('td'); tdVals.textContent = svcInfo.values;
+      if (!Array.isArray(servicesArr)) servicesArr = [];
+      if (!servicesArr.length) {
+        const single = getServiceLabelFromBooking(a);
+        const div = document.createElement('div');
+        div.className = 'svc-line';
+        div.textContent = single;
+        tdServ.appendChild(div);
+      } else {
+        servicesArr.forEach((s) => {
+          const title = (s && (s.title || s.name)) ? String(s.title || s.name).trim() : '';
+          const cents = (s && Number.isFinite(Number(s.value_cents))) ? Number(s.value_cents) : 0;
+          const mins = (s && Number.isFinite(Number(s.duration_min))) ? Number(s.duration_min) : 0;
 
-      const tdTotalServ = document.createElement('td'); tdTotalServ.textContent = centsToBRL(Number(svcInfo.totalCents || 0));
+          const div = document.createElement('div');
+          div.className = 'svc-line';
+          div.textContent = `${title || 'Serviço'} — R$ ${formatCentsToBRL(cents)} • ${mins} min`;
+          tdServ.appendChild(div);
+        });
+      }
 
-      const tdTempos = document.createElement('td'); tdTempos.textContent = svcInfo.times;
-
-      const tdTotalTempo = document.createElement('td'); tdTotalTempo.textContent = String(Number(svcInfo.totalMin || 0)) + ' min';
+      // Total serviços (valor + tempo)
+      const tdTotalServ = document.createElement('td');
+      tdTotalServ.className = 'td-services-total';
+      const totalCents = Number.isFinite(Number(a.services_total_cents)) ? Number(a.services_total_cents)
+        : (Number.isFinite(Number(a.service_value_cents)) ? Number(a.service_value_cents) : 0);
+      const totalMin = Number.isFinite(Number(a.services_total_min)) ? Number(a.services_total_min)
+        : (Number.isFinite(Number(a.service_duration_min)) ? Number(a.service_duration_min) : 0);
+      tdTotalServ.textContent = `R$ ${formatCentsToBRL(totalCents)} • ${totalMin} min`;
 
       const tdMimo = document.createElement('td');
       tdMimo.textContent = a.prize || '-';
@@ -2210,28 +2001,37 @@ if (selectedServicesList) {
       tdObs.textContent = a.notes || '';
       tdObs.className = 'td-obs';
 
+      // Ações (menu 3 pontinhos)
       const tdAcoes = document.createElement('td');
-      const divActions = document.createElement('div');
-      divActions.className = 'actions';
+      tdAcoes.className = 'td-actions';
 
-      const btnEditar = document.createElement('button');
-      btnEditar.textContent = 'Editar';
-      btnEditar.className = 'btn btn-small btn-secondary';
-      btnEditar.type = 'button';
-      btnEditar.addEventListener('click', async () => {
-        // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
-        try { await loadOpeningHours(); } catch (e) {}
-        try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
-        mostrarFormAgenda();
-        setEditMode(true);
+      const wrap = document.createElement('div');
+      wrap.className = 'actions-menu';
+
+      const btnKebab = document.createElement('button');
+      btnKebab.type = 'button';
+      btnKebab.className = 'kebab-btn';
+      btnKebab.setAttribute('aria-label', 'Ações');
+      btnKebab.textContent = '⋯';
+
+      const menu = document.createElement('div');
+      menu.className = 'kebab-menu hidden';
+
+      const miEditar = document.createElement('button');
+      miEditar.type = 'button';
+      miEditar.className = 'kebab-item';
+      miEditar.textContent = 'Editar';
+      miEditar.addEventListener('click', () => {
+        menu.classList.add('hidden');
         preencherFormEdicao(a);
       });
 
-      const btnExcluir = document.createElement('button');
-      btnExcluir.textContent = 'Excluir';
-      btnExcluir.className = 'btn btn-small btn-danger';
-      btnExcluir.type = 'button';
-      btnExcluir.addEventListener('click', async () => {
+      const miExcluir = document.createElement('button');
+      miExcluir.type = 'button';
+      miExcluir.className = 'kebab-item danger';
+      miExcluir.textContent = 'Excluir';
+      miExcluir.addEventListener('click', async () => {
+        menu.classList.add('hidden');
         if (!confirm('Deseja realmente excluir este agendamento?')) return;
         try {
           await apiDelete('/api/bookings/' + a.id);
@@ -2240,9 +2040,21 @@ if (selectedServicesList) {
         } catch (e) { alert(e.message); }
       });
 
-      divActions.appendChild(btnEditar);
-      divActions.appendChild(btnExcluir);
-      tdAcoes.appendChild(divActions);
+      menu.appendChild(miEditar);
+      menu.appendChild(miExcluir);
+
+      btnKebab.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        // fecha outros menus
+        document.querySelectorAll('.kebab-menu').forEach(el => {
+          if (el !== menu) el.classList.add('hidden');
+        });
+        menu.classList.toggle('hidden');
+      });
+
+      wrap.appendChild(btnKebab);
+      wrap.appendChild(menu);
+      tdAcoes.appendChild(wrap);
 
       tr.appendChild(tdData);
       tr.appendChild(tdHora);
@@ -2250,10 +2062,7 @@ if (selectedServicesList) {
       tr.appendChild(tdPet);
       tr.appendChild(tdTel);
       tr.appendChild(tdServ);
-      tr.appendChild(tdVals);
       tr.appendChild(tdTotalServ);
-      tr.appendChild(tdTempos);
-      tr.appendChild(tdTotalTempo);
       tr.appendChild(tdMimo);
       tr.appendChild(tdStatus);
       tr.appendChild(tdNotif);
@@ -2303,9 +2112,7 @@ if (selectedServicesList) {
       const main = document.createElement('div');
       main.className = 'agenda-card-main';
 
-      const svcInfo = getServicesInfoFromBooking(a);
-
-      const serviceLabel = svcInfo.labels;
+      const serviceLabel = getServiceLabelFromBooking(a);
 
       const l1 = document.createElement('div');
       l1.className = 'agenda-line';
@@ -2321,15 +2128,7 @@ if (selectedServicesList) {
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
-      l4.innerHTML = `<span class="agenda-key">Serviço(s):</span> <span class="agenda-val">${serviceLabel}</span>`;
-
-      const l4b = document.createElement('div');
-      l4b.className = 'agenda-line';
-      l4b.innerHTML = `<span class="agenda-key">Valores:</span> <span class="agenda-val">${escapeHtml(svcInfo.values)}</span> <span class="agenda-muted">(Total: ${centsToBRL(Number(svcInfo.totalCents || 0))})</span>`;
-
-      const l4c = document.createElement('div');
-      l4c.className = 'agenda-line';
-      l4c.innerHTML = `<span class="agenda-key">Tempo(s):</span> <span class="agenda-val">${escapeHtml(svcInfo.times)}</span> <span class="agenda-muted">(Total: ${escapeHtml(String(Number(svcInfo.totalMin || 0)))} min)</span>`;
+      l4.innerHTML = `<span class="agenda-key">Serviço:</span> <span class="agenda-val">${serviceLabel}</span>`;
 
       const l5 = document.createElement('div');
       l5.className = 'agenda-line';
@@ -2343,8 +2142,6 @@ if (selectedServicesList) {
       main.appendChild(l2);
       main.appendChild(l3);
       main.appendChild(l4);
-      main.appendChild(l4b);
-      main.appendChild(l4c);
       main.appendChild(l5);
       main.appendChild(l6);
 
@@ -2362,14 +2159,7 @@ if (selectedServicesList) {
       btnEditar.textContent = 'Editar';
       btnEditar.className = 'btn btn-small btn-secondary';
       btnEditar.type = 'button';
-      btnEditar.addEventListener('click', async () => {
-        // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
-        try { await loadOpeningHours(); } catch (e) {}
-        try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
-        mostrarFormAgenda();
-        setEditMode(true);
-        preencherFormEdicao(a);
-      });
+      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
 
       const btnExcluir = document.createElement('button');
       btnExcluir.textContent = 'Excluir';
@@ -2444,14 +2234,10 @@ if (selectedServicesList) {
   // Multi-serviços
   formService.value = '';
   clearSelectedServices();
-  if (formServiceValue) formServiceValue.value = '';
-  if (formServiceDuration) formServiceDuration.value = '';
 
   formDate.value = '';
   formTime.value = '';
   formStatus.value = 'agendado';
-  if (formPaymentStatus) formPaymentStatus.value = 'Não Pago';
-  if (formPaymentMethod) formPaymentMethod.value = '';
   formNotes.value = '';
   formError.style.display = 'none';
   formError.textContent = '';
@@ -2479,26 +2265,8 @@ async function salvarAgendamento() {
     const serviceObj = serviceIdSelected ? servicesCache.find(s => String(s.id) === String(serviceIdSelected)) : null;
     const servicesLabel = serviceObj ? serviceObj.title : '';
 
-    // Normaliza seleção (mantém compatibilidade com modo multi-serviços)
-    let selectedServices = [];
-    if (Array.isArray(selectedServiceIds) && selectedServiceIds.length) {
-      selectedServices = selectedServiceIds
-        .map((sid) => getServiceById(sid))
-        .filter(Boolean);
-    } else if (serviceObj) {
-      selectedServices = [serviceObj];
-      selectedServiceIds = [String(serviceObj.id)];
-      refreshSelectedServicesUI();
-    }
-
-    const firstServiceId = selectedServices.length ? Number(selectedServices[0].id) : (serviceIdSelected || null);
-    const servicesLabelAgg = selectedServices.length ? selectedServices.map(s => s.title).join(' + ') : servicesLabel;
-    const totalServicesCents = selectedServices.reduce((acc, s) => acc + Number(s.value_cents || 0), 0);
-    const totalServicesMin = selectedServices.reduce((acc, s) => acc + Number(s.duration_min || 0), 0);
-
     const date = formDate.value;
-    const time = normalizeHHMM(formTime.value);
-    if (time) formTime.value = time;
+    const time = formTime.value;
 
     // Validação de data/horário (mesmas regras do cliente)
     const dtMsg = validarDiaHora(date, time);
@@ -2553,21 +2321,10 @@ async function salvarAgendamento() {
         customer_id: customer.id,
         pet_id: petIdNum,
         date, time,
-
-        // Pagamento
-        payment_status: formPaymentStatus ? String(formPaymentStatus.value || '').trim() : '',
-        payment_method: formPaymentMethod ? String(formPaymentMethod.value || '').trim() : '',
-
-        // Serviços (compatível com modo multi-serviços)
-        services: selectedServices.map(s => ({ id: s.id, title: s.title, value_cents: s.value_cents, duration_min: s.duration_min })),
+        // envia multi-serviços (novo) + compatibilidade (service_id/service)
         service_ids: selectedServices.map(s => s.id),
         service_id: firstServiceId,
-        service: servicesLabelAgg,
-
-        // Snapshot do total (valor/tempo) no próprio agendamento
-        service_value_cents: totalServicesCents,
-        service_duration_min: totalServicesMin,
-
+        service: servicesLabel,
         prize, notes, status
       };
 
@@ -2617,9 +2374,7 @@ async function salvarAgendamento() {
     linhas.push(['ID','Data','Hora','Tutor','Pet','Telefone','Serviço','Mimo','Status','Última Notificação','Observações'].join(';'));
 
     ultimaLista.forEach(a => {
-      const svcInfo = getServicesInfoFromBooking(a);
-
-      const serviceLabel = svcInfo.labels;
+      const serviceLabel = getServiceLabelFromBooking(a);
 
       const cols = [
         a.id,
@@ -2698,9 +2453,6 @@ async function salvarAgendamento() {
     try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
 
     formDate.value = toISODateOnly(new Date());
-    if (formPaymentStatus) formPaymentStatus.value = 'Não Pago';
-    if (formPaymentMethod) formPaymentMethod.value = '';
-
     // dispara change porque set programtico no dispara evento
     try { formDate.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
     // Para novo agendamento, o pet é obrigatório e só pode ser escolhido após carregar os pets do cliente

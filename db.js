@@ -134,95 +134,7 @@ async function initDb() {
     );
   `);
 
-  
-  
-  
-  /* -------------------------
-     PATCH compat: migrations de services (bases antigas)
-     - suporta colunas antigas: name, price (NUMERIC), tempo_min, duration, etc.
-  ------------------------- */
-  await query(`
-    DO $$
-    BEGIN
-      -- title (antigo: name)
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='services' AND column_name='title'
-      ) THEN
-        ALTER TABLE services ADD COLUMN title TEXT;
-      END IF;
-
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='services' AND column_name='name'
-      ) THEN
-        UPDATE services SET title = COALESCE(title, name) WHERE (title IS NULL OR title = '');
-      END IF;
-
-      -- value_cents (antigo: price NUMERIC)
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='services' AND column_name='value_cents'
-      ) THEN
-        ALTER TABLE services ADD COLUMN value_cents INTEGER NOT NULL DEFAULT 0;
-      END IF;
-
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='services' AND column_name='price'
-      ) THEN
-        UPDATE services
-           SET value_cents = COALESCE(value_cents, ROUND(COALESCE(price,0) * 100)::INT)
-         WHERE value_cents IS NULL OR value_cents = 0;
-      END IF;
-
-      -- duration_min (antigos: tempo_min, duration)
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='services' AND column_name='duration_min'
-      ) THEN
-        ALTER TABLE services ADD COLUMN duration_min INTEGER NOT NULL DEFAULT 0;
-      END IF;
-
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='services' AND column_name='tempo_min'
-      ) THEN
-        UPDATE services
-           SET duration_min = COALESCE(duration_min, tempo_min)
-         WHERE duration_min IS NULL OR duration_min = 0;
-      END IF;
-
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name='services' AND column_name='duration'
-      ) THEN
-        UPDATE services
-           SET duration_min = COALESCE(duration_min, duration)
-         WHERE duration_min IS NULL OR duration_min = 0;
-      END IF;
-
-      -- Garantias finais de NOT NULL (quando possível)
-      UPDATE services SET title = COALESCE(title, '') WHERE title IS NULL;
-      UPDATE services SET value_cents = COALESCE(value_cents, 0) WHERE value_cents IS NULL;
-      UPDATE services SET duration_min = COALESCE(duration_min, 0) WHERE duration_min IS NULL;
-    END $$;
-  `);
-
-// ===== services: novos campos (categoria/porte/tempo) =====
-  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'Banho';`);
-  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS porte TEXT;`);
-  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS duration_min INTEGER NOT NULL DEFAULT 0;`);
-
-  // Normaliza dados existentes
-  await query(`UPDATE services SET category = 'Banho' WHERE category IS NULL OR category = '';`);
-  await query(`UPDATE services SET duration_min = 0 WHERE duration_min IS NULL;`);
-
-// services - novos campos (categoria, porte, tempo)
-  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS category TEXT;`);
-  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS porte TEXT;`);
-  await query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS duration_min INTEGER;`);
-// bookings (agendamentos) - compat com seu server.js (date/time como texto)
+  // bookings (agendamentos) - compat com seu server.js (date/time como texto)
   await query(`
     CREATE TABLE IF NOT EXISTS bookings (
       id SERIAL PRIMARY KEY,
@@ -239,21 +151,6 @@ async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
-
-  // Campos adicionais do agendamento (pagamento + valor/tempo do(s) serviço(s))
-  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'Não Pago';`);
-  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT '';`);
-  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service_value_cents INTEGER;`);
-  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service_duration_min INTEGER;`);
-  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS services_json JSONB NOT NULL DEFAULT '[]'::jsonb;`);
-
-
-
-  // ===== bookings: campos de pagamento =====
-  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'Não Pago';`);
-  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT '';`);
-  await query(`UPDATE bookings SET payment_status = 'Não Pago' WHERE payment_status IS NULL OR payment_status = '';`);
-  await query(`UPDATE bookings SET payment_method = '' WHERE payment_method IS NULL;`);
 
 /* =========================
      BOOKING_SERVICES (múltiplos serviços por agendamento)
@@ -452,4 +349,3 @@ module.exports = {
   normalizeCPF,
   safeJsonParse,
 };
-  

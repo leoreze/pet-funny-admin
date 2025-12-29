@@ -176,24 +176,13 @@
               <select id="formService">
                 <option value="">Carregando serviços...</option>
               </select>
-              <button type="button" class="btn btn-secondary" id="btnAddService">Adicionar</button>
+              <button type="button" class="btn btn-secondary" id="btnAddService" style="display:none">Adicionar</button>
             </div>
-            <div class="selected-services" id="selectedServicesWrap" style="display:none;">
+            <div class="selected-services" id="selectedServicesWrap" style="display:none;" style="display:none">
               <div class="selected-services-title">Serviços selecionados</div>
               <ul id="selectedServicesList"></ul>
               <div class="selected-services-total">Total serviços: <span id="servicesTotal">R$ 0,00</span></div>
-            
-            <div class="service-meta-row">
-              <div class="form-group">
-                <label for="formServiceValue">Valor dos serviços (R$)</label>
-                <input type="text" id="formServiceValue" class="-field" placeholder="R$ 0,00"  / readonly>
-              </div>
-              <div class="form-group">
-                <label for="formServiceDuration">Tempo total (min)</label>
-                <input type="number" id="formServiceDuration" class="-field" placeholder="0"  / readonly>
-              </div>
             </div>
-</div>
           </div>
           <div class="form-group">
             <label for="formDate">Data</label>
@@ -216,25 +205,6 @@
               <option value="concluído">Concluído</option>
               <option value="entregue">Entregue</option>
               <option value="cancelado">Cancelado</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="formPaymentStatus">Pagamento</label>
-            <select id="formPaymentStatus">
-              <option value="Não Pago">Não Pago</option>
-              <option value="Pago">Pago</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="formPaymentMethod">Forma de Pagamento</label>
-            <select id="formPaymentMethod">
-              <option value="">— Selecione —</option>
-              <option value="Dinheiro">Dinheiro</option>
-              <option value="Débito">Débito</option>
-              <option value="Crédito">Crédito</option>
-              <option value="Pix">Pix</option>
             </select>
           </div>
         </div>
@@ -275,10 +245,7 @@
             <th>Pet</th>
             <th>Telefone</th>
             <th>Serviço(s)</th>
-            <th>Valores</th>
             <th>Total serviços</th>
-            <th>Tempo(s)</th>
-            <th>Total tempo</th>
             <th>Mimo</th>
             <th>Status</th>
             <th>Última notificação</th>
@@ -449,15 +416,7 @@
           <div class="filters-group">
             <span style="font-size:13px;">Buscar:</span>
             <input type="text" id="filtroServicos" placeholder="Título do serviço" />
-            
-            <select id="filtroCategoriaServicos" class="select-small" aria-label="Filtrar por categoria">
-              <option value="">Todas categorias</option>
-              <option value="Banho">Banho</option>
-              <option value="Complemento">Complemento</option>
-              <option value="Tosa">Tosa</option>
-              <option value="Avulso">Avulso</option>
-            </select>
-<button class="btn btn-light" id="btnLimparServicos" type="button">Limpar</button>
+            <button class="btn btn-light" id="btnLimparServicos" type="button">Limpar</button>
           </div>
         </div>
         <button class="btn btn-light" id="btnNovoServico" type="button">+ Novo serviço</button>
@@ -465,42 +424,18 @@
 
       <div class="form-panel hidden" id="serviceFormPanel">
         <input type="hidden" id="serviceId" />
-        <input type="hidden" id="serviceDate" />
         <div class="form-row-2">
-<div class="form-group">
-            <label for="serviceCategory">Categoria</label>
-            <select id="serviceCategory">
-              <option value="">Selecione...</option>
-              <option value="Banho">Banho</option>
-              <option value="Complemento">Complemento</option>
-              <option value="Tosa">Tosa</option>
-              <option value="Avulso">Avulso</option>
-            </select>
+          <div class="form-group">
+            <label for="serviceDate">Data</label>
+            <input type="date" id="serviceDate" />
           </div>
-
           <div class="form-group">
             <label for="serviceTitle">Título do serviço</label>
-            <input type="text" id="serviceTitle" placeholder="Ex: Banho (Porte M)" />
+            <input type="text" id="serviceTitle" placeholder="Ex: Banho + Tosa (Porte M)" />
           </div>
-
           <div class="form-group">
-            <label for="servicePorte">Porte</label>
-            <select id="servicePorte">
-              <option value="">Selecione...</option>
-              <option value="Pequeno">Pequeno</option>
-              <option value="Médio">Médio</option>
-              <option value="Grande">Grande</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="servicePrice">Preço (R$)</label>
+            <label for="servicePrice">Valor (R$)</label>
             <input type="text" id="servicePrice" placeholder="R$ 0,00" inputmode="numeric" />
-          </div>
-
-          <div class="form-group">
-            <label for="serviceTempo">Tempo (min)</label>
-            <input type="number" name="duration_min" id="serviceTempo" class="input-tempo-min" min="0" step="5" placeholder="Ex: 60" inputmode="numeric" />
           </div>
         </div>
 
@@ -518,10 +453,7 @@
             <tr>
               <th>ID</th>
               <th>Data</th>
-              <th>Categoria</th>
               <th>Título</th>
-              <th>Porte</th>
-              <th>Tempo</th>
               <th>Valor</th>
               <th>Criado em</th>
               <th>Atualizado em</th>
