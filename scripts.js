@@ -429,15 +429,15 @@ const API_BASE_URL = '';
     appInitialized = true;
     try {
       await loadServices();      // garante servicesCache e dropdown de serviços
+      // Garante que o select de mimos no agendamento esteja preenchido,
+      // e que o dashboard possa calcular os totais por mimo.
+      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
+        await window.PF_MIMOS.ensureLoaded(true);
+      }
       await renderTabela();
       await loadClientes();
       await loadBreeds();
       await loadOpeningHours();
-      // Garante que o select de mimos no agendamento esteja preenchido,
-      // mesmo sem navegar na aba "Mimos".
-      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
-        await window.PF_MIMOS.ensureLoaded(true);
-      }
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
@@ -1110,7 +1110,7 @@ const formStatus = document.getElementById('formStatus');
         return !!m.is_active;
       };
       const countsByTitle = {};
-      (agendamentos || []).forEach((a) => {
+      (lista || []).forEach((a) => {
         const prize = String(a.prize || "").trim();
         if (!prize || prize.toLowerCase() === "sem mimo") return;
         const mimo = list.find(m => String(m.title || m.name || "").trim() === prize);
@@ -1118,8 +1118,9 @@ const formStatus = document.getElementById('formStatus');
         if (!isActiveOnBookingDate(mimo, a.date)) return;
         countsByTitle[prize] = (countsByTitle[prize] || 0) + 1;
       });
+      const refDate = (filtroData && filtroData.value) ? String(filtroData.value).slice(0,10) : (new Date()).toISOString().slice(0,10);
       const lines = list
-        .filter(m => isActiveOnBookingDate(m, (new Date()).toISOString().slice(0,10)))
+        .filter(m => isActiveOnBookingDate(m, refDate))
         .map(m => {
           const title = String(m.title || m.name || "").trim();
           const c = countsByTitle[title] || 0;
