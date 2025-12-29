@@ -974,7 +974,9 @@ function normalizeHHMM(t) {
 
   const bookingId = document.getElementById('bookingId');
   const bookingOriginalStatus = document.getElementById('bookingOriginalStatus');
-  const formPhone = document.getElementById('formPhone');
+  
+  const bookingIdInput = document.getElementById('bookingId');
+const formPhone = document.getElementById('formPhone');
   const formNome = document.getElementById('formNome');
 
   // PATCH: CEP mask + auto-lookup customer by WhatsApp phone on "Novo cliente" - 2025-12-24
@@ -2207,7 +2209,14 @@ if (selectedServicesList) {
       btnEditar.textContent = 'Editar';
       btnEditar.className = 'btn btn-small btn-secondary';
       btnEditar.type = 'button';
-      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
+      btnEditar.addEventListener('click', async () => {
+        // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
+        try { await loadOpeningHours(); } catch (e) {}
+        try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
+        mostrarFormAgenda();
+        setEditMode(true);
+        preencherFormEdicao(a);
+      });
 
       const btnExcluir = document.createElement('button');
       btnExcluir.textContent = 'Excluir';
@@ -2344,7 +2353,14 @@ if (selectedServicesList) {
       btnEditar.textContent = 'Editar';
       btnEditar.className = 'btn btn-small btn-secondary';
       btnEditar.type = 'button';
-      btnEditar.addEventListener('click', () => preencherFormEdicao(a));
+      btnEditar.addEventListener('click', async () => {
+        // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
+        try { await loadOpeningHours(); } catch (e) {}
+        try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
+        mostrarFormAgenda();
+        setEditMode(true);
+        preencherFormEdicao(a);
+      });
 
       const btnExcluir = document.createElement('button');
       btnExcluir.textContent = 'Excluir';

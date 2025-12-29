@@ -593,6 +593,28 @@ app.put('/api/bookings/:id', async (req, res) => {
       ? Number(req.body.service_duration_min)
       : null;
 
+// Múltiplos serviços (novo): array de objetos {id,title,value_cents,duration_min}
+let services_json = Array.isArray(req.body.services) ? req.body.services
+  : (Array.isArray(req.body.services_json) ? req.body.services_json : null);
+if (!services_json && service_id != null) {
+  // compat: serviço único vira lista
+  services_json = [{ id: service_id }];
+}
+if (!services_json) services_json = [];
+// normaliza e calcula totais
+services_json = services_json.map(s => ({
+  id: s && s.id != null ? Number(s.id) : null,
+  title: s && s.title != null ? String(s.title) : null,
+  value_cents: s && s.value_cents != null ? Number(s.value_cents) : null,
+  duration_min: s && s.duration_min != null ? Number(s.duration_min) : null
+})).filter(s => s.id != null || s.title);
+
+const total_cents_from_list = services_json.reduce((acc, s) => acc + (Number.isFinite(s.value_cents) ? s.value_cents : 0), 0);
+const total_min_from_list = services_json.reduce((acc, s) => acc + (Number.isFinite(s.duration_min) ? s.duration_min : 0), 0);
+const svcTotalsCents = (service_value_cents != null) ? service_value_cents : (services_json.length ? total_cents_from_list : null);
+const svcTotalsMin = (service_duration_min != null) ? service_duration_min : (services_json.length ? total_min_from_list : null);
+
+
     if (!id || !customer_id || !date || !time || !prize) {
       return res.status(400).json({ error: 'id, customer_id, date, time e prize são obrigatórios.' });
     }
