@@ -894,6 +894,96 @@
   let selectedServiceIds = [];
   let servicesUIReady = false;
 
+  // ===== Multi-serviços (cliente): helpers globais (evita ReferenceError por escopo) =====
+  function initMultiServicesUI() {
+    if (servicesUIReady) return;
+    if (!serviceSelect) return;
+    const wrap = serviceSelect.parentElement;
+    if (!wrap) return;
+
+    // Lista de serviços selecionados
+    let box = document.getElementById('selectedServicesList');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'selectedServicesList';
+      box.style.marginTop = '8px';
+      box.style.display = 'none';
+      wrap.appendChild(box);
+    }
+
+    // Botão "Adicionar serviço"
+    let btn = document.getElementById('btnAddServiceClient');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'btnAddServiceClient';
+      btn.className = 'btn btn-secondary btn-inline';
+      btn.textContent = '+ Adicionar serviço';
+      btn.style.marginTop = '8px';
+      wrap.appendChild(btn);
+
+      btn.addEventListener('click', () => {
+        const sid = String(serviceSelect.value || '');
+        if (!sid) return;
+        if (!selectedServiceIds.includes(sid)) selectedServiceIds.push(sid);
+        refreshSelectedServicesUI();
+      });
+    }
+
+    servicesUIReady = true;
+    refreshSelectedServicesUI();
+  }
+
+  function refreshSelectedServicesUI() {
+    const box = document.getElementById('selectedServicesList');
+    if (!box) return;
+
+    if (!Array.isArray(selectedServiceIds) || selectedServiceIds.length === 0) {
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+
+    const items = selectedServiceIds
+      .map(id => (servicesCache || []).find(s => String(s.id) === String(id)))
+      .filter(Boolean);
+
+    if (!items.length) {
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+
+    const totalCents = items.reduce((acc, s) => acc + (Number.isFinite(Number(s.value_cents)) ? Number(s.value_cents) : 0), 0);
+
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div style="font-size:12px; font-weight:700; margin-bottom:6px;">Serviços selecionados</div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        ${items.map(s => `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border:1px solid rgba(0,0,0,0.08); border-radius:12px; background:#fff;">
+            <div style="font-size:12px; font-weight:600;">
+              ${String(s.title || '')}
+              <span style="font-weight:500; color:#607d8b;">${(s.value_cents!=null && s.value_cents!=='') ? (' • ' + formatCentsBRL(s.value_cents)) : ''}</span>
+            </div>
+            <button type="button" class="btn btn-secondary btn-inline" style="padding:6px 10px; font-size:11px;" data-remove-sid="${String(s.id)}">Remover</button>
+          </div>
+        `).join('')}
+      </div>
+      <div style="margin-top:8px; font-size:12px; color:#455a64;">
+        <strong>Total:</strong> ${formatCentsBRL(totalCents)}
+      </div>
+    `;
+
+    box.querySelectorAll('[data-remove-sid]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sid = String(btn.getAttribute('data-remove-sid') || '');
+        selectedServiceIds = selectedServiceIds.filter(x => String(x) !== sid);
+        refreshSelectedServicesUI();
+      });
+    });
+  }
+
   const dateInput = document.getElementById('dateInput');
 
   const hourSelect = document.getElementById('hourSelect');
