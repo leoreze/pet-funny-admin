@@ -1578,7 +1578,9 @@
   }
 
   function timeToMinutes(hhmm) {
-    const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(hhmm || '').trim());
+    const s = String(hhmm || '').trim();
+    // aceita HH:MM e HH:MM:SS (PostgreSQL TIME costuma vir com segundos)
+    const m = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(s);
     if (!m) return NaN;
     return Number(m[1]) * 60 + Number(m[2]);
   }
