@@ -463,7 +463,7 @@ app.get('/api/bookings', async (req, res) => {
         COALESCE((b.services_json->0->>'duration_min')::int, b.service_duration_min, s.duration_min, 0) AS service_duration_min,
 
         -- múltiplos serviços (novo): armazenado em bookings.services_json
-        COALESCE(b.services_json, '[]'::json) AS services,
+        COALESCE(b.services_json, '[]'::jsonb) AS services,
         COALESCE(b.service_value_cents, 0) AS services_total_cents,
         COALESCE(b.service_duration_min, 0) AS services_total_min
       FROM bookings b

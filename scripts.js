@@ -1695,11 +1695,20 @@ function clearSelectedServices(){
 if (formService) {
   formService.addEventListener('change', () => {
     const sid = formService.value;
-    selectedServiceIds = sid ? [String(sid)] : [];
-    refreshSelectedServicesUI();
+
+    // Apenas atualiza os campos de apoio (valor/tempo) do serviço atualmente selecionado.
+    // A lista multi-serviços é controlada pelo botão "Adicionar".
+    const svc = sid ? getServiceById(sid) : null;
+    if (formServiceValue) formServiceValue.value = svc ? centsToBRL(Number(svc.value_cents || 0)) : '';
+    if (formServiceDuration) formServiceDuration.value = svc ? String(Number(svc.duration_min || 0)) : '';
+
+    // Se ainda não houver nenhum serviço selecionado, mantém compatibilidade: define o primeiro.
+    if ((!Array.isArray(selectedServiceIds) || !selectedServiceIds.length) && sid) {
+      selectedServiceIds = [String(sid)];
+      refreshSelectedServicesUI();
+    }
   });
 }
-
 // Multi-serviços - adicionar/remover
 if (btnAddService) {
     // Multi-serviços desativado: botão oculto no HTML. Mantemos o handler por compatibilidade, mas forçamos 1 serviço.
