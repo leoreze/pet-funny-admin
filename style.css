@@ -1160,3 +1160,14 @@ input[name="duration_min"],
 .kebab-item.danger:hover {
   background: #fdecea;
 }
+
+
+/* ===== LAYOUT: container único para todas as abas (evita sobreposição com menu) ===== */
+.main-content{
+  width: min(1600px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 14px 0 24px;
+  box-sizing: border-box;
+}
+
+.main-content .tab-view{ width: 100%; box-sizing: border-box; }
