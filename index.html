@@ -830,6 +830,56 @@
 <script>
   const API_BASE_URL = ''; // mesmo host/porta do backend
 
+  /* ===== Toast (cliente) — feedback rápido sem alterar layout ===== */
+  function pfToast(message, type = 'success', timeout = 2400) {
+    try {
+      const id = 'pfClientToast';
+      let el = document.getElementById(id);
+      if (!el) {
+        el = document.createElement('div');
+        el.id = id;
+        el.setAttribute('role', 'status');
+        el.setAttribute('aria-live', 'polite');
+        el.style.position = 'fixed';
+        el.style.left = '50%';
+        el.style.bottom = '22px';
+        el.style.transform = 'translateX(-50%)';
+        el.style.zIndex = '9999';
+        el.style.maxWidth = '92vw';
+        el.style.padding = '12px 14px';
+        el.style.borderRadius = '14px';
+        el.style.fontSize = '14px';
+        el.style.fontWeight = '600';
+        el.style.boxShadow = '0 10px 30px rgba(0,0,0,.18)';
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 160ms ease, transform 160ms ease';
+        document.body.appendChild(el);
+      }
+
+      // cores discretas (sem mexer no CSS do layout)
+      const bg = (type === 'error') ? '#c0392b' : (type === 'warn') ? '#e67e22' : '#1AB1BB';
+      el.style.background = bg;
+      el.style.color = '#ffffff';
+
+      el.textContent = String(message || '');
+      el.style.display = 'block';
+
+      // anima
+      requestAnimationFrame(() => {
+        el.style.opacity = '1';
+        el.style.transform = 'translateX(-50%) translateY(0)';
+      });
+
+      clearTimeout(el.__pfTimer);
+      el.__pfTimer = setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(-50%) translateY(6px)';
+        setTimeout(() => { el.style.display = 'none'; }, 180);
+      }, Math.max(900, Number(timeout) || 2400));
+    } catch (_) {}
+  }
+
+
   let currentPhoneDigits = null;
   let currentCustomer = null;
   let currentPets = [];
@@ -2120,11 +2170,19 @@ Aguardo o retorno de confirmação do agendamento.`).trim();
 
       successScreen.classList.remove('hidden');
 
+      // Toast visual + encaminhamento WhatsApp e retorno ao início
+      pfToast('Agendamento enviado com sucesso! Te chamamos no WhatsApp 🐾', 'success', 2200);
+
       setTimeout(() => {
         window.open(url, '_blank');
+      }, 650);
+
+      setTimeout(() => {
         successScreen.classList.add('hidden');
         try { localStorage.removeItem('petfunny_prize'); } catch {}
-      }, 5000);
+        // voltar para o início (onboarding)
+        window.location.href = '/';
+      }, 1300);
 
     } catch (e) {
       step4Error.textContent = e.message;
