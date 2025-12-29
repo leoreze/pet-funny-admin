@@ -1193,7 +1193,7 @@
   }
 
 
-  function renderServiceSelect(services) {
+    function renderServiceSelect(services) {
     serviceSelect.innerHTML = '';
 
     const opt0 = document.createElement('option');
@@ -1207,12 +1207,16 @@
 
       opt.dataset.title = String(s.title || '');
       opt.dataset.valueCents = String(s.value_cents ?? '');
+      opt.dataset.durationMin = String(s.duration_min ?? s.tempo_min ?? '');
 
       const priceLabel = (s.value_cents !== undefined && s.value_cents !== null && s.value_cents !== '')
         ? ` • ${formatCentsBRL(s.value_cents)}`
         : '';
 
-      opt.textContent = `${s.title}${priceLabel}`;
+      const dur = Number(s.duration_min ?? s.tempo_min);
+      const durLabel = (Number.isFinite(dur) && dur > 0) ? ` • ${dur} min` : '';
+
+      opt.textContent = `${s.title}${priceLabel}${durLabel}`;
       serviceSelect.appendChild(opt);
     });
 
@@ -1222,7 +1226,7 @@
     } else {
       serviceSelect.disabled = false;
     }
-
+  }
 
   function initMultiServicesUI() {
     if (servicesUIReady) return;
@@ -1269,23 +1273,33 @@
       .filter(Boolean);
 
     const totalCents = items.reduce((acc, s) => acc + (Number.isFinite(Number(s.value_cents)) ? Number(s.value_cents) : 0), 0);
+    const totalMin = items.reduce((acc, s) => {
+      const m = Number(s.duration_min ?? s.tempo_min ?? 0);
+      return acc + (Number.isFinite(m) ? m : 0);
+    }, 0);
 
     box.style.display = 'block';
     box.innerHTML = `
       <div style="font-size:12px; font-weight:700; margin-bottom:6px;">Serviços selecionados</div>
       <div style="display:flex; flex-direction:column; gap:6px;">
-        ${items.map(s => `
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border:1px solid rgba(0,0,0,0.08); border-radius:12px; background:#fff;">
-            <div style="font-size:12px; font-weight:600;">
-              ${String(s.title || '')}
-              <span style="font-weight:500; color:#607d8b;">${(s.value_cents!=null)?(' • '+formatCentsBRL(s.value_cents)) : ''}</span>
+        ${items.map(s => {
+          const dur = Number(s.duration_min ?? s.tempo_min ?? 0);
+          const durLabel = (Number.isFinite(dur) && dur > 0) ? ` • ${dur} min` : '';
+          const priceLabel = (s.value_cents!=null)?(' • '+formatCentsBRL(s.value_cents)) : '';
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border:1px solid rgba(0,0,0,0.08); border-radius:12px; background:#fff;">
+              <div style="font-size:12px; font-weight:600;">
+                ${String(s.title || '')}
+                <span style="font-weight:500; color:#607d8b;">${priceLabel}${durLabel}</span>
+              </div>
+              <button type="button" class="btn btn-secondary btn-inline" style="padding:6px 10px; font-size:11px;" data-remove-sid="${String(s.id)}">Remover</button>
             </div>
-            <button type="button" class="btn btn-secondary btn-inline" style="padding:6px 10px; font-size:11px;" data-remove-sid="${String(s.id)}">Remover</button>
-          </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
-      <div style="margin-top:8px; font-size:12px; color:#455a64;">
-        <strong>Total:</strong> ${formatCentsBRL(totalCents)}
+      <div style="margin-top:8px; font-size:12px; color:#455a64; display:flex; flex-direction:column; gap:2px;">
+        <div><strong>Total:</strong> ${formatCentsBRL(totalCents)}</div>
+        <div><strong>Tempo total:</strong> ${Number.isFinite(totalMin) ? totalMin : 0} min</div>
       </div>
     `;
 
@@ -1304,7 +1318,6 @@
       selectedServiceIds = [sid];
       refreshSelectedServicesUI();
     }
-  }
   }
 
   async function loadServicesForSelect() {
@@ -1497,13 +1510,34 @@
     }
   }
 
-  function getOpeningForDate(dateStr) {
+    function getOpeningForDate(dateStr) {
     if (!dateStr) return null;
-    const d = new Date(dateStr + 'T00:00:00');
+
+    // Mesma lógica do admin (evita diferença de fuso/parse do Date em browsers)
+    const d = new Date(dateStr + 'T00:00:00-03:00');
     if (Number.isNaN(d.getTime())) return null;
-    const dow = d.getDay();
+    const dow = d.getUTCDay();
+
     const row = openingHoursMap.get(dow);
-    return row ? { ...row, dow } : { dow, is_closed: (dow === 0), open_time: '07:30', close_time: (dow === 6 ? '13:00' : '17:30'), max_per_half_hour: 1 };
+
+    const isClosed = row ? (
+      row.is_closed === true ||
+      row.is_closed === 1 ||
+      row.is_closed === '1' ||
+      row.is_closed === 't' ||
+      row.is_closed === 'true'
+    ) : null;
+
+    if (row) return { ...row, dow, is_closed: !!isClosed };
+
+    // Fallback (se Opening Hours não estiver configurado)
+    return {
+      dow,
+      is_closed: (dow === 0),
+      open_time: '07:30',
+      close_time: (dow === 6 ? '13:00' : '17:30'),
+      max_per_half_hour: 1
+    };
   }
 
   function validarDiaHora(dateStr, timeStr) {
