@@ -3265,3 +3265,83 @@ attachCepMaskToCrudIfPresent();
     const cap = parseInt(oh.max_per_half_hour, 10);
     return Number.isFinite(cap) && cap > 0 ? cap : 1;
   }
+
+
+/* =========================
+   FINANCEIRO (READ ONLY)
+========================= */
+
+function financeFormatBRL(cents) {
+  return (Number(cents || 0) / 100).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+}
+
+async function loadFinanceSummary() {
+  const el = document.getElementById('financeContent');
+  if (!el) return;
+  el.innerHTML = 'Carregando resumo financeiro...';
+  try {
+    const data = await PF_API.get('/api/finance/summary');
+    el.innerHTML = `
+      <div class="stats">
+        <div class="stats-item"><span class="stats-label">Hoje:</span> <span class="stats-value">${financeFormatBRL(data.today.revenue_cents)}</span></div>
+        <div class="stats-item"><span class="stats-label">Mês:</span> <span class="stats-value">${financeFormatBRL(data.month.revenue_cents)}</span></div>
+        <div class="stats-item"><span class="stats-label">Ticket médio:</span> <span class="stats-value">${financeFormatBRL(data.ticket_avg_cents)}</span></div>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = 'Erro ao carregar resumo financeiro.';
+  }
+}
+
+async function loadFinanceCashflow() {
+  const el = document.getElementById('financeContent');
+  if (!el) return;
+  el.innerHTML = 'Carregando caixa...';
+  try {
+    const data = await PF_API.get('/api/finance/cashflow');
+    let html = `<div class="table-wrapper"><table><thead><tr>
+      <th>Data</th><th>Cliente</th><th>Pet</th><th>Valor</th><th>Pagamento</th><th>Status</th>
+    </tr></thead><tbody>`;
+    data.cashflow.forEach(r => {
+      html += `<tr>
+        <td>${r.date} ${r.time || ''}</td>
+        <td>${r.customer}</td>
+        <td>${r.pet || '-'}</td>
+        <td>${financeFormatBRL(r.total_cents)}</td>
+        <td>${r.payment_method || '-'}</td>
+        <td>${r.status}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = 'Erro ao carregar caixa.';
+  }
+}
+
+async function loadFinanceReports() {
+  const el = document.getElementById('financeContent');
+  if (!el) return;
+  el.innerHTML = 'Carregando relatórios...';
+  try {
+    const data = await PF_API.get('/api/finance/reports/services');
+    let html = `<div class="table-wrapper"><table><thead><tr>
+      <th>Serviço</th><th>Qtd</th><th>Faturamento</th>
+    </tr></thead><tbody>`;
+    data.services.forEach(r => {
+      html += `<tr>
+        <td>${r.service}</td>
+        <td>${r.qty}</td>
+        <td>${financeFormatBRL(r.revenue_cents)}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>
+      <a class="btn btn-secondary" target="_blank" href="/api/finance/export">Exportar CSV</a>`;
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = 'Erro ao carregar relatórios.';
+  }
+}
