@@ -1447,35 +1447,48 @@ function clearSelectedServices(){
       tbodyServices.appendChild(tr);
     });
   }
-  function refreshServiceOptionsInAgenda() {
-    // mantém seleção atual se possível
-    const current = formService.value || '';
-    formService.innerHTML = '<option value="">Selecione...</option>';
-    const sizeFilter = (typeof currentPetSize === 'string') ? currentPetSize.trim() : '';
-    const sizeNorm = sizeFilter.toLowerCase();
-    const normalizeSize = (v) => String(v || '').trim().toLowerCase();
-    const list = servicesCache.filter(s => {
-      if (!sizeNorm) return true; // sem pet selecionado => mostra tudo
-      const sSize = normalizeSize(s.porte || s.size || s.pet_size);
-      if (!sSize) return true; // serviços sem porte cadastrado continuam aparecendo
-      return sSize === sizeNorm;
-    });
-    list.forEach(s => {
+ function refreshServiceOptionsInAgenda() {
+  const current = formService.value || '';
+  formService.innerHTML = '<option value="">Selecione...</option>';
+
+  const sizeFilter = (typeof currentPetSize === 'string') ? currentPetSize.trim().toLowerCase() : '';
+
+  // 1️⃣ Filtra serviços por porte (regra atual)
+  const filtered = (servicesCache || []).filter(svc => {
+    if (!sizeFilter) return true;
+    if (!svc.porte) return true;
+    return String(svc.porte).toLowerCase() === sizeFilter;
+  });
+
+  // 2️⃣ Agrupa por categoria
+  const grouped = {};
+  filtered.forEach(svc => {
+    const cat = svc.category || 'Outros';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(svc);
+  });
+
+  // 3️⃣ Renderiza por categoria (optgroup)
+  Object.keys(grouped).sort().forEach(category => {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = category;
+
+    grouped[category].forEach(svc => {
       const opt = document.createElement('option');
-      opt.value = String(s.id);
-      const price = (s.value_cents != null) ? centsToBRL(s.value_cents) : '';
-      const dur = (s.duration_min != null ? s.duration_min
-        : (s.tempo_min != null ? s.tempo_min
-        : (s.duration != null ? s.duration
-        : (s.tempo != null ? s.tempo : null))));
-      const parts = [s.title];
-      if (price) parts.push(price);
-      if (dur != null && String(dur).trim() !== '') parts.push(`${dur} min`);
-      opt.textContent = parts.join(' • ');
-      formService.appendChild(opt);
+      opt.value = svc.id;
+      opt.textContent = `${svc.title} (${formatCentsToBRL(svc.value_cents)} • ${svc.duration_min || 0} min)`;
+      optgroup.appendChild(opt);
     });
-    if (current) formService.value = current;
+
+    formService.appendChild(optgroup);
+  });
+
+  // 4️⃣ Mantém seleção se existir
+  if (current) {
+    formService.value = current;
   }
+}
+
 if (formService) {
   formService.addEventListener('change', () => {
     const sid = formService.value;
