@@ -526,8 +526,9 @@ app.post('/api/bookings', async (req, res) => {
     const svcTotalsCents = (service_value_cents != null) ? service_value_cents : (services_json.length ? total_cents_from_list : null);
     const svcTotalsMin = (service_duration_min != null) ? service_duration_min : (services_json.length ? total_min_from_list : null);
 
-    if (!customer_id || !date || !time || !prize) {
-      return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
+    // `prize` (mimo) pode ser vazio.
+    if (!customer_id || !date || !time) {
+      return res.status(400).json({ error: 'customer_id, date e time são obrigatórios.' });
     }
 
     if (service_value_cents != null && (!Number.isFinite(service_value_cents) || service_value_cents < 0)) {
@@ -615,8 +616,9 @@ const svcTotalsCents = (service_value_cents != null) ? service_value_cents : (se
 const svcTotalsMin = (service_duration_min != null) ? service_duration_min : (services_json.length ? total_min_from_list : null);
 
 
-    if (!id || !customer_id || !date || !time || !prize) {
-      return res.status(400).json({ error: 'id, customer_id, date, time e prize são obrigatórios.' });
+    // `id` vem da URL (/api/bookings/:id). `prize` (mimo) pode ser vazio.
+    if (!id || !customer_id || !date || !time) {
+      return res.status(400).json({ error: 'customer_id, date e time são obrigatórios.' });
     }
 
     if (service_value_cents != null && (!Number.isFinite(service_value_cents) || service_value_cents < 0)) {

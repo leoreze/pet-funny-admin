@@ -77,7 +77,7 @@ const API_BASE_URL = '';
   // seja populado mesmo sem o usuário abrir a aba "Mimos".
   async function ensureMimosLoaded(force = false) {
     if (!force && Array.isArray(cacheMimos) && cacheMimos.length > 0) {
-      syncPrizeSelect();
+      syncPrizeSelect(cacheMimos);
       return;
     }
     await reloadMimos();
@@ -269,6 +269,15 @@ const API_BASE_URL = '';
       opt.setAttribute('data-mimo-id', String(m.id));
       prizeSelect.appendChild(opt);
     });
+
+    // Se o mimo gravado não estiver ativo no período, manter a seleção visível.
+    if (current && !Array.from(prizeSelect.options).some(o => o.value === current)) {
+      const optX = document.createElement('option');
+      optX.value = current;
+      optX.textContent = `${current} (indisponível)`;
+      optX.setAttribute('data-inactive', '1');
+      prizeSelect.appendChild(optX);
+    }
 
     if (current) prizeSelect.value = current;
   }
