@@ -1124,27 +1124,33 @@ input[name="duration_min"],
   display: block;
 }
 
-.kebab-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
+/* remove completamente visual de botão */
+.kebab-item{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 6px 2px;
+  border-radius: 0;
   font-size: 12px;
-  cursor: pointer;
+  font-weight: 600;
   color: #37474f;
-  white-space: nowrap;
+  cursor: pointer;
+  display: block;
 }
 
-.kebab-item:hover {
-  background: #f0f7f9;
+/* hover simples: sublinhado */
+.kebab-item:hover{
+  background: transparent !important;
+  text-decoration: underline;
   color: #014c52;
 }
 
-.kebab-item.danger {
+/* item perigoso (excluir) */
+.kebab-item.danger{
   color: #c62828;
 }
 
-.kebab-item.danger:hover {
-  background: #fdecea;
+.kebab-item.danger:hover{
+  color: #b71c1c;
+  text-decoration: underline;
 }
