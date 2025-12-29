@@ -805,6 +805,65 @@ textarea {
   white-space:pre-line;
 }
 
+/* ===== Agenda: Serviços + Menu 3 pontinhos ===== */
+.td-services .svc-line{
+  line-height:1.2;
+  margin-bottom:2px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:380px;
+}
+
+.td-services-total{
+  white-space:nowrap;
+  font-weight:600;
+}
+
+.td-actions{ width:56px; }
+
+.actions-menu{ position:relative; display:flex; justify-content:center; }
+
+.kebab-btn{
+  width:32px;
+  height:32px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,.08);
+  background:#fff;
+  cursor:pointer;
+  font-size:18px;
+  line-height:0;
+}
+
+.kebab-btn:hover{ background:#f3f4f6; }
+
+.kebab-menu{
+  position:absolute;
+  top:36px;
+  right:0;
+  min-width:140px;
+  background:#fff;
+  border:1px solid rgba(0,0,0,.1);
+  border-radius:12px;
+  box-shadow:0 8px 20px rgba(0,0,0,.08);
+  padding:6px;
+  z-index:999;
+}
+
+.kebab-item{
+  width:100%;
+  text-align:left;
+  background:transparent;
+  border:none;
+  padding:10px 10px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:13px;
+}
+
+.kebab-item:hover{ background:#f3f4f6; }
+.kebab-item.danger{ color:#b91c1c; }
+
 
 .pf-hint-overlay {
   position: fixed;
@@ -1080,3 +1139,43 @@ input[name="duration_min"],
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+
+
+/* ===== Ações (⋯) - Kebab menu ===== */
+.kebab-wrap{ position:relative; display:flex; justify-content:flex-end; }
+.kebab-btn{
+  width:36px; height:32px;
+  border:1px solid rgba(0,0,0,0.12);
+  background:#fff;
+  border-radius:10px;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.kebab-btn:hover{ filter:brightness(0.98); }
+.kebab-menu{
+  position:absolute;
+  right:0;
+  top:40px;
+  min-width:160px;
+  background:#fff;
+  border:1px solid rgba(0,0,0,0.12);
+  border-radius:12px;
+  box-shadow:0 10px 24px rgba(0,0,0,0.12);
+  padding:6px;
+  z-index:1000;
+}
+.kebab-menu.hidden{ display:none; }
+.kebab-item{
+  width:100%;
+  text-align:left;
+  border:0;
+  background:transparent;
+  padding:10px 10px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:14px;
+}
+.kebab-item:hover{ background:rgba(0,0,0,0.06); }
+.kebab-item.danger{ color:#b00020; }
