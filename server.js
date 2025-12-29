@@ -458,13 +458,14 @@ app.get('/api/bookings', async (req, res) => {
         pet.name AS pet_name,
 
         -- serviço único (compatível com snapshot no booking)
-        s.title AS service_title,
-        COALESCE(b.service_value_cents, s.value_cents, 0) AS service_value_cents,
-        COALESCE(b.service_duration_min, s.duration_min, 0) AS service_duration_min,
+        COALESCE((b.services_json->0->>'title'), s.title) AS service_title,
+        COALESCE((b.services_json->0->>'value_cents')::int, b.service_value_cents, s.value_cents, 0) AS service_value_cents,
+        COALESCE((b.services_json->0->>'duration_min')::int, b.service_duration_min, s.duration_min, 0) AS service_duration_min,
 
-        -- compatibilidade: manter campos esperados pelo front
-        '[]'::json AS services,
-        COALESCE(b.service_value_cents, s.value_cents, 0) AS services_total_cents
+        -- múltiplos serviços (novo): armazenado em bookings.services_json
+        COALESCE(b.services_json, '[]'::json) AS services,
+        COALESCE(b.service_value_cents, 0) AS services_total_cents,
+        COALESCE(b.service_duration_min, 0) AS services_total_min
       FROM bookings b
       JOIN customers c ON c.id = b.customer_id
       LEFT JOIN pets pet ON pet.id = b.pet_id
@@ -506,6 +507,25 @@ app.post('/api/bookings', async (req, res) => {
       ? Number(req.body.service_duration_min)
       : null;
 
+    // Múltiplos serviços (novo): array de objetos {id,title,value_cents,duration_min}
+    let services_json = Array.isArray(req.body.services) ? req.body.services : (Array.isArray(req.body.services_json) ? req.body.services_json : null);
+    if (!services_json && service_id != null) {
+      // compat: serviço único vira lista
+      services_json = [{ id: service_id }];
+    }
+    if (!services_json) services_json = [];
+    // normaliza e calcula totais
+    services_json = services_json.map(s => ({
+      id: s && s.id != null ? Number(s.id) : null,
+      title: s && s.title != null ? String(s.title) : null,
+      value_cents: s && s.value_cents != null ? Number(s.value_cents) : null,
+      duration_min: s && s.duration_min != null ? Number(s.duration_min) : null
+    })).filter(s => s.id != null || s.title);
+    const total_cents_from_list = services_json.reduce((acc, s) => acc + (Number.isFinite(s.value_cents) ? s.value_cents : 0), 0);
+    const total_min_from_list = services_json.reduce((acc, s) => acc + (Number.isFinite(s.duration_min) ? s.duration_min : 0), 0);
+    const svcTotalsCents = (service_value_cents != null) ? service_value_cents : (services_json.length ? total_cents_from_list : null);
+    const svcTotalsMin = (service_duration_min != null) ? service_duration_min : (services_json.length ? total_min_from_list : null);
+
     if (!customer_id || !date || !time || !prize) {
       return res.status(400).json({ error: 'customer_id, date, time e prize são obrigatórios.' });
     }
@@ -527,16 +547,18 @@ app.post('/api/bookings', async (req, res) => {
         customer_id, pet_id, service_id, service,
         date, time, prize, notes, status, last_notification_at,
         payment_status, payment_method,
-        service_value_cents, service_duration_min
+        service_value_cents, service_duration_min,
+        services_json
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       RETURNING *
       `,
       [
         customer_id, pet_id, service_id, service,
         date, time, prize, notes, status, last_notification_at,
         payment_status, payment_method,
-        service_value_cents, service_duration_min
+        svcTotalsCents, svcTotalsMin,
+        JSON.stringify(services_json)
       ]
     );
     res.json({ booking: row });
@@ -603,7 +625,8 @@ app.put('/api/bookings/:id', async (req, res) => {
         payment_status=$12,
         payment_method=$13,
         service_value_cents=$14,
-        service_duration_min=$15
+        service_duration_min=$15,
+        services_json=$16
       WHERE id=$1
       RETURNING *
       `,
@@ -611,7 +634,8 @@ app.put('/api/bookings/:id', async (req, res) => {
         id, customer_id, pet_id, service_id, service,
         date, time, prize, notes, status, last_notification_at,
         payment_status, payment_method,
-        service_value_cents, service_duration_min
+        svcTotalsCents, svcTotalsMin,
+        JSON.stringify(services_json)
       ]
     );
     res.json({ booking: row });

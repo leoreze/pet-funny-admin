@@ -172,6 +172,8 @@ async function initDb() {
   await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT '';`);
   await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service_value_cents INTEGER;`);
   await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS service_duration_min INTEGER;`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS services_json JSONB NOT NULL DEFAULT '[]'::jsonb;`);
+
 
 
   // ===== bookings: campos de pagamento =====
@@ -377,3 +379,4 @@ module.exports = {
   normalizeCPF,
   safeJsonParse,
 };
+  

@@ -176,9 +176,9 @@
               <select id="formService">
                 <option value="">Carregando serviços...</option>
               </select>
-              <button type="button" class="btn btn-secondary" id="btnAddService" style="display:none">Adicionar</button>
+              <button type="button" class="btn btn-secondary" id="btnAddService">Adicionar</button>
             </div>
-            <div class="selected-services" id="selectedServicesWrap" style="display:none;" style="display:none">
+            <div class="selected-services" id="selectedServicesWrap" style="display:none;">
               <div class="selected-services-title">Serviços selecionados</div>
               <ul id="selectedServicesList"></ul>
               <div class="selected-services-total">Total serviços: <span id="servicesTotal">R$ 0,00</span></div>
@@ -186,11 +186,11 @@
             <div class="service-meta-row">
               <div class="form-group">
                 <label for="formServiceValue">Valor dos serviços (R$)</label>
-                <input type="text" id="formServiceValue" class="readonly-field" placeholder="R$ 0,00" readonly />
+                <input type="text" id="formServiceValue" class="-field" placeholder="R$ 0,00"  / readonly>
               </div>
               <div class="form-group">
                 <label for="formServiceDuration">Tempo total (min)</label>
-                <input type="number" id="formServiceDuration" class="readonly-field" placeholder="0" readonly />
+                <input type="number" id="formServiceDuration" class="-field" placeholder="0"  / readonly>
               </div>
             </div>
 </div>
@@ -275,7 +275,10 @@
             <th>Pet</th>
             <th>Telefone</th>
             <th>Serviço(s)</th>
+            <th>Valores</th>
             <th>Total serviços</th>
+            <th>Tempo(s)</th>
+            <th>Total tempo</th>
             <th>Mimo</th>
             <th>Status</th>
             <th>Última notificação</th>

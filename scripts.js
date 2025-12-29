@@ -1407,7 +1407,7 @@ const formStatus = document.getElementById('formStatus');
   function preencherFormEdicao(booking) {
   // ID do agendamento em edição
   const id = booking && booking.id ? String(booking.id) : '';
-  bookingIdInput.value = id;
+  bookingId.value = id;
 
   // Cliente/Telefone
   formPhone.value = booking && booking.phone ? booking.phone : '';
@@ -2048,18 +2048,88 @@ if (selectedServicesList) {
     if (btnViewCards) btnViewCards.classList.toggle('active', isCards);
   }
 
-  function getServiceLabelFromBooking(a) {
-    let serviceLabel = a.service || a.service_title || '-';
-    const sid = a.service_id ?? a.serviceId ?? null;
+  function getServicesInfoFromBooking(a) {
+    // Prefer lista vinda do backend (bookings.services_json -> alias services)
+    const list = Array.isArray(a && a.services) ? a.services : [];
+    let titles = [];
+    let values = [];
+    let times = [];
+    let totalCents = null;
+    let totalMin = null;
+
+    if (list.length) {
+      list.forEach((it) => {
+        const t = it && it.title ? String(it.title) : (it && it.id != null ? `Serviço #${it.id}` : '-');
+        const vc = (it && it.value_cents != null) ? Number(it.value_cents) : 0;
+        const dm = (it && it.duration_min != null) ? Number(it.duration_min) : 0;
+        titles.push(t);
+        values.push(centsToBRL(Number.isFinite(vc) ? vc : 0));
+        times.push(String(Number.isFinite(dm) ? dm : 0) + ' min');
+      });
+      totalCents = (a && a.services_total_cents != null) ? Number(a.services_total_cents) : null;
+      totalMin = (a && a.services_total_min != null) ? Number(a.services_total_min) : null;
+      if (!Number.isFinite(totalCents)) {
+        totalCents = list.reduce((acc, it) => acc + (Number.isFinite(Number(it.value_cents)) ? Number(it.value_cents) : 0), 0);
+      }
+      if (!Number.isFinite(totalMin)) {
+        totalMin = list.reduce((acc, it) => acc + (Number.isFinite(Number(it.duration_min)) ? Number(it.duration_min) : 0), 0);
+      }
+      return {
+        labels: titles.join(' + '),
+        values: values.join(' + '),
+        times: times.join(' + '),
+        totalCents: totalCents,
+        totalMin: totalMin
+      };
+    }
+
+    // Fallback: modo antigo (um serviço)
+    let serviceLabel = (a && (a.service || a.service_title)) ? (a.service || a.service_title) : '-';
+    const sid = a && (a.service_id ?? a.serviceId ?? null);
 
     if (sid != null) {
       const svc = servicesCache.find(s => String(s.id) === String(sid));
-      if (svc) serviceLabel = svc.title;
+      if (svc) {
+        serviceLabel = svc.title;
+        totalCents = Number(svc.value_cents || 0);
+        totalMin = Number(svc.duration_min || 0);
+        return {
+          labels: serviceLabel,
+          values: centsToBRL(totalCents),
+          times: String(totalMin) + ' min',
+          totalCents,
+          totalMin
+        };
+      }
     } else {
       const match = servicesCache.find(s => normStr(s.title) === normStr(serviceLabel));
-      if (match) serviceLabel = match.title;
+      if (match) {
+        totalCents = Number(match.value_cents || 0);
+        totalMin = Number(match.duration_min || 0);
+        return {
+          labels: match.title,
+          values: centsToBRL(totalCents),
+          times: String(totalMin) + ' min',
+          totalCents,
+          totalMin
+        };
+      }
     }
-    return serviceLabel;
+
+    // Último fallback: tentar usar snapshot do booking
+    totalCents = (a && a.services_total_cents != null) ? Number(a.services_total_cents) : (a && a.service_value_cents != null ? Number(a.service_value_cents) : 0);
+    totalMin = (a && a.services_total_min != null) ? Number(a.services_total_min) : (a && a.service_duration_min != null ? Number(a.service_duration_min) : 0);
+    return {
+      labels: String(serviceLabel),
+      values: centsToBRL(Number.isFinite(totalCents) ? totalCents : 0),
+      times: String(Number.isFinite(totalMin) ? totalMin : 0) + ' min',
+      totalCents: Number.isFinite(totalCents) ? totalCents : 0,
+      totalMin: Number.isFinite(totalMin) ? totalMin : 0
+    };
+  }
+
+  function getServiceLabelFromBooking(a) {
+    return getServicesInfoFromBooking(a).labels;
   }
 
   function renderAgendaByView(lista) {
@@ -2090,7 +2160,17 @@ if (selectedServicesList) {
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
       const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
 
-      const tdServ = document.createElement('td'); tdServ.textContent = getServiceLabelFromBooking(a);
+      const svcInfo = getServicesInfoFromBooking(a);
+
+      const tdServ = document.createElement('td'); tdServ.textContent = svcInfo.labels;
+
+      const tdVals = document.createElement('td'); tdVals.textContent = svcInfo.values;
+
+      const tdTotalServ = document.createElement('td'); tdTotalServ.textContent = centsToBRL(Number(svcInfo.totalCents || 0));
+
+      const tdTempos = document.createElement('td'); tdTempos.textContent = svcInfo.times;
+
+      const tdTotalTempo = document.createElement('td'); tdTotalTempo.textContent = String(Number(svcInfo.totalMin || 0)) + ' min';
 
       const tdMimo = document.createElement('td');
       tdMimo.textContent = a.prize || '-';
@@ -2143,6 +2223,10 @@ if (selectedServicesList) {
       tr.appendChild(tdPet);
       tr.appendChild(tdTel);
       tr.appendChild(tdServ);
+      tr.appendChild(tdVals);
+      tr.appendChild(tdTotalServ);
+      tr.appendChild(tdTempos);
+      tr.appendChild(tdTotalTempo);
       tr.appendChild(tdMimo);
       tr.appendChild(tdStatus);
       tr.appendChild(tdNotif);
@@ -2192,7 +2276,9 @@ if (selectedServicesList) {
       const main = document.createElement('div');
       main.className = 'agenda-card-main';
 
-      const serviceLabel = getServiceLabelFromBooking(a);
+      const svcInfo = getServicesInfoFromBooking(a);
+
+      const serviceLabel = svcInfo.labels;
 
       const l1 = document.createElement('div');
       l1.className = 'agenda-line';
@@ -2208,7 +2294,15 @@ if (selectedServicesList) {
 
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
-      l4.innerHTML = `<span class="agenda-key">Serviço:</span> <span class="agenda-val">${serviceLabel}</span>`;
+      l4.innerHTML = `<span class="agenda-key">Serviço(s):</span> <span class="agenda-val">${serviceLabel}</span>`;
+
+      const l4b = document.createElement('div');
+      l4b.className = 'agenda-line';
+      l4b.innerHTML = `<span class="agenda-key">Valores:</span> <span class="agenda-val">${escapeHtml(svcInfo.values)}</span> <span class="agenda-muted">(Total: ${centsToBRL(Number(svcInfo.totalCents || 0))})</span>`;
+
+      const l4c = document.createElement('div');
+      l4c.className = 'agenda-line';
+      l4c.innerHTML = `<span class="agenda-key">Tempo(s):</span> <span class="agenda-val">${escapeHtml(svcInfo.times)}</span> <span class="agenda-muted">(Total: ${escapeHtml(String(Number(svcInfo.totalMin || 0)))} min)</span>`;
 
       const l5 = document.createElement('div');
       l5.className = 'agenda-line';
@@ -2222,6 +2316,8 @@ if (selectedServicesList) {
       main.appendChild(l2);
       main.appendChild(l3);
       main.appendChild(l4);
+      main.appendChild(l4b);
+      main.appendChild(l4c);
       main.appendChild(l5);
       main.appendChild(l6);
 
@@ -2367,7 +2463,8 @@ async function salvarAgendamento() {
     const totalServicesMin = selectedServices.reduce((acc, s) => acc + Number(s.duration_min || 0), 0);
 
     const date = formDate.value;
-    const time = formTime.value;
+    const time = normalizeHHMM(formTime.value);
+    if (time) formTime.value = time;
 
     // Validação de data/horário (mesmas regras do cliente)
     const dtMsg = validarDiaHora(date, time);
@@ -2428,6 +2525,7 @@ async function salvarAgendamento() {
         payment_method: formPaymentMethod ? String(formPaymentMethod.value || '').trim() : '',
 
         // Serviços (compatível com modo multi-serviços)
+        services: selectedServices.map(s => ({ id: s.id, title: s.title, value_cents: s.value_cents, duration_min: s.duration_min })),
         service_ids: selectedServices.map(s => s.id),
         service_id: firstServiceId,
         service: servicesLabelAgg,
@@ -2485,7 +2583,9 @@ async function salvarAgendamento() {
     linhas.push(['ID','Data','Hora','Tutor','Pet','Telefone','Serviço','Mimo','Status','Última Notificação','Observações'].join(';'));
 
     ultimaLista.forEach(a => {
-      const serviceLabel = getServiceLabelFromBooking(a);
+      const svcInfo = getServicesInfoFromBooking(a);
+
+      const serviceLabel = svcInfo.labels;
 
       const cols = [
         a.id,
