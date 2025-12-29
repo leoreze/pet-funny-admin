@@ -25,7 +25,7 @@ function sanitizePhone(phone) {
 }
 
 function timeToMinutes(hhmm) {
-  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(hhmm || '').trim());
+  const m = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(String(hhmm || '').trim());
   if (!m) return NaN;
   return Number(m[1]) * 60 + Number(m[2]);
 }
@@ -57,7 +57,7 @@ async function validateBookingSlot({ date, time, excludeBookingId = null }) {
   if (!Number.isFinite(t) || !Number.isFinite(open) || !Number.isFinite(close)) {
     return { ok: false, error: 'Horário inválido.' };
   }
-  if (t < open || t >= close) {
+  if (t < open || t > close) {
     return { ok: false, error: 'Horário fora do funcionamento.' };
   }
   if ((t - open) % 30 !== 0) {
