@@ -1125,20 +1125,23 @@ input[name="duration_min"],
 }
 
 .kebab-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 12px;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.2;
   cursor: pointer;
   color: #37474f;
-  white-space: nowrap;
 }
 
 .kebab-item:hover {
-  background: #f0f7f9;
+  background: transparent;
   color: #014c52;
+  text-decoration: underline;
 }
 
 .kebab-item.danger {
@@ -1146,5 +1149,7 @@ input[name="duration_min"],
 }
 
 .kebab-item.danger:hover {
-  background: #fdecea;
+  background: transparent;
+  text-decoration: underline;
 }
+
