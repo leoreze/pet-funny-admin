@@ -429,15 +429,15 @@ const API_BASE_URL = '';
     appInitialized = true;
     try {
       await loadServices();      // garante servicesCache e dropdown de serviços
+      // Garante que o select de mimos no agendamento esteja preenchido,
+      // e que o dashboard possa calcular os totais por mimo.
+      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
+        await window.PF_MIMOS.ensureLoaded(true);
+      }
       await renderTabela();
       await loadClientes();
       await loadBreeds();
       await loadOpeningHours();
-      // Garante que o select de mimos no agendamento esteja preenchido,
-      // mesmo sem navegar na aba "Mimos".
-      if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
-        await window.PF_MIMOS.ensureLoaded(true);
-      }
       await loadDashboard();
       initAgendaViewToggle();    // NOVO: inicia toggle (lista/cards)
     } catch (e) { console.error(e); }
@@ -1080,10 +1080,14 @@ const formStatus = document.getElementById('formStatus');
   function atualizaEstatisticas(lista) {
     const total = lista.length;
     // Mantém contadores existentes (por serviço) para compatibilidade do painel
-    const contTosa = lista.filter(a => (a.service || '').toLowerCase().includes('tosa higiênica')).length;
-    const contHidra = lista.filter(a => (a.prize || '').toLowerCase().includes('hidra')).length;
-    const contFoto = lista.filter(a => (a.prize || '').toLowerCase().includes('foto')).length;
-    const contPatinhas = lista.filter(a => (a.prize || '').toLowerCase().includes('patinhas')).length;
+// Mantém contadores existentes (por mimo/prize) para compatibilidade do painel
+    // Importante: o painel "Tosa/Hidratação/Foto/Vídeo/Patinhas" é sobre o MIMO (campo prize),
+    // não sobre o(s) serviço(s). Antes ele contava por a.service e acabava inflando/errando quando
+    // existe serviço "Patinhas" mas o mimo do agendamento é outro.
+    const contTosa = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('tosa higiênica')).length;
+    const contHidra = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('hidrata')).length;
+    const contFoto = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('foto')).length;
+    const contPatinhas = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('patinhas')).length;
     statTotal.textContent = total;
     statTosa.textContent = contTosa;
     statHidratacao.textContent = contHidra;
@@ -1110,7 +1114,7 @@ const formStatus = document.getElementById('formStatus');
         return !!m.is_active;
       };
       const countsByTitle = {};
-      (agendamentos || []).forEach((a) => {
+      (lista || []).forEach((a) => {
         const prize = String(a.prize || "").trim();
         if (!prize || prize.toLowerCase() === "sem mimo") return;
         const mimo = list.find(m => String(m.title || m.name || "").trim() === prize);
@@ -1118,8 +1122,9 @@ const formStatus = document.getElementById('formStatus');
         if (!isActiveOnBookingDate(mimo, a.date)) return;
         countsByTitle[prize] = (countsByTitle[prize] || 0) + 1;
       });
+      const refDate = (filtroData && filtroData.value) ? String(filtroData.value).slice(0,10) : (new Date()).toISOString().slice(0,10);
       const lines = list
-        .filter(m => isActiveOnBookingDate(m, (new Date()).toISOString().slice(0,10)))
+        .filter(m => isActiveOnBookingDate(m, refDate))
         .map(m => {
           const title = String(m.title || m.name || "").trim();
           const c = countsByTitle[title] || 0;
@@ -1382,60 +1387,32 @@ function clearSelectedServices(){
       const tdPrice = document.createElement('td'); tdPrice.textContent = formatCentsToBRL(svc.value_cents || 0);
       const tdCreated = document.createElement('td'); tdCreated.textContent = svc.created_at ? formatDateTimeBr(svc.created_at) : '-';
       const tdUpdated = document.createElement('td'); tdUpdated.textContent = svc.updated_at ? formatDateTimeBr(svc.updated_at) : '-';
-      
-const tdAcoes = document.createElement('td');
-      const wrap = document.createElement('div');
-      wrap.className = 'kebab-wrap';
-
-      const btnKebab = document.createElement('button');
-      btnKebab.type = 'button';
-      btnKebab.className = 'kebab-btn';
-      btnKebab.title = 'Ações';
-      btnKebab.textContent = '⋯';
-
-      const menu = document.createElement('div');
-      menu.className = 'kebab-menu hidden';
-
-      const actEdit = document.createElement('button');
-      actEdit.type = 'button';
-      actEdit.className = 'kebab-item';
-      actEdit.textContent = 'Editar';
-      actEdit.addEventListener('click', async () => {
-        menu.classList.add('hidden');
-        try { await loadOpeningHours(); } catch (e) {}
-        try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
-        mostrarFormAgenda();
-        setEditMode(true);
-        preencherFormEdicao(a);
+      const tdAcoes = document.createElement('td');
+      const divActions = document.createElement('div'); divActions.className = 'actions';
+      const btnEdit = document.createElement('button');
+      btnEdit.textContent = 'Editar';
+      btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.type = 'button';
+      btnEdit.addEventListener('click', () => {
+        fillServiceForm(svc);
+        showServiceForm();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
-
-      const actDel = document.createElement('button');
-      actDel.type = 'button';
-      actDel.className = 'kebab-item danger';
-      actDel.textContent = 'Excluir';
-      actDel.addEventListener('click', async () => {
-        menu.classList.add('hidden');
-        if (!confirm('Deseja realmente excluir este agendamento?')) return;
+      const btnDel = document.createElement('button');
+      btnDel.textContent = 'Excluir';
+      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.type = 'button';
+      btnDel.addEventListener('click', async () => {
+        if (!confirm('Deseja realmente excluir este serviço?')) return;
         try {
-          await apiDelete('/api/bookings/' + a.id);
-          await carregarAgendamentos();
+          await apiDelete('/api/services/' + svc.id);
+          await loadServices();
+          await loadDashboard();
         } catch (e) { alert(e.message); }
       });
-
-      menu.appendChild(actEdit);
-      menu.appendChild(actDel);
-
-      btnKebab.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        // fecha outros menus abertos
-        document.querySelectorAll('.kebab-menu').forEach(el => { if (el !== menu) el.classList.add('hidden'); });
-        menu.classList.toggle('hidden');
-      });
-
-      wrap.appendChild(btnKebab);
-      wrap.appendChild(menu);
-      tdAcoes.appendChild(wrap);
-
+      divActions.appendChild(btnEdit);
+      divActions.appendChild(btnDel);
+      tdAcoes.appendChild(divActions);
       tr.appendChild(tdId);
       tr.appendChild(tdDate);
       tr.appendChild(tdCat);
@@ -1910,11 +1887,32 @@ const tdMimo = document.createElement('td');
       tdObs.textContent = a.notes || '';
       tdObs.className = 'td-obs';
       const tdAcoes = document.createElement('td');
+      // Menu de ações (kebab) — mantém as mesmas ações (Editar/Excluir) sem alterar lógica
       const divActions = document.createElement('div');
-      divActions.className = 'actions';
+      divActions.className = 'actions actions-kebab';
+
+      const kebabBtn = document.createElement('button');
+      kebabBtn.type = 'button';
+      kebabBtn.className = 'kebab-btn';
+      kebabBtn.setAttribute('aria-label', 'Ações');
+      kebabBtn.textContent = '⋮';
+
+      const kebabMenu = document.createElement('div');
+      kebabMenu.className = 'kebab-menu hidden';
+
+      // Fecha o menu ao clicar fora
+      const closeMenu = () => kebabMenu.classList.add('hidden');
+      kebabBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        // fecha outros menus abertos
+        document.querySelectorAll('.kebab-menu').forEach(m => { if (m !== kebabMenu) m.classList.add('hidden'); });
+        kebabMenu.classList.toggle('hidden');
+      });
+      document.addEventListener('click', closeMenu);
+
       const btnEditar = document.createElement('button');
       btnEditar.textContent = 'Editar';
-      btnEditar.className = 'btn btn-small btn-secondary';
+      btnEditar.className = 'kebab-item';
       btnEditar.type = 'button';
       btnEditar.addEventListener('click', async () => {
         // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
@@ -1923,10 +1921,12 @@ const tdMimo = document.createElement('td');
         mostrarFormAgenda();
         setEditMode(true);
         preencherFormEdicao(a);
+              closeMenu();
       });
+
       const btnExcluir = document.createElement('button');
       btnExcluir.textContent = 'Excluir';
-      btnExcluir.className = 'btn btn-small btn-danger';
+      btnExcluir.className = 'kebab-item kebab-item-danger';
       btnExcluir.type = 'button';
       btnExcluir.addEventListener('click', async () => {
         if (!confirm('Deseja realmente excluir este agendamento?')) return;
@@ -1935,9 +1935,13 @@ const tdMimo = document.createElement('td');
           await renderTabela();
           await loadDashboard();
         } catch (e) { alert(e.message); }
+              closeMenu();
       });
-      divActions.appendChild(btnEditar);
-      divActions.appendChild(btnExcluir);
+
+      kebabMenu.appendChild(btnEditar);
+      kebabMenu.appendChild(btnExcluir);
+      divActions.appendChild(kebabBtn);
+      divActions.appendChild(kebabMenu);
       tdAcoes.appendChild(divActions);
       tr.appendChild(tdData);
       tr.appendChild(tdHora);
@@ -2022,38 +2026,25 @@ const tdMimo = document.createElement('td');
       notes.textContent = (a.notes || '').trim() ? a.notes : 'Sem observações.';
       const bottom = document.createElement('div');
       bottom.className = 'agenda-card-bottom';
-      
-const actions = document.createElement('div');
-      actions.className = 'kebab-wrap';
-
-      const btnKebab = document.createElement('button');
-      btnKebab.type = 'button';
-      btnKebab.className = 'kebab-btn';
-      btnKebab.title = 'Ações';
-      btnKebab.textContent = '⋯';
-
-      const menu = document.createElement('div');
-      menu.className = 'kebab-menu hidden';
-
-      const actEdit = document.createElement('button');
-      actEdit.type = 'button';
-      actEdit.className = 'kebab-item';
-      actEdit.textContent = 'Editar';
-      actEdit.addEventListener('click', async () => {
-        menu.classList.add('hidden');
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const btnEditar = document.createElement('button');
+      btnEditar.textContent = 'Editar';
+      btnEditar.className = 'btn btn-small btn-secondary';
+      btnEditar.type = 'button';
+      btnEditar.addEventListener('click', async () => {
+        // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
         try { await loadOpeningHours(); } catch (e) {}
         try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
         mostrarFormAgenda();
         setEditMode(true);
         preencherFormEdicao(a);
       });
-
-      const actDel = document.createElement('button');
-      actDel.type = 'button';
-      actDel.className = 'kebab-item danger';
-      actDel.textContent = 'Excluir';
-      actDel.addEventListener('click', async () => {
-        menu.classList.add('hidden');
+      const btnExcluir = document.createElement('button');
+      btnExcluir.textContent = 'Excluir';
+      btnExcluir.className = 'btn btn-small btn-danger';
+      btnExcluir.type = 'button';
+      btnExcluir.addEventListener('click', async () => {
         if (!confirm('Deseja realmente excluir este agendamento?')) return;
         try {
           await apiDelete('/api/bookings/' + a.id);
@@ -2061,20 +2052,9 @@ const actions = document.createElement('div');
           await loadDashboard();
         } catch (e) { alert(e.message); }
       });
-
-      menu.appendChild(actEdit);
-      menu.appendChild(actDel);
-
-      btnKebab.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        document.querySelectorAll('.kebab-menu').forEach(el => { if (el !== menu) el.classList.add('hidden'); });
-        menu.classList.toggle('hidden');
-      });
-
-      actions.appendChild(btnKebab);
-      actions.appendChild(menu);
+      actions.appendChild(btnEditar);
+      actions.appendChild(btnExcluir);
       bottom.appendChild(actions);
-
       card.appendChild(top);
       card.appendChild(main);
       card.appendChild(notes);
