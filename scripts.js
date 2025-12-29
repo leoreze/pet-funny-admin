@@ -834,13 +834,6 @@ function normalizeHHMM(t) {
 
   // garante estado inicial consistente (evita múltiplas abas visíveis)
   try { showTab(document.querySelector('.tab-btn.active')?.getAttribute('data-tab') || 'tab-agenda'); } catch (_) {}
-      }
-      // NOVO: quando voltar para agenda, renderiza conforme view atual
-      if (tabId === 'tab-agenda') {
-        try { renderAgendaByView(ultimaLista || []); } catch (_) {}
-      }
-    });
-  });
   // ===== CAMPOS AGENDA =====
   const filtroData = document.getElementById('filtroData');
   const filtroBusca = document.getElementById('filtroBusca');
