@@ -12,6 +12,15 @@ app.use(express.json());
 // Static files (admin.html, index.html, assets)
 app.use(express.static(__dirname));
 
+// PATCH: serve admin-prefixed static assets (avoid 404 on /admin/* when files live at project root)
+app.get('/admin/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
+app.get('/admin/js/bootstrap.js', (req, res) => res.sendFile(path.join(__dirname, 'bootstrap.js')));
+app.get('/admin/js/modules/mimos.js', (req, res) => res.sendFile(path.join(__dirname, 'mimos.js')));
+app.get('/admin/js/modules/services.js', (req, res) => res.sendFile(path.join(__dirname, 'services.js')));
+// (Opcional) logo no prefixo /admin, caso o HTML esteja com caminhos relativos
+app.get('/admin/pet-funny-logo.svg', (req, res) => res.sendFile(path.join(__dirname, 'pet-funny-logo.svg')));
+
+
 app.get(['/admin', '/admin/'], (req, res) => {
   return res.sendFile(path.join(__dirname, 'admin.html'));
 });
@@ -98,7 +107,8 @@ app.get('/api/customers', async (req, res) => {
   try {
     const sql = `
       SELECT c.*,
-        (SELECT COUNT(*) FROM pets p WHERE p.customer_id = c.id) AS pets_count
+        (SELECT COUNT(*) FROM pets p WHERE p.customer_id = c.id) AS pets_count,
+        (SELECT COUNT(*) FROM bookings b WHERE b.customer_id = c.id) AS bookings_count
       FROM customers c
       ORDER BY c.name
     `;
@@ -382,6 +392,293 @@ app.delete('/api/services/:id', async (req, res) => {
   }
 });
 
+
+/* =========================
+   PACKAGES (por porte)
+========================= */
+
+function addDaysISO(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + Number(days || 0));
+  return d.toISOString().slice(0, 10);
+}
+
+async function getServiceRow(id) {
+  if (!id) return null;
+  return await db.get('SELECT * FROM services WHERE id = $1', [Number(id)]);
+}
+
+async function getServicesByIds(ids) {
+  const clean = (ids || []).map(n => Number(n)).filter(n => Number.isFinite(n) && n > 0);
+  if (!clean.length) return [];
+  const params = clean;
+  const placeholders = clean.map((_, i) => `$${i + 1}`).join(',');
+  return await db.all(`SELECT * FROM services WHERE id IN (${placeholders})`, params);
+}
+
+function cents(n) {
+  const v = Number(n);
+  return Number.isFinite(v) ? Math.round(v) : 0;
+}
+
+async function computePackagePreview(pkg) {
+  const bath = await getServiceRow(pkg.bath_service_id);
+  const includes = Array.isArray(pkg.includes_json) ? pkg.includes_json : (pkg.includes_json ? JSON.parse(pkg.includes_json) : []);
+  const includeIds = includes.map(x => x && x.service_id != null ? Number(x.service_id) : null).filter(Boolean);
+  const incRows = await getServicesByIds(includeIds);
+
+  const bathQty = Number(pkg.bath_qty || 0);
+  const disc = Number(pkg.bath_discount_percent || 0) / 100;
+  const bathUnit = cents(bath?.value_cents);
+  const bathDiscounted = cents(bathUnit * (1 - disc));
+
+  const incReal = incRows.reduce((acc, s) => acc + cents(s.value_cents), 0);
+
+  const totalAvulso = cents(bathQty * bathUnit + incReal);
+  const totalPacote = cents(bathQty * bathDiscounted);
+  const economia = cents(totalAvulso - totalPacote);
+
+  return {
+    porte: pkg.porte,
+    bath_unit_cents: bathUnit,
+    bath_unit_discounted_cents: bathDiscounted,
+    included_real_cents: incReal,
+    total_avulso_cents: totalAvulso,
+    total_pacote_cents: totalPacote,
+    economia_cents: economia
+  };
+}
+
+app.get('/api/packages', async (req, res) => {
+  try {
+    const porte = (req.query.porte ? String(req.query.porte).trim() : '');
+    const where = [];
+    const params = [];
+    if (porte) { params.push(porte); where.push(`porte = $${params.length}`); }
+    const rows = await db.all(
+      `SELECT * FROM service_packages ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY id DESC`,
+      params
+    );
+    const out = [];
+    for (const r of rows) {
+      const preview = await computePackagePreview(r);
+      out.push({ ...r, preview });
+    }
+    res.json({ packages: out });
+  } catch (err) {
+    console.error('Erro ao listar packages:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar pacotes.' });
+  }
+});
+
+app.get('/api/packages/:id/preview', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    const pkg = await db.get('SELECT * FROM service_packages WHERE id = $1', [id]);
+    if (!pkg) return res.status(404).json({ error: 'Pacote não encontrado.' });
+    const preview = await computePackagePreview(pkg);
+    res.json({ preview });
+  } catch (err) {
+    console.error('Erro ao calcular preview do pacote:', err);
+    res.status(500).json({ error: 'Erro interno ao calcular preview.' });
+  }
+});
+
+app.post('/api/packages', async (req, res) => {
+  try {
+    const title = String(req.body.title || '').trim();
+    const type = String(req.body.type || 'mensal').trim();
+    const porte = String(req.body.porte || '').trim();
+    const validity_days = Number(req.body.validity_days || 30);
+    const bath_qty = Number(req.body.bath_qty || 0);
+    const bath_discount_percent = Number(req.body.bath_discount_percent || 0);
+    const bath_service_id = Number(req.body.bath_service_id || 0);
+    const is_active = (String(req.body.is_active ?? 'true') === 'true');
+    const includes_json = Array.isArray(req.body.includes) ? req.body.includes : (Array.isArray(req.body.includes_json) ? req.body.includes_json : []);
+
+    if (!title || !porte || !bath_service_id || !Number.isFinite(bath_qty) || bath_qty <= 0) {
+      return res.status(400).json({ error: 'title, porte, bath_service_id e bath_qty são obrigatórios.' });
+    }
+
+    const row = await db.get(
+      `INSERT INTO service_packages
+       (title, type, porte, validity_days, bath_qty, bath_discount_percent, bath_service_id, includes_json, is_active, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+       RETURNING *`,
+      [title, type, porte, validity_days, bath_qty, bath_discount_percent, bath_service_id, JSON.stringify(includes_json), is_active]
+    );
+    const preview = await computePackagePreview(row);
+    res.json({ package: { ...row, preview } });
+  } catch (err) {
+    console.error('Erro ao criar package:', err);
+    res.status(500).json({ error: 'Erro interno ao criar pacote.' });
+  }
+});
+
+app.put('/api/packages/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const title = String(req.body.title || '').trim();
+    const type = String(req.body.type || 'mensal').trim();
+    const porte = String(req.body.porte || '').trim();
+    const validity_days = Number(req.body.validity_days || 30);
+    const bath_qty = Number(req.body.bath_qty || 0);
+    const bath_discount_percent = Number(req.body.bath_discount_percent || 0);
+    const bath_service_id = Number(req.body.bath_service_id || 0);
+    const is_active = (String(req.body.is_active ?? 'true') === 'true');
+    const includes_json = Array.isArray(req.body.includes) ? req.body.includes : (Array.isArray(req.body.includes_json) ? req.body.includes_json : []);
+
+    if (!id || !title || !porte || !bath_service_id || !Number.isFinite(bath_qty) || bath_qty <= 0) {
+      return res.status(400).json({ error: 'id, title, porte, bath_service_id e bath_qty são obrigatórios.' });
+    }
+
+    const row = await db.get(
+      `UPDATE service_packages
+       SET title=$2, type=$3, porte=$4, validity_days=$5, bath_qty=$6, bath_discount_percent=$7,
+           bath_service_id=$8, includes_json=$9, is_active=$10, updated_at=NOW()
+       WHERE id=$1
+       RETURNING *`,
+      [id, title, type, porte, validity_days, bath_qty, bath_discount_percent, bath_service_id, JSON.stringify(includes_json), is_active]
+    );
+    const preview = await computePackagePreview(row);
+    res.json({ package: { ...row, preview } });
+  } catch (err) {
+    console.error('Erro ao atualizar package:', err);
+    res.status(500).json({ error: 'Erro interno ao atualizar pacote.' });
+  }
+});
+
+app.delete('/api/packages/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+    await db.run('DELETE FROM service_packages WHERE id = $1', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao deletar package:', err);
+    res.status(500).json({ error: 'Erro interno ao excluir pacote.' });
+  }
+});
+
+/* =========================
+   PACKAGE SALES (fechar pacote e gerar agenda)
+========================= */
+
+app.post('/api/package-sales', async (req, res) => {
+  try {
+    const customer_id = Number(req.body.customer_id);
+    const pet_id = req.body.pet_id != null ? Number(req.body.pet_id) : null;
+    const package_id = Number(req.body.package_id);
+    const start_date = String(req.body.start_date || '').slice(0,10);
+    const time = String(req.body.time || '').slice(0,5);
+    const payment_status = String(req.body.payment_status || 'Pago').trim();
+    const payment_method = String(req.body.payment_method || '').trim();
+
+    if (!customer_id || !package_id || !start_date || !time) {
+      return res.status(400).json({ error: 'customer_id, package_id, start_date e time são obrigatórios.' });
+    }
+
+    const pkg = await db.get('SELECT * FROM service_packages WHERE id = $1', [package_id]);
+    if (!pkg) return res.status(404).json({ error: 'Pacote não encontrado.' });
+    if (!pkg.is_active) return res.status(409).json({ error: 'Pacote inativo.' });
+
+    const preview = await computePackagePreview(pkg);
+    const expires_date = addDaysISO(start_date, Number(pkg.validity_days || 30));
+
+    const intervalDays = (String(pkg.type) === 'quinzenal') ? 15 : 7;
+    const totalBaths = Number(pkg.bath_qty || 0);
+
+    const bathSvc = await getServiceRow(pkg.bath_service_id);
+    if (!bathSvc) return res.status(409).json({ error: 'Serviço de banho do pacote não existe.' });
+
+    const includes = Array.isArray(pkg.includes_json) ? pkg.includes_json : (pkg.includes_json ? JSON.parse(pkg.includes_json) : []);
+    const includeIds = includes.map(x => x && x.service_id != null ? Number(x.service_id) : null).filter(Boolean);
+    const includeSvcs = await getServicesByIds(includeIds);
+
+    // prepara payloads de agendamento
+    const bathDiscountedCents = preview.bath_unit_discounted_cents;
+
+    // transação
+    await db.query('BEGIN');
+
+    const sale = await db.get(
+      `INSERT INTO package_sales
+       (package_id, customer_id, pet_id, porte, start_date, time, expires_date, status, total_cents, payment_status, payment_method)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'vigente',$8,$9,$10)
+       RETURNING *`,
+      [package_id, customer_id, pet_id, pkg.porte, start_date, time, expires_date, preview.total_pacote_cents, payment_status, payment_method]
+    );
+
+    const createdBookings = [];
+    for (let i = 0; i < totalBaths; i++) {
+      const date_i = addDaysISO(start_date, i * intervalDays);
+
+      // valida capacidade/funcionamento para cada data
+      const v = await validateBookingSlot({ date: date_i, time });
+      if (!v.ok) {
+        await db.query('ROLLBACK');
+        return res.status(409).json({ error: `Não foi possível agendar o Banho ${String(i+1).padStart(2,'0')}/${String(totalBaths).padStart(2,'0')} em ${date_i} ${time}: ${v.error}` });
+      }
+
+      const services_list = [];
+      // banho (com valor do pacote)
+      services_list.push({
+        id: bathSvc.id,
+        title: bathSvc.title,
+        value_cents: bathDiscountedCents,
+        duration_min: Number(bathSvc.duration_min || 0)
+      });
+
+      // inclusos somente no primeiro banho
+      if (i === 0) {
+        for (const s of includeSvcs) {
+          services_list.push({
+            id: s.id,
+            title: s.title,
+            value_cents: 0,
+            duration_min: Number(s.duration_min || 0)
+          });
+        }
+      }
+
+      const totCents = services_list.reduce((acc, s) => acc + (Number.isFinite(s.value_cents) ? s.value_cents : 0), 0);
+      const totMin = services_list.reduce((acc, s) => acc + (Number.isFinite(s.duration_min) ? s.duration_min : 0), 0);
+
+      const notes = `Pacote: ${pkg.title} — Banho ${String(i+1).padStart(2,'0')}/${String(totalBaths).padStart(2,'0')}`;
+
+      const row = await db.get(
+        `INSERT INTO bookings (
+          customer_id, pet_id, service_id, service,
+          date, time, prize, notes, status, last_notification_at,
+          payment_status, payment_method,
+          service_value_cents, service_duration_min,
+          services_json,
+          package_sale_id, package_seq, package_total
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,'',$7,'confirmado',NULL,$8,$9,$10,$11,$12,$13,$14,$15)
+        RETURNING *`,
+        [
+          customer_id, pet_id, bathSvc.id, bathSvc.title,
+          date_i, time, notes,
+          payment_status, payment_method,
+          totCents, totMin,
+          JSON.stringify(services_list),
+          sale.id, i+1, totalBaths
+        ]
+      );
+      createdBookings.push(row);
+    }
+
+    await db.query('COMMIT');
+    res.json({ sale, bookings: createdBookings, preview });
+  } catch (err) {
+    try { await db.query('ROLLBACK'); } catch (_) {}
+    console.error('Erro ao fechar pacote:', err);
+    res.status(500).json({ error: 'Erro interno ao fechar pacote.' });
+  }
+});
+
 /* =========================
    BOOKINGS
 ========================= */
@@ -457,6 +754,7 @@ app.get('/api/bookings', async (req, res) => {
         c.phone AS phone,
         pet.name AS pet_name,
 
+        ps.package_id AS package_id,
         -- serviço único (compatível com snapshot no booking)
         COALESCE((b.services_json->0->>'title'), s.title) AS service_title,
         COALESCE((b.services_json->0->>'value_cents')::int, b.service_value_cents, s.value_cents, 0) AS service_value_cents,
@@ -470,6 +768,7 @@ app.get('/api/bookings', async (req, res) => {
       JOIN customers c ON c.id = b.customer_id
       LEFT JOIN pets pet ON pet.id = b.pet_id
       LEFT JOIN services s ON s.id = b.service_id
+      LEFT JOIN package_sales ps ON ps.id = b.package_sale_id
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY b.date DESC, b.time DESC, b.id DESC
     `;

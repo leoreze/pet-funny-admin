@@ -196,8 +196,8 @@
     const o = opts || {};
     const type = (o.type || 'info').toLowerCase(); // success | error | warn | info
     const title = String(o.title || (type === 'success' ? 'Sucesso' : type === 'error' ? 'Erro' : type === 'warn' ? 'Atenção' : 'Aviso'));
-    const message = String(o.message || '');
-    const timeout = Number.isFinite(o.timeout) ? o.timeout : 2400;
+    const message = String((o.message !== undefined ? o.message : (o.msg !== undefined ? o.msg : '')) || '');
+    const timeout = Number.isFinite(o.timeout) ? o.timeout : (Number.isFinite(o.time) ? o.time : 2400);
 
     const els = _pfGetHintEls();
     if (!els.overlay) return;

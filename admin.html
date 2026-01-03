@@ -6,12 +6,12 @@
   <title>Admin – Pet Funny</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
 
 <header class="top-brand">
-  <img src="pet-funny-logo.svg" alt="Pet Funny" />
+  <img src="/pet-funny-logo.svg" alt="Pet Funny" />
 </header>
 
 <section id="loginScreen">
@@ -47,60 +47,61 @@
 
 <div id="adminApp">
   <div class="container">
-<div class="header header-admin">
-  <!-- Menu + texto + logo-sub (lado esquerdo) -->
-  <div class="header-left">
-    <button
-      id="btnMenu"
-      class="menu-trigger"
-      type="button"
-      aria-label="Abrir menu"
-      aria-expanded="false"
-    >
-      <span class="menu-icon" aria-hidden="true">☰</span>
-      <span class="menu-text">Menu</span>
-    </button>
 
-    <div class="logo-sub logo-inline">
-      Área Administrativa – Pet Funny
+    <div class="header header-admin">
+      <!-- Menu + texto + logo-sub (lado esquerdo) -->
+      <div class="header-left">
+        <button
+          id="btnMenu"
+          class="menu-trigger"
+          type="button"
+          aria-label="Abrir menu"
+          aria-expanded="false"
+        >
+          <span class="menu-icon" aria-hidden="true">☰</span>
+          <span class="menu-text">Menu</span>
+        </button>
+
+        <div class="logo-sub logo-inline">
+          Área Administrativa – Pet Funny
+        </div>
+      </div>
+
+      <!-- Ações (lado direito) -->
+      <div class="filters header-right">
+        <button class="btn btn-danger" id="btnLogout" type="button">
+          Sair
+        </button>
+      </div>
     </div>
-  </div>
-
-  <!-- Ações (lado direito) -->
-  <div class="filters header-right">
-    <button class="btn btn-danger btn-small" id="btnLogout" type="button">
-      Sair
-    </button>
-  </div>
-</div>
 
 
 
-<!-- MENU LATERAL (HAMBURGUER) -->
-<div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+    <!-- MENU LATERAL (HAMBURGUER) -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
 
-<nav id="sidebar" class="sidebar hidden" aria-label="Menu do painel">
-  <div class="sidebar-header">
-    <div class="sidebar-title">Menu</div>
-    <button id="btnMenuClose" class="sidebar-close" type="button" aria-label="Fechar menu">✕</button>
-  </div>
+    <nav id="sidebar" class="sidebar hidden" aria-label="Menu do painel">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Menu</div>
+        <button id="btnMenuClose" class="sidebar-close" type="button" aria-label="Fechar menu">✕</button>
+      </div>
 
-  <div class="sidebar-links">
-    <!-- Reaproveita os MESMOS botões/tab-btn e data-tab -->
-    <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agendamentos</button>
-    <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; Pets</button>
-    <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
-<button class="tab-btn" data-tab="tab-mimos" type="button"><span>🎁</span> Mimos</button>
-    <button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
-    <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
-  </div>
-</nav>
+      <div class="sidebar-links">
+          <!-- Reaproveita os MESMOS botões/tab-btn e data-tab -->
+          <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agendamentos</button>
+          <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; 🐶 Pets</button>
+          <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
+      <button class="tab-btn" data-tab="tab-mimos" type="button"><span>🎁</span> Mimos</button>
+          <button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
+          <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
+      </div>
+    </nav>
 
 
     <!-- TAB: AGENDA -->
     <section id="tab-agenda" class="tab-view active">
       <div class="section-title-row">
-         <div class="section-title">Agendamentos</div>
+         <div class="section-title"><span>📅</span> Agendamentos</div>
 
            <div class="agenda-actions-right">
           <!-- NOVO: Toggle Lista/Cards -->
@@ -118,7 +119,7 @@
         <!-- FILTROS (APENAS DA AGENDA) -->
   <div class="agenda-filters" style="margin: 8px 0 14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
     <div class="filters-group">
-      <label style="font-size:12px;">Data</label>
+      <label>Data</label>
       <input type="date" id="filtroData" />
     </div>
 
@@ -142,7 +143,7 @@
 
       
 
-      <div class="form-panel hidden" id="formPanel">
+  <div class="form-panel hidden" id="formPanel">
         <input type="hidden" id="bookingId" />
         <input type="hidden" id="bookingOriginalStatus" />
 
@@ -156,7 +157,7 @@
             <input type="text" id="formNome" placeholder="Nome do tutor" />
           </div>
           <div class="form-group">
-            <label for="formPetSelect">Pet (opcional)</label>
+            <label for="formPetSelect">Pet</label>
             <select id="formPetSelect">
               <option value="">(Sem pet informado)</option>
             </select>
@@ -169,96 +170,117 @@
           </div>
         </div>
 
-        <div class="form-row-2">
+        
+        <div class="form-row-2" id="bookingRowTipo">
           <div class="form-group">
-            <label for="formService">Serviços (pode adicionar mais de 1)</label>
-            <div class="service-picker">
-              <select id="formService">
-                <option value="">Carregando serviços...</option>
-              </select>
-              <button type="button" class="btn btn-secondary" id="btnAddService">Adicionar</button>
-            </div>
-            <div class="selected-services" id="selectedServicesWrap" style="display:none;">
-              <div class="selected-services-title">Serviços selecionados</div>
-              <ul id="selectedServicesList"></ul>
-              <div class="selected-services-total">Total serviços: <span id="servicesTotal">R$ 0,00</span></div>
-            
-            <div class="service-meta-row">
+            <div class="form-row-2" style="margin-top:8px;">
               <div class="form-group">
-                <label for="formServiceValue">Valor dos serviços (R$)</label>
-                <input type="text" id="formServiceValue" class="-field" placeholder="R$ 0,00"  / readonly>
+                <label for="formBookingKind">Tipo</label>
+                <select id="formBookingKind">
+                  <option value="">— Selecione —</option>
+                  <option value="avulso">Avulso</option>
+                  <option value="pacote">Pacote</option>
+                </select>
               </div>
-              <div class="form-group">
-                <label for="formServiceDuration">Tempo total (min)</label>
-                <input type="number" id="formServiceDuration" class="-field" placeholder="0"  / readonly>
+              <div class="form-group" id="packagePickerGroup" style="display:none;">
+                <label for="formPackageId">Pacotes</label>
+                <select id="formPackageId">
+                  <option value="">Selecione um pacote...</option>
+                </select>
               </div>
             </div>
-</div>
-          </div>
-          <div class="form-group">
-            <label for="formDate">Data</label>
-            <input type="date" id="formDate" />
-          </div>
-          <div class="form-group">
-            <label for="formTime">Horário</label>
-            <input type="time" id="formTime" />
+
+            <!-- Campos dependentes do Tipo -->
+            <div id="bookingKindGate" style="display:none;">
+              <!-- AVULSO: seleção de serviços + lista -->
+              <div id="bookingAvulsoOnly" style="display:none;">
+                <div class="form-group" id="service-picker">
+                  <label for="formService">Serviços (pode adicionar mais de 1)</label>
+                  <select id="formService">
+                    <option value="">Carregando serviços...</option>
+                  </select>
+                  <button type="button" class="btn btn-secondary" id="btnAddService">Adicionar</button>
+                </div>
+
+                <div class="selected-services" id="selectedServicesWrap" style="display:none;">
+                  <div class="selected-services-title">Serviços selecionados</div>
+                  <ul id="selectedServicesList"></ul>
+                  <div class="selected-services-total">Total serviços: <span id="servicesTotal">R$ 0,00</span></div>
+
+                  <div class="service-meta-row">
+                    <div class="form-group">
+                      <label for="formServiceValue">Valor dos serviços (R$)</label>
+                      <input type="text" id="formServiceValue" class="-field" placeholder="R$ 0,00" / readonly>
+                    </div>
+                    <div class="form-group">
+                      <label for="formServiceDuration">Tempo total (min)</label>
+                      <input type="number" id="formServiceDuration" class="-field" placeholder="0" / readonly>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- COMUM (Avulso e Pacote): Data/Horário/Pagamento/Forma/Status -->
+              <div class="form-row" id="bookingRowSchedule" style="grid-template-columns: repeat(5, minmax(0, 1fr)); gap:8px; margin-top:8px;">
+                <div class="form-group">
+                  <label for="formDate">Data</label>
+                  <input type="date" id="formDate" />
+                </div>
+                <div class="form-group">
+                  <label for="formTime">Horário</label>
+                  <input type="time" id="formTime" />
+                </div>
+                <div class="form-group">
+                  <label for="formPaymentStatus">Pagamento</label>
+                  <select id="formPaymentStatus">
+                    <option value="Não Pago">Não Pago</option>
+                    <option value="Pago">Pago</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="formPaymentMethod">Forma de Pagamento</label>
+                  <select id="formPaymentMethod">
+                    <option value="">— Selecione —</option>
+                    <option value="Dinheiro">Dinheiro</option>
+                    <option value="Débito">Débito</option>
+                    <option value="Crédito">Crédito</option>
+                    <option value="Pix">Pix</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="formStatus">Status</label>
+                  <select id="formStatus">
+                    <option value="agendado">Agendado</option>
+                    <option value="confirmado">Confirmado</option>
+                    <option value="recebido">Recebido</option>
+                    <option value="em serviço">Em serviço</option>
+                    <option value="concluído">Concluído</option>
+                    <option value="entregue">Entregue</option>
+                    <option value="cancelado">Cancelado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group" id="bookingRowNotes">
+                <label for="formNotes">Observações</label>
+                <textarea id="formNotes" placeholder="Ex: porte, comportamento, cuidados especiais..."></textarea>
+              </div>
+
+              <div id="formError" class="error-msg" style="display:none;"></div>
+
+              <div class="form-actions" id="bookingRowActions">
+                <button class="btn btn-secondary" id="btnCancelarEdicao" type="button">Limpar / cancelar</button>
+                <button class="btn" id="btnSalvar" type="button">Salvar</button>
+              </div>
+            </div>
           </div>
         </div>
+  </div>
 
-        <div class="form-row-2">
-          <div class="form-group">
-            <label for="formStatus">Status</label>
-            <select id="formStatus">
-              <option value="agendado">Agendado</option>
-              <option value="confirmado">Confirmado</option>
-              <option value="recebido">Recebido</option>
-              <option value="em serviço">Em serviço</option>
-              <option value="concluído">Concluído</option>
-              <option value="entregue">Entregue</option>
-              <option value="cancelado">Cancelado</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="formPaymentStatus">Pagamento</label>
-            <select id="formPaymentStatus">
-              <option value="Não Pago">Não Pago</option>
-              <option value="Pago">Pago</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="formPaymentMethod">Forma de Pagamento</label>
-            <select id="formPaymentMethod">
-              <option value="">— Selecione —</option>
-              <option value="Dinheiro">Dinheiro</option>
-              <option value="Débito">Débito</option>
-              <option value="Crédito">Crédito</option>
-              <option value="Pix">Pix</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="formNotes">Observações</label>
-          <textarea id="formNotes" placeholder="Ex: porte, comportamento, cuidados especiais..."></textarea>
-        </div>
-
-        <div id="formError" class="error-msg" style="display:none;"></div>
-
-        <div class="form-actions">
-          <button class="btn btn-secondary" id="btnCancelarEdicao" type="button">Limpar / cancelar</button>
-          <button class="btn" id="btnSalvar" type="button">Salvar</button>
-        </div>
-      </div>
-
-      <div class="stats">
+   <div class="stats">
         <div class="stats-item"><span class="stats-label">Total de agendamentos:</span> <span class="stats-value" id="statTotal">0</span></div>
-        <div class="stats-item"><span class="stats-label">Tosa Higiênica:</span> <span class="stats-value" id="statTosa">0</span></div>
-        <div class="stats-item"><span class="stats-label">Hidratação:</span> <span class="stats-value" id="statHidratacao">0</span></div>
-        <div class="stats-item"><span class="stats-label">Foto/Vídeo:</span> <span class="stats-value" id="statFotoVideo">0</span></div>
-        <div class="stats-item"><span class="stats-label">Patinhas impecáveis:</span> <span class="stats-value" id="statPatinhas">0</span></div>
-<div id="statMimosList" class="stats-mimos-list">—</div>
+        <div class="stats-item"><span class="stats-label">Total de agendamentos Avulsos:</span> <span class="stats-value" id="statAvulsos">0</span></div>
+        <div class="stats-item"><span class="stats-label">Total de agendamentos Pacotes:</span> <span class="stats-value" id="statPacotes">0</span></div>
       </div>
 
        <!-- NOVO: Wrapper Lista -->
@@ -274,11 +296,10 @@
             <th>Serviço(s)</th>
             <th>Valores e tempo(s)</th>
             <th>Mimo</th>
-            <th>Status</th>
             <th>Pagamento</th>
-            <th>Forma de Pagamento</th>
-            <th>Última notificação</th>
-            <th>Obs.</th>
+            <th>Forma</th>
+                        <th>Obs.</th>
+            <th>Status</th>
             <th>Ações</th>
           </tr>
           </thead>
@@ -286,31 +307,39 @@
         </table>
         <div id="estadoVazio" class="empty" style="display:none;">Nenhum agendamento encontrado para o filtro atual.</div>
       </div>
+      
+
+   
 
       <!-- NOVO: Wrapper Cards -->
       <div id="agendaCardsWrapper" class="cards-wrapper hidden">
         <div id="agendaCards" class="cards-grid"></div>
         <div id="estadoVazioCards" class="empty hidden">Nenhum agendamento encontrado para o filtro atual.</div>
       </div>
-      </section>
+    </section>
 
-       <!-- TAB: CLIENTES & PETS -->
+    <!-- TAB: CLIENTES & PETS -->
     <section id="tab-clientes" class="tab-view">
-      <div class="section-title">Clientes &amp; Pets</div>
-      <div class="tab-toolbar">
-        <div class="filters-group">
-          <span style="font-size:13px;">Buscar:</span>
-          <input type="text" id="filtroClientes" placeholder="Nome do tutor ou telefone" />
-          <button class="btn btn-light" id="btnLimparClientes" type="button">Limpar</button>
-        </div>
-      </div>
+
+      
+      <div class="section-title" style="margin-bottom: 20px;"><span>👤</span> Clientes &amp; 🐶 Pets</div>
+    
       <div class="two-cols">
         <!-- CLIENTES -->
         <div class="subcard">
           <div class="subcard-title">
             <span>Clientes</span>
             <span id="badgeClienteSelecionado" class="badge-mini badge-selected hidden">Cliente selecionado</span>
-            <button class="btn btn-secondary btn-small" id="btnNovoCliente" type="button">+ Novo cliente</button>
+
+              <div class="tab-toolbar">
+        <div class="filters-group">
+          <span style="font-size:13px;">Buscar:</span>
+          <input type="text" id="filtroClientes" placeholder="Nome do tutor ou telefone" />
+          <button class="btn btn-light" id="btnLimparClientes" type="button">Limpar</button>
+        </div>
+      </div>
+
+            <button class="btn btn-light" id="btnNovoCliente" type="button">+ Novo cliente</button>
           </div>
 
           <div id="clienteFormBlock" class="hidden">
@@ -354,8 +383,8 @@
 
             <div id="cliError" class="error-msg" style="display:none;"></div>
             <div class="form-actions">
-              <button class="btn btn-secondary btn-small" id="btnCliLimpar" type="button">Limpar</button>
-              <button class="btn btn-small" id="btnCliSalvar" type="button">Salvar / Atualizar</button>
+              <button class="btn btn-secondary" id="btnCliLimpar" type="button">Limpar</button>
+              <button class="btn" id="btnCliSalvar" type="button">Salvar / Atualizar</button>
             </div>
           </div>
 
@@ -367,6 +396,7 @@
                 <th>Tutor</th>
                 <th>Telefone</th>
                 <th>Pets</th>
+                <th>Agendamentos</th>
                 <th>Ações</th>
               </tr>
               </thead>
@@ -453,6 +483,12 @@
               <option value="Tosa">Tosa</option>
               <option value="Avulso">Avulso</option>
             </select>
+<select id="filtroPorteServicos" class="select-small" aria-label="Filtrar por porte">
+  <option value="">Todos os portes</option>
+  <option value="Pequeno">Pequeno</option>
+  <option value="Médio">Médio</option>
+  <option value="Grande">Grande</option>
+</select>
 <button class="btn btn-light" id="btnLimparServicos" type="button">Limpar</button>
           </div>
         </div>
@@ -528,111 +564,248 @@
         </table>
         <div id="servicesEmpty" class="empty" style="display:none;">Nenhum serviço cadastrado ainda.</div>
       </div>
-    </section>
+
+   
+      <!-- PACOTES DE SERVIÇOS (POR PORTE) -->
+      <div class="section-divider"></div>
+      <div class="section-title-row" style="margin-top:16px;">
+        <div class="section-title">Pacotes de Serviços</div>
+        <div class="tab-toolbar-inline">
+          <div class="filters-group">
+            <span style="font-size:13px;">Buscar:</span>
+            <input type="text" id="filtroPacotesTitle" placeholder="Título do pacote" />
+            <select id="filtroPacotesTipo" class="select-small" aria-label="Filtrar por tipo">
+              <option value="">Todos os tipos</option>
+              <option value="mensal">Mensal</option>
+              <option value="quinzenal">Quinzenal</option>
+            </select>
+            <select id="filtroPacotesPorte" class="select-small" aria-label="Filtrar por porte">
+              <option value="">Todos os portes</option>
+              <option value="Pequeno">Pequeno</option>
+              <option value="Médio">Médio</option>
+              <option value="Grande">Grande</option>
+            </select>
+            <button class="btn btn-light" id="btnLimparPacotes" type="button">Limpar</button>
+          </div>
+          <button type="button" class="btn btn-light" id="btnNewPackage">Novo pacote</button>
+        </div>
+      </div>
+
+      <div id="packageFormCard" class="card" style="display:none; margin-top:12px;">
+        <div class="card-content">
+          <div class="form-row">
+  <div class="form-group">
+    <label for="pkgTitle">Nome do pacote</label>
+    <input id="pkgTitle" type="text" placeholder="Ex.: Pacote Mensal" />
+  </div>
+  <div class="form-group">
+    <label for="pkgType">Tipo de pacote</label>
+    <select id="pkgType">
+      <option value="mensal">Mensal</option>
+      <option value="quinzenal">Quinzenal</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="pkgPorte">Porte do pet</label>
+    <select id="pkgPorte">
+      <option value="">Selecione o porte...</option>
+      <option value="Pequeno">Pequeno</option>
+      <option value="Médio">Médio</option>
+      <option value="Grande">Grande</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="pkgIsActive">Ativo</label>
+    <select id="pkgIsActive">
+      <option value="true">Sim</option>
+      <option value="false">Não</option>
+    </select>
+  </div>
+</div>
+
+          <div id="pkgMoreFields" style="display:none;">
+            <div class="form-row-3">
+              <div class="form-group">
+                <label for="pkgValidityDays">Vigência (dias)</label>
+                <input id="pkgValidityDays" type="number" min="1" value="30" />
+              </div>
+              <div class="form-group">
+                <label for="pkgBathQty">Qtd. de banhos</label>
+                <input id="pkgBathQty" type="number" min="1" value="4" />
+              </div>
+              <div class="form-group">
+                <label for="pkgBathDiscount">Desconto no banho (%)</label>
+                <input id="pkgBathDiscount" type="number" min="0" max="100" value="20" />
+              </div>
+            </div>
+
+            <div class="form-row-1">
+  <div class="form-group">
+    <label for="pkgBathService">Serviço banho (filtrado pelo porte)</label>
+    <select id="pkgBathService">
+      <option value="">Selecione o porte primeiro...</option>
+    </select>
+  </div>
+</div>
+
+<div class="form-row-2cols">
+  <div class="form-group">
+    <label>Serviços inclusos (gratuitos no pacote)</label>
+    <div id="pkgIncludedList" class="checkbox-grid"></div>
+  </div>
+  <div class="form-group">
+    <label><strong>Resumo da economia (automático)</strong></label>
+    <hr style="border:0; border-top:1px solid #e0edf0; margin:6px 0 10px;" />
+    <div id="pkgEconomyPreview" class="economy-preview">Selecione o porte e o serviço de banho para ver o resumo.</div>
+  </div>
+</div>
+                <div style="margin-top:10px; display:flex; gap:8px; justify-content:flex-end;">
+                  <button type="button" class="btn btn-secondary" id="btnCancelPackage">Cancelar</button>
+                  <button type="button" class="btn" id="btnSavePackage">Salvar pacote</button>
+                </div>
+                <input type="hidden" id="pkgId" value="" />
+              </div>
+            </div>
+      </div>
+
+      <div class="table-wrapper" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Tipo</th>
+              <th>Porte</th>
+              <th>Vigência</th>
+              <th>Banhos</th>
+              <th>Desconto</th>
+              <th>Preço pacote</th>
+              <th>Avulso real</th>
+              <th>Economia</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyPackages"></tbody>
+        </table>
+        <div id="packagesEmpty" class="empty" style="display:none;">Nenhum pacote cadastrado ainda.</div>
+      </div>
 
     
-    <!-- TAB: RAÇAS DE CÃES -->
-<!-- TAB: MIMOS -->
-<section id="tab-mimos" class="tab-view">
-  <div class="section-title-row">
-    <div class="section-title">Mimos</div>
 
-    <div class="section-actions" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <div style="display:flex; gap:8px; align-items:center;">
-        <input id="mimosSearch" type="text" placeholder="Buscar mimos..." class="input" style="min-width:260px;" />
+    </section>
+
+    <!-- TAB: MIMOS -->
+    <section id="tab-mimos" class="tab-view">
+      <div class="section-title-row">
+        <div class="section-title">🎁 Mimos</div>
+
+        <div class="section-actions" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+   <div style="display:flex; gap:8px; align-items:center;">
+  <input id="mimosSearch" type="text" placeholder="Buscar..." class="input" style="min-width:260px;" />
+
+  <button class="btn btn-secondary" id="btnMimosClearSearch" type="button">
+    Limpar
+  </button>
+</div>
+
+
+          <button class="btn btn-secondary" id="btnNovoMimo" type="button">+ Novo Mimo</button>
+        </div>
       </div>
 
-      <button class="btn" id="btnNovoMimo" type="button">Novo Mimo</button>
-      <button class="btn btn-secondary btn-small" id="btnMimosReload" type="button">Recarregar</button>
-    </div>
-  </div>
+      <div class="card">
 
-  <div class="card">
-
-    <!-- Form colapsável (fechado por padrão) -->
-    <div id="mimoFormWrap" class="card" style="margin:0 0 16px 0; display:none;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <h3 style="margin:0;">Cadastrar / Editar Mimo</h3>
-        <button class="btn btn-secondary btn-small" id="btnFecharMimoForm" type="button">Fechar</button>
-      </div>
-
-      <div class="grid-2" style="margin-top:12px;">
-        <div>
-          <div class="form-row">
-            <label for="mimoTitle">Título</label>
-            <input id="mimoTitle" type="text" placeholder="Ex.: 🎁 Banho Grátis" maxlength="80" />
+        <!-- Form colapsável (fechado por padrão) -->
+        <div id="mimoFormWrap" class="card" style="margin:0 0 16px 0; display:none;">
+          <div class="form-panel">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <h3 style="margin:0;">Cadastrar / Editar Mimo</h3>
+           
           </div>
 
-          <div class="form-row">
-            <label for="mimoDesc">Descrição (com emojis)</label>
-            <textarea id="mimoDesc" rows="3" placeholder="Ex.: 🎉 Você ganhou 1 banho grátis!"></textarea>
+          <div class="grid-2" style="margin-top:12px;">
+            <div>
+              <div class="form-row">
+                <label for="mimoTitle">Título</label>
+                <input id="mimoTitle" type="text" placeholder="Ex.: 🎁 Banho Grátis" maxlength="80" />
+              </div>
 
-            <div id="emojiPanel" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; user-select:none;"></div>
-            <small style="opacity:.75">Dica rápida: no Windows, use <b>Win + .</b> para abrir o seletor de emojis.</small>
+              <div class="form-row">
+                <label for="mimoDesc">Descrição (com emojis)</label>
+                <textarea id="mimoDesc" rows="3" placeholder="Ex.: 🎉 Você ganhou 1 banho grátis!"></textarea>
+
+                <div id="emojiPanel" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; user-select:none;"></div>
+                <small style="opacity:.75">Dica rápida: no Windows, use <b>Win + .</b> para abrir o seletor de emojis.</small>
+              </div>
+            </div>
+
+            <div>
+              <div class="grid-2">
+                <div class="form-row">
+                  <label for="mimoValue">Valor (R$)</label>
+                  <input id="mimoValue" type="text" inputmode="numeric" placeholder="0,00" />
+                </div>
+
+                <div class="form-row" style="display:flex; align-items:flex-end;">
+                  <label style="display:flex; gap:8px; align-items:center; margin:0;">
+                    <input id="mimoActive" type="checkbox" checked />
+                    Ativo
+                  </label>
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div class="form-row">
+                  <label for="mimoStart">Início</label>
+                  <input id="mimoStart" type="datetime-local" class="dt-input" />
+                </div>
+
+                <div class="form-row">
+                  <label for="mimoEnd">Término</label>
+                  <input id="mimoEnd" type="datetime-local" class="dt-input" />
+                </div>
+              </div>
+  <div id="mimoMsg" style="margin-left:12px; opacity:.85;"></div>
+           <div style="
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+  align-items:center;
+  justify-content:flex-end;
+">
+  <button class="btn" id="btnMimoSave" type="button">Salvar</button>
+  <button class="btn btn-secondary" id="btnMimoClear" type="button">Limpar</button>
+
+</div>
+            </div>
+          </div>
           </div>
         </div>
 
-        <div>
-          <div class="grid-2">
-            <div class="form-row">
-              <label for="mimoValue">Valor (R$)</label>
-              <input id="mimoValue" type="text" inputmode="numeric" placeholder="0,00" />
-            </div>
 
-            <div class="form-row" style="display:flex; align-items:flex-end;">
-              <label style="display:flex; gap:8px; align-items:center; margin:0;">
-                <input id="mimoActive" type="checkbox" checked />
-                Ativo
-              </label>
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div class="form-row">
-              <label for="mimoStart">Início</label>
-              <input id="mimoStart" type="datetime-local" class="dt-input" />
-            </div>
-
-            <div class="form-row">
-              <label for="mimoEnd">Término</label>
-              <input id="mimoEnd" type="datetime-local" class="dt-input" />
-            </div>
-          </div>
-
-          <div style="display:flex; gap:8px; margin-top:10px; align-items:center;">
-            <button class="btn" id="btnMimoSave" type="button">Salvar</button>
-            <button class="btn btn-secondary" id="btnMimoClear" type="button">Limpar</button>
-            <div id="mimoMsg" style="margin-left:auto; opacity:.85;"></div>
-          </div>
+        <!-- Lista -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin:18px 0 14px 0;">
+          <h3 style="margin:0;">Lista de Mimos</h3>
         </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Título</th>
+                <th>Valor</th>
+                <th>Período</th>
+                <th>Ativo</th>
+                <th style="width:200px;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyMimos"></tbody>
+          </table>
+          <div id="mimosEmpty" class="empty" style="display:none;">Nenhum mimo cadastrado.</div>
+        </div>
+
       </div>
-    </div>
-
-    <!-- Lista -->
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin:18px 0 14px 0;">
-      <h3 style="margin:0;">Lista de Mimos</h3>
-    </div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Título</th>
-            <th>Valor</th>
-            <th>Período</th>
-            <th>Ativo</th>
-            <th style="width:160px;">Ações</th>
-          </tr>
-        </thead>
-        <tbody id="tbodyMimos"></tbody>
-      </table>
-      <div id="mimosEmpty" class="empty" style="display:none;">Nenhum mimo cadastrado.</div>
-    </div>
-
-  </div>
-</section>
-
-
+    </section>
 
     <!-- TAB: HORÁRIO DE FUNCIONAMENTO -->
     <section id="tab-horarios" class="tab-view">
@@ -672,7 +845,7 @@
       <div id="hoursMsg" class="login-footer-hint" style="margin-top:8px;"></div>
     </section>
 
-<!-- TAB: DASHBOARD -->
+    <!-- TAB: DASHBOARD -->
     <section id="tab-dashboard" class="tab-view">
       <div class="section-title-row">
         <div class="section-title">Dashboard de Indicadores</div>
@@ -761,24 +934,14 @@
     </section>
 
 </div>
-
-     
-    
-
-   
-
-   
-    <div class="footer">
-      <div>Dados via API (<code>/api/customers</code>, <code>/api/pets</code>, <code>/api/bookings</code>, <code>/api/services</code>). Exportação CSV feita no navegador.</div>
-      <div>Pet Funny • Admin CRUD &amp; Status</div>
-    </div>
-  </div>
 </div>
+     
 
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-top">
-      <img src="pet-funny-logo.svg" alt="Pet Funny" class="footer-logo" />
+      <img src="/pet-funny-logo.svg" alt="Pet Funny" class="footer-logo" />
+      <div class="footer-bottom">© 2026 Pet Funny • Roleta de Mimos. Todos os direitos reservados.</div>
       <div class="footer-info">
         <strong>Pet Funny • Banho &amp; Tosa</strong>
         <span>Rua Virgílio de Carvalho Neves Neto, 794 – Ribeirão Preto / SP</span>
@@ -786,18 +949,12 @@
         <span>WhatsApp: (16) 98153-5338</span>
       </div>
     </div>
-    <div class="footer-bottom">© 2024 Pet Funny • Roleta de Mimos. Todos os direitos reservados.</div>
+    
   </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- PATCH: load modular JS in correct order (globals for backward compatibility) - 2025-12-24 -->
-<script src="pf_time.js"></script>
-<script src="pf_helpers.js"></script>
-<script src="pf_api.js"></script>
-<script src="scripts.js"></script>
-<!-- <script src="pf_healthcheck.js"></script> -->
+<!-- <script src="/pf_healthcheck.js"></script> -->
 <!-- PF HINT MODAL (auto-close + focus) -->
 <div id="pfHintOverlay" class="pf-hint-overlay" aria-hidden="true">
   <div class="pf-hint-modal" role="dialog" aria-modal="true" aria-label="Notificação">
@@ -814,6 +971,64 @@
     <div class="pf-hint-bar" aria-hidden="true"><i id="pfHintBar"></i></div>
   </div>
 </div>
+
+<!-- Histórico de Agendamentos do Cliente (modal) -->
+<div id="custHistOverlay" class="pf-hint-overlay" aria-hidden="true" style="display:none;">
+  <div class="pf-hint-modal" role="dialog" aria-modal="true" aria-label="Histórico de agendamentos" style="width:min(980px, calc(100vw - 32px));">
+    <div class="pf-hint-head">
+      <div class="pf-hint-left">
+        <div class="pf-hint-ic" aria-hidden="true">📅</div>
+        <div>
+          <p class="pf-hint-title" id="custHistTitle">Histórico</p>
+          <p class="pf-hint-msg" id="custHistSub" style="margin-top:2px;">...</p>
+        </div>
+      </div>
+      <button class="pf-hint-x" id="custHistClose" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <div style="margin-top:12px; max-height: 62vh; overflow:auto; border:1px solid rgba(255,255,255,.10); border-radius:12px; background: rgba(255,255,255,.04);">
+      
+      <table style="width:100%; border-collapse: collapse; font-size:13px;">
+        <thead>
+          <tr style="background-color: #BBE1E9">
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.10);">Data</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.10);">Hora</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.10);">Pet</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.10);">Serviços</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.10);">Status</th>
+            <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.10);">Pagamento</th>
+          </tr>
+        </thead>
+        <tbody id="custHistTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de loading para envio da ficha do pacote (WhatsApp) -->
+<div id="packageDispatchOverlay" aria-hidden="true" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55); align-items:center; justify-content:center;">
+  <div style="background:#fff; color:#111; padding:18px 20px; border-radius:14px; width:min(520px, 92vw); box-shadow:0 10px 30px rgba(0,0,0,.25);">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="width:18px; height:18px; border:3px solid #ddd; border-top-color:#01ADB7; border-radius:50%; animation: pfSpin 1s linear infinite;"></div>
+      <div>
+        <div style="font-weight:800; font-size:16px; line-height:1.2;">Encaminhando Detalhes do Pacote.....</div>
+        <div id="packageDispatchSub" style="margin-top:4px; font-size:13px; opacity:.85;">Abrindo o WhatsApp com a ficha completa do pacote.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  @keyframes pfSpin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- PATCH: load modular JS in correct order (globals for backward compatibility) - 2025-12-24 -->
+<script src="/pf_time.js"></script>
+<script src="/pf_helpers.js"></script>
+<script src="/pf_api.js"></script>
+<script src="/admin/js/bootstrap.js"></script>
 
 </body>
 </html>

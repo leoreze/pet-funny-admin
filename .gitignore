@@ -4,3 +4,12 @@ npm-debug.log
 .env
 *.sqlite
 *.log
+
+
+# backups locais
+bck*/
+bkp*/
+*.bak
+
+# arquivos/pastas experimentais
+admin-ai.html

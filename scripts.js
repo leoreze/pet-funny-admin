@@ -19,374 +19,110 @@ const API_BASE_URL = '';
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   }
+
+/* =========================
+   HINT / TOAST (fallback)
+   - Compat: alguns fluxos antigos chamam showHint(msg, type)
+   - Se existir pfHint (modal toast do sistema), usa ele.
+========================= */
+function showHint(msg, type = 'info', title = '') {
+  try {
+    const t = String(type || 'info').toLowerCase();
+    const mapped = (t === 'error' || t === 'danger') ? 'error'
+      : (t === 'success') ? 'success'
+      : (t === 'warning' || t === 'warn') ? 'warning'
+      : 'info';
+
+    if (typeof window.pfHint === 'function') {
+      window.pfHint({
+        type: mapped,
+        title: title || (mapped === 'error' ? 'Erro' : 'OK'),
+        msg: String(msg || ''),
+        time: mapped === 'error' ? 3800 : 2200
+      });
+      return;
+    }
+  } catch (_) {}
+  // fallback absoluto
+  try { alert(String(msg || '')); } catch (_) {}
+}
+
+/* =========================
+   UX LISTAGEM AGENDAMENTOS (Admin)
+   - Dia da semana abaixo da data
+   - Link WhatsApp no telefone
+   - Destaque por antecedência: <=10h verde, <=4h amarelo, <=1h vermelho
+   - Pagamento: pago verde / não pago vermelho
+   - Forma: ícone + texto (cabeçalho vira "Forma")
+========================= */
+function getWeekdayPt(dateISO) {
+  try {
+    if (!dateISO) return '';
+    const d = new Date(String(dateISO).slice(0,10) + 'T00:00:00-03:00');
+    return d.toLocaleDateString('pt-BR', { weekday: 'long' }).replace(/^./, c => c.toUpperCase());
+  } catch (_) { return ''; }
+}
+function buildWhatsUrl(phone, msg) {
+  try {
+    const digits = String(phone || '').replace(/\D+/g,'');
+    if (!digits) return '';
+    // Brasil: garante DDI 55
+    const full = digits.startsWith('55') ? digits : ('55' + digits);
+    const base = 'https://api.whatsapp.com/send?phone=' + full;
+    if (msg) return base + '&text=' + encodeURIComponent(String(msg));
+    return base;
+  } catch (_) { return ''; }
+}
+function setRowTimeHighlight(tr, dateISO, timeHHMM) {
+  try {
+    if (!tr || !dateISO || !timeHHMM) return;
+    const dt = new Date(String(dateISO).slice(0,10) + 'T' + String(timeHHMM).slice(0,5) + ':00-03:00');
+    const now = new Date();
+    const diffH = (dt.getTime() - now.getTime()) / 3600000;
+    tr.classList.remove('row-soon-green','row-soon-yellow','row-soon-red');
+    if (diffH > 0 && diffH <= 1) tr.classList.add('row-soon-red');
+    else if (diffH > 1 && diffH <= 4) tr.classList.add('row-soon-yellow');
+    else if (diffH > 4 && diffH <= 10) tr.classList.add('row-soon-green');
+  } catch (_) {}
+}
+function classPayment(ps) {
+  const s = normStr(ps || '');
+  if (!s) return 'pay-unknown';
+
+  // IMPORTANTE: checar "não pago" antes de "pago" (porque "nao pago" contém "pago")
+  if (
+    s.includes('nao pago') || s.includes('não pago') ||
+    s.includes('nao') || s.includes('não') ||
+    s.includes('pendente') || s.includes('aberto') || s.includes('unpaid')
+  ) return 'pay-unpaid';
+
+  if (
+    s === 'pago' || s === 'paga' ||
+    s.includes(' pago') || s.includes('paid') || s === 'sim'
+  ) return 'pay-paid';
+
+  return 'pay-unknown';
+}
+
+function iconForMethod(method) {
+  const m = normStr(method || '');
+  if (!m) return '';
+  if (m.includes('dinheiro')) return '💵';
+  if (m.includes('pix')) return '❖';
+  if (m.includes('credito') || m.includes('crédito')) return '💳';
+  if (m.includes('debito') || m.includes('débito')) return '💳';
+  if (m.includes('cartao') || m.includes('cartão')) return '💳';
+  if (m.includes('transfer')) return '🏦';
+  return '-';
+}
+
+
   /* =========================================================
-   MIMOS (Admin) - CRUD + Emojis + Valor (cents) + Período
-   Requisitos:
-   - HTML ids: tab-mimos, tbodyMimos, mimosEmpty,
-              mimoTitle, mimoDesc, emojiPanel,
-              mimoValue, mimoStart, mimoEnd, mimoActive,
-              btnMimoSave, btnMimoClear, btnMimosReload, mimoMsg
-   - API no server:
-     GET    /api/mimos
-     POST   /api/mimos
-     PUT    /api/mimos/:id
-     DELETE /api/mimos/:id
-   - Opcional: select existente #formPrize (para roleta/prêmio no agendamento)
+   MIMOS (Admin)
+   - Extraído para /admin/js/modules/mimos.js
+   - scripts.js mantém apenas integrações via window.PF_MIMOS (ex.: no fluxo de agendamentos)
 ========================================================= */
-(function () {
-  'use strict';
-  const $ = (id) => document.getElementById(id);
-  // Mesmo que a aba de Mimos não exista no DOM (variações de layout),
-  // ainda precisamos carregar os mimos para o select do agendamento (#formPrize).
-  const elTab = $('tab-mimos');
-  const els = {
-    title: $('mimoTitle'),
-    desc: $('mimoDesc'),
-    emojiPanel: $('emojiPanel'),
-    value: $('mimoValue'),
-    start: $('mimoStart'),
-    end: $('mimoEnd'),
-    active: $('mimoActive'),
-    save: $('btnMimoSave'),
-    clear: $('btnMimoClear'),
-    reload: $('btnMimosReload'),
-    msg: $('mimoMsg'),
-    tbody: $('tbodyMimos'),
-    empty: $('mimosEmpty'),
-    prizeSelect: document.getElementById('formPrize') || null,
-    // novos do layout
-    search: $('mimosSearch'),
-    btnNovo: $('btnNovoMimo'),
-    formWrap: $('mimoFormWrap'),
-    btnCloseForm: $('btnFecharMimoForm'),
-  };
-  let currentEditId = null;
-  window.cacheMimos = Array.isArray(window.cacheMimos) ? window.cacheMimos : [];
-  let cacheMimos = window.cacheMimos;
-  // Fluxo "Novo Agendamento": garantir que o select de mimos (#formPrize)
-  // seja populado mesmo sem o usuário abrir a aba "Mimos".
-  async function ensureMimosLoaded(force = false) {
-    if (!force && Array.isArray(cacheMimos) && cacheMimos.length > 0) {
-      syncPrizeSelect(cacheMimos);
-      return;
-    }
-    await reloadMimos();
-  }
-  // Expor funções para o fluxo de agendamento (novo/edição)
-  // sem depender do usuário abrir a aba "Mimos".
-  window.PF_MIMOS = window.PF_MIMOS || {};
-  window.PF_MIMOS.ensureLoaded = ensureMimosLoaded;
-  window.PF_MIMOS.reload = reloadMimos;
-  window.PF_MIMOS.syncSelect = syncPrizeSelect;
-  function setMsg(text, isError) {
-    if (!els.msg) return;
-    els.msg.textContent = text || '';
-    els.msg.style.color = isError ? '#c0392b' : '';
-  }
-  function pad2(n) { return String(n).padStart(2, '0'); }
-  function toDatetimeLocalValue(isoOrTs) {
-    if (!isoOrTs) return '';
-    const d = new Date(isoOrTs);
-    if (isNaN(d.getTime())) return '';
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  }
-  function fromDatetimeLocalValue(v) {
-    if (!v) return null;
-    const d = new Date(v);
-    if (isNaN(d.getTime())) return null;
-    return d.toISOString();
-  }
-  function parseBRLToCents(input) {
-    if (input == null) return 0;
-    const s = String(input).replace(/[^\d,.-]/g, '').trim();
-    if (!s) return 0;
-    const normalized = s.replace(/\./g, '').replace(',', '.');
-    const n = Number(normalized);
-    if (!Number.isFinite(n)) return 0;
-    return Math.max(0, Math.round(n * 100));
-  }
-  function formatCentsToBRL(cents) {
-    const v = Number(cents || 0) / 100;
-    return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  function moneyMaskAttach(inputEl) {
-    if (!inputEl) return;
-    inputEl.addEventListener('blur', () => {
-      const cents = parseBRLToCents(inputEl.value);
-      inputEl.value = formatCentsToBRL(cents);
-    });
-  }
-  const EMOJI_LIST = [
-    '🎁','🎉','✨','⭐','💎','🏆','🥇','🎯','🔥','✅','🧡','💛','💚','💙','💜',
-    '🐶','🐾','🛁','✂️','🧴','🧼','🫧','🦴','🍖','💸','🎟️','📣','📅','🔔','🎡','🎲'
-  ];
-  function insertAtCursor(textarea, text) {
-    if (!textarea) return;
-    const start = textarea.selectionStart ?? textarea.value.length;
-    const end = textarea.selectionEnd ?? textarea.value.length;
-    const before = textarea.value.slice(0, start);
-    const after = textarea.value.slice(end);
-    textarea.value = before + text + after;
-    const newPos = start + text.length;
-    textarea.selectionStart = textarea.selectionEnd = newPos;
-  }
-  function buildEmojiPanel() {
-    if (!els.emojiPanel || !els.desc) return;
-    els.emojiPanel.innerHTML = '';
-    EMOJI_LIST.forEach((e) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = e;
-      b.className = 'btn btn-small';
-      b.style.padding = '6px 8px';
-      b.style.lineHeight = '1';
-      b.addEventListener('click', () => {
-        insertAtCursor(els.desc, e);
-        els.desc.focus();
-      });
-      els.emojiPanel.appendChild(b);
-    });
-  }
-  function openForm() {
-    if (els.formWrap) els.formWrap.style.display = '';
-  }
-  function closeForm() {
-    if (els.formWrap) els.formWrap.style.display = 'none';
-  }
-  function clearForm() {
-    currentEditId = null;
-    if (els.title) els.title.value = '';
-    if (els.desc) els.desc.value = '';
-    if (els.value) els.value.value = formatCentsToBRL(0);
-    if (els.start) els.start.value = '';
-    if (els.end) els.end.value = '';
-    if (els.active) els.active.checked = true;
-    setMsg('', false);
-  }
-  /* ---------- API ---------- */
-  async function apiGetMimos() {
-    const r = await fetch('/api/mimos', { method: 'GET' });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || 'Erro ao buscar mimos.');
-    return data.mimos || [];
-  }
-  async function apiCreateMimo(payload) {
-    const r = await fetch('/api/mimos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || 'Erro ao criar mimo.');
-    return data.mimo;
-  }
-  async function apiUpdateMimo(id, payload) {
-    const r = await fetch(`/api/mimos/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || 'Erro ao atualizar mimo.');
-    return data.mimo;
-  }
-  async function apiDeleteMimo(id) {
-    const r = await fetch(`/api/mimos/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || 'Erro ao excluir mimo.');
-    return true;
-  }
-  /* ---------- Render ---------- */
-  function syncPrizeSelect(mimos) {
-    const prizeSelect = document.getElementById('formPrize');
-    if (!prizeSelect) return;
-        // Usa a data do agendamento (formDate) como referência para filtrar os mimos por período.
-    // Isso permite agendar para dias futuros e ainda assim mostrar apenas mimos válidos naquele dia.
-    const ref = (() => {
-      try {
-        const fd = document.getElementById('formDate');
-        const v = (fd && fd.value) ? String(fd.value).trim() : '';
-        if (v) {
-          // meio-dia local para evitar problemas de fuso em datas
-          const d = new Date(v + 'T12:00:00');
-          if (!isNaN(d.getTime())) return d;
-        }
-      } catch (_) {}
-      return new Date();
-    })();
-    const isInPeriod = (m) => {
-      if (!m.is_active) return false;
-      const s = m.starts_at ? new Date(m.starts_at) : null;
-      const e = m.ends_at ? new Date(m.ends_at) : null;
-      if (s && !isNaN(s.getTime()) && ref < s) return false;
-      if (e && !isNaN(e.getTime()) && ref > e) return false;
-      return true;
-    };
-    const active = (mimos || []).filter(isInPeriod);
-    const current = prizeSelect.value;
-    prizeSelect.innerHTML = '';
-    const opt0 = document.createElement('option');
-    opt0.value = '';
-    opt0.textContent = '— Sem mimo —';
-    prizeSelect.appendChild(opt0);
-    active.forEach((m) => {
-      const opt = document.createElement('option');
-      opt.value = m.title; // compat: booking.prize é texto
-      opt.textContent = `${m.title} (R$ ${formatCentsToBRL(m.value_cents)})`;
-      opt.setAttribute('data-mimo-id', String(m.id));
-      prizeSelect.appendChild(opt);
-    });
-    // Se o mimo gravado não estiver ativo no período, manter a seleção visível.
-    if (current && !Array.from(prizeSelect.options).some(o => o.value === current)) {
-      const optX = document.createElement('option');
-      optX.value = current;
-      optX.textContent = `${current} (indisponível)`;
-      optX.setAttribute('data-inactive', '1');
-      prizeSelect.appendChild(optX);
-    }
-    if (current) prizeSelect.value = current;
-  }
-  function renderMimosTable(mimos) {
-    if (!els.tbody) return;
-    els.tbody.innerHTML = '';
-    const q = (els.search?.value || '').trim().toLowerCase();
-    const filtered = !q ? (mimos || []) : (mimos || []).filter(m =>
-      String(m.title || '').toLowerCase().includes(q) ||
-      String(m.description || '').toLowerCase().includes(q)
-    );
-    if (!filtered || filtered.length === 0) {
-      if (els.empty) els.empty.style.display = '';
-      return;
-    }
-    if (els.empty) els.empty.style.display = 'none';
-    const fmt = (d) => {
-      if (!d || isNaN(d.getTime())) return '—';
-      return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    };
-    filtered.forEach((m) => {
-      const tr = document.createElement('tr');
-      const tdTitle = document.createElement('td');
-      tdTitle.textContent = m.title || '';
-      tr.appendChild(tdTitle);
-      const tdValue = document.createElement('td');
-      tdValue.textContent = `R$ ${formatCentsToBRL(m.value_cents)}`;
-      tr.appendChild(tdValue);
-      const tdPeriod = document.createElement('td');
-      const s = m.starts_at ? new Date(m.starts_at) : null;
-      const e = m.ends_at ? new Date(m.ends_at) : null;
-      tdPeriod.textContent = `${fmt(s)} → ${fmt(e)}`;
-      tr.appendChild(tdPeriod);
-      const tdActive = document.createElement('td');
-      tdActive.textContent = m.is_active ? 'Sim' : 'Não';
-      tr.appendChild(tdActive);
-      const tdActions = document.createElement('td');
-      tdActions.style.whiteSpace = 'nowrap';
-      const btnEdit = document.createElement('button');
-      btnEdit.type = 'button';
-      btnEdit.className = 'btn btn-small';
-      btnEdit.textContent = 'Editar';
-      btnEdit.addEventListener('click', () => {
-        currentEditId = m.id;
-        if (els.title) els.title.value = m.title || '';
-        if (els.desc) els.desc.value = m.description || '';
-        if (els.value) els.value.value = formatCentsToBRL(m.value_cents);
-        if (els.start) els.start.value = toDatetimeLocalValue(m.starts_at);
-        if (els.end) els.end.value = toDatetimeLocalValue(m.ends_at);
-        if (els.active) els.active.checked = !!m.is_active;
-        setMsg(`Editando ID ${m.id}`, false);
-        openForm();
-      });
-      const btnDel = document.createElement('button');
-      btnDel.type = 'button';
-      btnDel.className = 'btn btn-small btn-danger';
-      btnDel.textContent = 'Excluir';
-      btnDel.style.marginLeft = '6px';
-      btnDel.addEventListener('click', async () => {
-        const ok = confirm(`Excluir o mimo "${m.title}"?`);
-        if (!ok) return;
-        try {
-          setMsg('Excluindo...', false);
-          await apiDeleteMimo(m.id);
-          await reloadMimos();
-          setMsg('Mimo excluído.', false);
-        } catch (err) {
-          setMsg(err.message || 'Erro ao excluir.', true);
-        }
-      });
-      tdActions.appendChild(btnEdit);
-      tdActions.appendChild(btnDel);
-      tr.appendChild(tdActions);
-      els.tbody.appendChild(tr);
-    });
-  }
-  async function reloadMimos() {
-    setMsg('Carregando...', false);
-    const mimos = await apiGetMimos();
-    cacheMimos = mimos;
-    window.cacheMimos = cacheMimos;
-    renderMimosTable(mimos);
-    syncPrizeSelect(mimos);
-    setMsg('', false);
-  }
-  async function handleSave() {
-    try {
-      setMsg('Salvando...', false);
-      const title = (els.title?.value || '').trim();
-      const description = (els.desc?.value || '').trim();
-      const value_cents = parseBRLToCents(els.value?.value || '0');
-      const starts_at = fromDatetimeLocalValue(els.start?.value || '');
-      const ends_at = fromDatetimeLocalValue(els.end?.value || '');
-      const is_active = !!els.active?.checked;
-      if (!title) {
-        setMsg('Informe o título.', true);
-        els.title?.focus();
-        return;
-      }
-      if (ends_at && starts_at && new Date(ends_at) < new Date(starts_at)) {
-        setMsg('A data de término não pode ser menor que a data de início.', true);
-        return;
-      }
-      const payload = { title, description, value_cents, starts_at, ends_at, is_active };
-      if (currentEditId) {
-        await apiUpdateMimo(currentEditId, payload);
-        setMsg('Mimo atualizado.', false);
-      } else {
-        await apiCreateMimo(payload);
-        setMsg('Mimo criado.', false);
-      }
-      await reloadMimos();
-      clearForm();
-      closeForm();
-    } catch (err) {
-      setMsg(err.message || 'Erro ao salvar.', true);
-    }
-  }
-  function attachEvents() {
-    moneyMaskAttach(els.value);
-    if (els.save) els.save.addEventListener('click', handleSave);
-    if (els.clear) els.clear.addEventListener('click', clearForm);
-    if (els.reload) els.reload.addEventListener('click', () => reloadMimos().catch(e => setMsg(e.message || 'Erro.', true)));
-    if (els.btnNovo) els.btnNovo.addEventListener('click', () => {
-      clearForm();
-      openForm();
-      els.title?.focus();
-    });
-    if (els.btnCloseForm) els.btnCloseForm.addEventListener('click', () => {
-      closeForm();
-      setMsg('', false);
-    });
-    if (els.search) els.search.addEventListener('input', () => {
-      renderMimosTable(cacheMimos);
-    });
-    document.addEventListener('click', (e) => {
-      const btn = e.target?.closest?.('.tab-btn[data-tab="tab-mimos"]');
-      if (!btn) return;
-      reloadMimos().catch(err => setMsg(err.message || 'Erro ao carregar mimos.', true));
-    });
-  }
-  buildEmojiPanel();
-  attachEvents();
-})();
+
   /* ========= CONTROLE DE SESSÃO (30 MIN) ========= */
   const SESSION_KEY = 'pf_admin_session';
   const SESSION_DURATION_MS = 30 * 60 * 1000;
@@ -428,7 +164,9 @@ const API_BASE_URL = '';
     }
     appInitialized = true;
     try {
-      await loadServices();      // garante servicesCache e dropdown de serviços
+      await loadServices();      // garante servicesCache
+      try { await loadPackages(); } catch (_) {}
+      // garante servicesCache e dropdown de serviços
       // Garante que o select de mimos no agendamento esteja preenchido,
       // e que o dashboard possa calcular os totais por mimo.
       if (window.PF_MIMOS && typeof window.PF_MIMOS.ensureLoaded === 'function') {
@@ -532,6 +270,143 @@ const API_BASE_URL = '';
     return data;
   }
   function sanitizePhone(phone) { return (phone || '').replace(/\D/g, ''); }
+
+/* =========================
+   WhatsApp – Ficha completa do Pacote (Admin)
+========================= */
+function normalizeWhatsPhone(phoneRaw){
+  let p = String(phoneRaw || '').replace(/\D/g,'');
+  if (!p) return '';
+  // Se veio sem código do país (11 dígitos BR), adiciona 55
+  if (p.length === 10 || p.length === 11) p = '55' + p;
+  // Remove zeros à esquerda (caso exista)
+  p = p.replace(/^0+/, '');
+  return p;
+}
+
+function formatDateBrOnly(dateISO){
+  try{
+    if(!dateISO) return '';
+    const d = new Date(String(dateISO).slice(0,10) + 'T00:00:00-03:00');
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+  }catch(e){ return String(dateISO||''); }
+}
+
+function showPackageDispatchOverlay(subText){
+  const ov = document.getElementById('packageDispatchOverlay');
+  const sub = document.getElementById('packageDispatchSub');
+  if (sub) sub.textContent = String(subText || 'Preparando mensagem do pacote.');
+  if (ov){
+    ov.style.display = 'flex';
+    ov.setAttribute('aria-hidden','false');
+  }
+}
+function hidePackageDispatchOverlay(){
+  const ov = document.getElementById('packageDispatchOverlay');
+  if (ov){
+    ov.style.display = 'none';
+    ov.setAttribute('aria-hidden','true');
+  }
+}
+
+function buildPackageWhatsText({ customerName, petName, sale, bookings, preview }) {
+  const nome = String(customerName || '').trim() || '[NOME_DO_CLIENTE]';
+  const pet = String(petName || '').trim() || '[NOME_DO_PET]';
+  const payStatus = (sale && sale.payment_status != null) ? String(sale.payment_status).trim() : '[STATUS DO PAGAMENTO]';
+  const payMethod = (sale && sale.payment_method != null) ? String(sale.payment_method).trim() : '[FORMA DE PAGAMENTO]';
+
+  // Ordena agendamentos por data/hora
+  const arr = Array.isArray(bookings) ? bookings.slice() : [];
+  arr.sort((a, b) => {
+    const da = String(a.date || a.start_date || '');
+    const db = String(b.date || b.start_date || '');
+    if (da !== db) return da.localeCompare(db);
+    return String(a.time || '').localeCompare(String(b.time || ''));
+  });
+
+  // Serviços inclusos: por regra do backend, os "inclusos" vêm com value_cents = 0 no 1º banho.
+  const includedMap = new Map();
+  try {
+    const first = arr[0] || null;
+    const raw = first ? (first.services_json || first.servicesJson) : null;
+    let list = null;
+    if (typeof raw === 'string' && raw.trim()) {
+      try { list = JSON.parse(raw); } catch (_) {}
+    } else if (Array.isArray(raw)) {
+      list = raw;
+    }
+    if (Array.isArray(list)) {
+      list.forEach((s) => {
+        const title = s && (s.title || s.name) ? String(s.title || s.name).trim() : '';
+        const v = (s && s.value_cents != null) ? Number(s.value_cents) : null;
+        if (!title) return;
+        if (v === 0) includedMap.set(title, (includedMap.get(title) || 0) + 1);
+      });
+    }
+  } catch (_) {}
+
+  const includedLines = [];
+  if (includedMap.size) {
+    for (const [title, qty] of includedMap.entries()) {
+      includedLines.push(`  → ${qty} ${title}.`);
+    }
+  }
+
+  const lines = [];
+  lines.push(`Olá, ${nome}!`);
+  lines.push(`Aqui é do *PetFunny – Banho & Tosa*.`);
+  lines.push('');
+  lines.push(`Primeiramente, queremos agradecer de coração pela confiança em nossa equipe para cuidar do(a) *${pet}*. É um prazer ter você com a gente!`);
+  lines.push('');
+  lines.push(`Preparamos tudo com muito carinho e, abaixo, você confere a **ficha completa do pacote que acabou de adquirir**, com todas as informações importantes:`);
+  lines.push('');
+  lines.push(`**Agendamentos do pacote**  `);
+  lines.push(`→ Datas e horários de cada banho:`);
+  arr.forEach((b, idx) => {
+    const dateISO = b.date || b.start_date || '';
+    const dd = formatDateBrOnly(dateISO);
+    const wkRaw = (typeof getWeekdayPt === 'function') ? String(getWeekdayPt(dateISO) || '') : '';
+    const wk = wkRaw ? (wkRaw.charAt(0).toUpperCase() + wkRaw.slice(1)) : '';
+    const time = String(b.time || '').slice(0, 5);
+    const bathNo = (b.package_seq != null) ? Number(b.package_seq) : ((b.bath_no != null) ? Number(b.bath_no) : (idx + 1));
+    const bathTag = String(bathNo).padStart(2, '0');
+    const st = (b.status != null) ? String(b.status).trim() : 'confirmado';
+    const stNorm = st ? st.toLowerCase() : 'confirmado';
+    lines.push(`  → Banho ${bathTag}: ${dd}${wk ? ` (${wk})` : ''} às ${time} — ${stNorm}.`);
+  });
+  lines.push('');
+  lines.push(`→ Serviços incluídos no pacote: `);
+  if (includedLines.length) includedLines.forEach(l => lines.push(l));
+  lines.push('');
+  lines.push(`**Pagamento**  `);
+  lines.push(`→ Status do pagamento: ${payStatus}.`);
+  lines.push(`→ Forma de pagamento escolhida: ${payMethod}.`);
+  lines.push('');
+  lines.push(`**Resumo da sua economia**  `);
+  lines.push(`→ Comparativo entre valor avulso x valor do pacote.`);
+  lines.push(`→ Economia total obtida com o pacote.  `);
+  lines.push('');
+  lines.push(`Qualquer dúvida, alteração ou se precisar de ajuda, é só responder por aqui.  `);
+  lines.push('');
+  lines.push(`Estamos à disposição e ansiosos para cuidar do(a) *${pet}* com todo o carinho que ele(a) merece.`);
+  lines.push('');
+  lines.push(`Até breve!  `);
+  lines.push(`*Equipe PetFunny – Banho & Tosa*`);
+  return lines.join('\n');
+}
+
+
+function openWhatsAppWithText(phoneRaw, text){
+  const phone = normalizeWhatsPhone(phoneRaw);
+  if (!phone) return;
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(String(text||''))}`;
+  window.open(url, '_blank');
+}
+
+
   function formatTelefone(phone) {
     const digits = (phone || '').replace(/\D/g, '');
     if (digits.length === 11) return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
@@ -594,29 +469,66 @@ const API_BASE_URL = '';
   const todayISO = new Date().toISOString().split('T')[0];
   function validarDiaHora(dateStr, timeStr) {
     if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+
+    // Determina o dia da semana em São Paulo (evita bug de fuso em alguns browsers)
+    const dDow = new Date(dateStr + 'T00:00:00-03:00');
+    if (Number.isNaN(dDow.getTime())) return 'Data inválida.';
+    const dow = dDow.getUTCDay(); // 0=Dom..6=Sáb (São Paulo)
+
+    // Lê horário de funcionamento configurado (menu "Horário de Funcionamento")
+    const oh = Array.isArray(openingHoursCache)
+      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
+      : null;
+
+    const isClosed = oh ? (
+      oh.is_closed === true ||
+      oh.is_closed === 1 ||
+      oh.is_closed === '1' ||
+      oh.is_closed === 't' ||
+      oh.is_closed === 'true'
+    ) : null;
+
+    // Fallback (se ainda não carregou/foi configurado)
+    const openStr = (oh && !isClosed) ? String(oh.open_time || '07:30') : '07:30';
+    const closeStr = (oh && !isClosed) ? String(oh.close_time || (dow === 6 ? '13:00' : '17:30')) : (dow === 6 ? '13:00' : '17:30');
+
+    if (isClosed === true || (oh && isClosed) || (!oh && dow === 0)) {
+      // Mantém mensagens alinhadas ao comportamento do cliente
+      if (dow === 0) return 'Atendemos apenas de segunda a sábado.';
+      return 'Dia fechado para agendamentos.';
+    }
+
+    const m = /^([01]\d|2[0-3]):[0-5]\d$/.exec(String(timeStr || '').trim());
+    if (!m) return 'Horário inválido.';
+
+    const t = parseInt(timeStr.slice(0, 2), 10) * 60 + parseInt(timeStr.slice(3, 5), 10);
+    const open = hhmmToMinutes(normalizeHHMM(openStr));
+    const close = hhmmToMinutes(normalizeHHMM(closeStr));
+
+    if (!Number.isFinite(open) || !Number.isFinite(close) || close <= open) return 'Horário de funcionamento inválido.';
+    if (t < open || t >= close) {
+      // Mantém o padrão antigo de texto, mas com horários dinâmicos
+      if (dow >= 1 && dow <= 5) return `Segunda a sexta: horários entre ${minutesToHHMM(open)} e ${minutesToHHMM(close)}.`;
+      if (dow === 6) return `Sábado: horários entre ${minutesToHHMM(open)} e ${minutesToHHMM(close)}.`;
+      return `Horários entre ${minutesToHHMM(open)} e ${minutesToHHMM(close)}.`;
+    }
+
+    // Admin também deve seguir a regra do cliente: somente 00 ou 30
+    if ((t - open) % 30 !== 0) return 'Escolha um horário fechado (minutos 00 ou 30).';
+
+    // Não permite agendar no passado (comparando data/hora local)
+    // EXCEÇÃO (ADMIN): em agendamento AVULSO, permitir registrar datas/horários passados (retroativo).
     const date = new Date(dateStr + 'T' + timeStr + ':00');
     if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
-    const diaSemana = date.getDay();
-    const parts = String(timeStr).split(':');
-    const hh = parseInt(parts[0], 10);
-    const mm = parseInt(parts[1] || '0', 10);
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
-    // Admin também deve seguir a regra do cliente: somente 00 ou 30
-    if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
-    const minutos = hh * 60 + mm;
-    const inicio = 7 * 60 + 30;
-    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
-    if (diaSemana >= 1 && diaSemana <= 5) {
-      const fim = 17 * 60 + 30;
-      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+
+    const kindEl = document.getElementById('formBookingKind');
+    const kind = kindEl ? String(kindEl.value || '') : '';
+    const allowPast = (kind === 'avulso');
+    if (!allowPast) {
+      const now = new Date();
+      if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
     }
-    if (diaSemana === 6) {
-      const fim = 13 * 60;
-      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
-    }
-    // Não permite agendar no passado (comparando data/hora local)
-    const now = new Date();
-    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+
     return null;
   }
   function pad2(n) { return String(n).padStart(2, '0'); }
@@ -851,10 +763,8 @@ function normalizeHHMM(t) {
   const btnViewList = document.getElementById('btnViewList');
   const btnViewCards = document.getElementById('btnViewCards');
   const statTotal = document.getElementById('statTotal');
-  const statTosa = document.getElementById('statTosa');
-  const statHidratacao = document.getElementById('statHidratacao');
-  const statFotoVideo = document.getElementById('statFotoVideo');
-  const statPatinhas = document.getElementById('statPatinhas');
+  const statAvulsos = document.getElementById('statAvulsos');
+  const statPacotes = document.getElementById('statPacotes');
   const formPanel = document.getElementById('formPanel');
   const bookingId = document.getElementById('bookingId');
   const bookingOriginalStatus = document.getElementById('bookingOriginalStatus');
@@ -1031,6 +941,327 @@ const formStatus = document.getElementById('formStatus');
   let clientesCache = [];
   let clienteSelecionadoId = null;
   let petsCache = [];
+/* =========================
+   SERVICES (Admin) — módulo interno (restaura loadServices)
+   Objetivo: manter compatibilidade com agendamentos/pacotes sem alterar layout.
+========================= */
+
+
+
+function parseBRLToCents(input) {
+  const s = String(input ?? '').trim();
+  if (!s) return 0;
+  // remove currency symbols/spaces
+  const cleaned = s.replace(/[Rr]\$\s/g, '').replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9.\-]/g, '');
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 100);
+}
+
+function formatBRLInput(value) {
+  // value: cents or number
+  const cents = Number(value) || 0;
+  return formatBRLFromCents(cents);
+}
+
+function getServicesFilters() {
+  const t = document.getElementById('filtroServicosTitle');
+  const c = document.getElementById('filtroServicosTipo');
+  const p = document.getElementById('filtroPorteServicos');
+  return {
+    title: t ? normStr(t.value) : '',
+    category: c ? normStr(c.value) : '',
+    porte: p ? normStr(p.value) : '',
+  };
+}
+
+function applyServicesFilters(list) {
+  const f = getServicesFilters();
+  return (Array.isArray(list) ? list : []).filter(s => {
+    const okTitle = !f.title || normStr(s.title).includes(f.title);
+    const okCat = !f.category || normStr(s.category).includes(f.category);
+    const okPorte = !f.porte || normStr(s.porte).includes(f.porte);
+    return okTitle && okCat && okPorte;
+  });
+}
+
+function showServicePanel(show) {
+  const panel = document.getElementById('serviceFormPanel');
+  if (!panel) return;
+  panel.classList.toggle('hidden', !show);
+  if (show) {
+    // foco amigável
+    const first = document.getElementById('serviceCategory') || document.getElementById('serviceTitle');
+    if (first) first.focus();
+  }
+}
+
+function setServiceError(msg) {
+  const box = document.getElementById('serviceError');
+  if (!box) return;
+  if (!msg) { box.style.display = 'none'; box.textContent = ''; return; }
+  box.textContent = msg;
+  box.style.display = 'block';
+}
+
+function clearServiceForm() {
+  const id = document.getElementById('serviceId');
+  const date = document.getElementById('serviceDate');
+  const cat = document.getElementById('serviceCategory');
+  const title = document.getElementById('serviceTitle');
+  const porte = document.getElementById('servicePorte');
+  const price = document.getElementById('servicePrice');
+  const tempo = document.getElementById('serviceTempo');
+
+  if (id) id.value = '';
+  if (date) date.value = '';
+  if (cat) cat.value = '';
+  if (title) title.value = '';
+  if (porte) porte.value = '';
+  if (price) price.value = '';
+  if (tempo) tempo.value = '';
+  setServiceError('');
+}
+
+function fillServiceForm(service) {
+  const id = document.getElementById('serviceId');
+  const date = document.getElementById('serviceDate');
+  const cat = document.getElementById('serviceCategory');
+  const title = document.getElementById('serviceTitle');
+  const porte = document.getElementById('servicePorte');
+  const price = document.getElementById('servicePrice');
+  const tempo = document.getElementById('serviceTempo');
+
+  if (id) id.value = service?.id != null ? String(service.id) : '';
+  if (date) date.value = service?.date != null ? String(service.date) : '';
+  if (cat) cat.value = service?.category != null ? String(service.category) : '';
+  if (title) title.value = service?.title != null ? String(service.title) : '';
+  if (porte) porte.value = service?.porte != null ? String(service.porte) : '';
+  if (price) price.value = formatBRLInput(service?.value_cents || 0);
+  if (tempo) tempo.value = service?.duration_min != null ? String(service.duration_min) : '';
+  setServiceError('');
+}
+
+function renderServicesTable() {
+  const tbody = document.getElementById('tbodyServices');
+  const empty = document.getElementById('servicesEmpty');
+  if (!tbody) return;
+
+  const filtered = applyServicesFilters(servicesCache);
+
+  tbody.innerHTML = '';
+  if (!filtered.length) {
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  for (const s of filtered) {
+    const tr = document.createElement('tr');
+
+    const created = s.created_at || s.createdAt || '';
+    const updated = s.updated_at || s.updatedAt || '';
+
+    tr.innerHTML = `
+      <td>${escapeHtml(s.date ?? '')}</td>
+      <td>${escapeHtml(s.category ?? '')}</td>
+      <td>${escapeHtml(s.title ?? '')}</td>
+      <td>${escapeHtml(s.porte ?? '')}</td>
+      <td>${escapeHtml(String(s.duration_min ?? ''))}</td>
+      <td>${escapeHtml(formatBRLFromCents(s.value_cents ?? 0))}</td>
+      <td>${escapeHtml(String(created))}</td>
+      <td>${escapeHtml(String(updated))}</td>
+      <td class="actions-cell">
+        <button type="button" class="btn btn-light btn-sm" data-action="edit" data-id="${escapeHtml(s.id)}">Editar</button>
+        <button type="button" class="btn btn-light btn-sm" data-action="del" data-id="${escapeHtml(s.id)}">Excluir</button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+  }
+}
+
+function populateServiceSelects() {
+  // Select do agendamento (multi-service)
+  const sel = document.getElementById('formService');
+  if (sel) {
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">Selecione...</option>';
+    for (const s of servicesCache) {
+      const opt = document.createElement('option');
+      opt.value = String(s.id);
+      opt.textContent = s.title || `Serviço #${s.id}`;
+      opt.dataset.value_cents = String(s.value_cents ?? 0);
+      opt.dataset.duration_min = String(s.duration_min ?? 0);
+      opt.dataset.porte = String(s.porte ?? '');
+      opt.dataset.category = String(s.category ?? '');
+      sel.appendChild(opt);
+    }
+    // tenta manter seleção
+    if (prev) sel.value = prev;
+  }
+
+  // Select do banho base em Pacotes (somente categoria Banho)
+  const bathSel = document.getElementById('pkgBathService');
+  if (bathSel) {
+    const prev = bathSel.value;
+    bathSel.innerHTML = '<option value="">Selecione...</option>';
+    const baths = (servicesCache || []).filter(s => normStr(s.category) === 'banho');
+    for (const s of baths) {
+      const opt = document.createElement('option');
+      opt.value = String(s.id);
+      opt.textContent = s.title || `Banho #${s.id}`;
+      bathSel.appendChild(opt);
+    }
+    if (prev) bathSel.value = prev;
+  }
+}
+
+async function loadServices() {
+  try {
+    const resp = await apiGet('/api/services');
+    servicesCache = (resp && resp.services) ? resp.services : [];
+  } catch (e) {
+    console.error('Erro ao carregar serviços:', e);
+    servicesCache = [];
+  }
+  populateServiceSelects();
+  renderServicesTable();
+  try { if (typeof refreshSelectedServicesUI === 'function') refreshSelectedServicesUI(); } catch (_) {}
+  return servicesCache;
+}
+
+async function saveServiceFromForm() {
+  const idEl = document.getElementById('serviceId');
+  const catEl = document.getElementById('serviceCategory');
+  const titleEl = document.getElementById('serviceTitle');
+  const porteEl = document.getElementById('servicePorte');
+  const priceEl = document.getElementById('servicePrice');
+  const tempoEl = document.getElementById('serviceTempo');
+
+  const id = idEl && idEl.value ? Number(idEl.value) : null;
+  const category = catEl ? String(catEl.value || '') : '';
+  const title = titleEl ? String(titleEl.value || '') : '';
+  const porte = porteEl ? String(porteEl.value || '') : '';
+  const value_cents = parseBRLToCents(priceEl ? priceEl.value : '');
+  const duration_min = tempoEl ? Number(tempoEl.value || 0) : 0;
+
+  if (!category) return setServiceError('Selecione a categoria do serviço.');
+  if (!title.trim()) return setServiceError('Informe o título do serviço.');
+  if (!porte) return setServiceError('Selecione o porte.');
+  if (!Number.isFinite(value_cents) || value_cents <= 0) return setServiceError('Informe um preço válido.');
+  if (!Number.isFinite(duration_min) || duration_min <= 0) return setServiceError('Informe o tempo (min) do serviço.');
+
+  setServiceError('');
+
+  const payload = { category, title: title.trim(), porte, value_cents, duration_min };
+
+  try {
+    if (id) {
+      await apiPut(`/api/services/${id}`, payload);
+    } else {
+      await apiPost('/api/services', payload);
+    }
+    clearServiceForm();
+    showServicePanel(false);
+    await loadServices();
+  } catch (e) {
+    console.error('Erro ao salvar serviço:', e);
+    setServiceError((e && e.message) ? e.message : 'Erro ao salvar serviço.');
+  }
+}
+
+async function deleteServiceById(id) {
+  if (!id) return;
+  const ok = confirm('Tem certeza que deseja excluir este serviço?');
+  if (!ok) return;
+  try {
+    await apiDelete(`/api/services/${id}`);
+    await loadServices();
+  } catch (e) {
+    console.error('Erro ao excluir serviço:', e);
+    alert((e && e.message) ? e.message : 'Erro ao excluir serviço.');
+  }
+}
+
+function bindServicesEventsOnce() {
+  const btnNovo = document.getElementById('btnNovoServico');
+  const btnCancel = document.getElementById('btnServiceCancel');
+  const btnSave = document.getElementById('btnServiceSave');
+  const tbody = document.getElementById('tbodyServices');
+  const btnLimpar = document.getElementById('btnLimparServicos');
+
+  const t = document.getElementById('filtroServicosTitle');
+  const c = document.getElementById('filtroServicosTipo');
+  const p = document.getElementById('filtroPorteServicos');
+
+  if (btnNovo && !btnNovo.dataset.bound) {
+    btnNovo.dataset.bound = '1';
+    btnNovo.addEventListener('click', () => {
+      clearServiceForm();
+      showServicePanel(true);
+    });
+  }
+
+  if (btnCancel && !btnCancel.dataset.bound) {
+    btnCancel.dataset.bound = '1';
+    btnCancel.addEventListener('click', () => {
+      clearServiceForm();
+      showServicePanel(false);
+    });
+  }
+
+  if (btnSave && !btnSave.dataset.bound) {
+    btnSave.dataset.bound = '1';
+    btnSave.addEventListener('click', () => saveServiceFromForm());
+  }
+
+  if (btnLimpar && !btnLimpar.dataset.bound) {
+    btnLimpar.dataset.bound = '1';
+    btnLimpar.addEventListener('click', () => {
+      if (t) t.value = '';
+      if (c) c.value = '';
+      if (p) p.value = '';
+      renderServicesTable();
+    });
+  }
+
+  [t, c, p].forEach(el => {
+    if (!el || el.dataset.bound) return;
+    el.dataset.bound = '1';
+    el.addEventListener('input', () => renderServicesTable());
+    el.addEventListener('change', () => renderServicesTable());
+  });
+
+  if (tbody && !tbody.dataset.bound) {
+    tbody.dataset.bound = '1';
+    tbody.addEventListener('click', (ev) => {
+      const btn = ev.target && ev.target.closest ? ev.target.closest('button[data-action]') : null;
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      const id = Number(btn.getAttribute('data-id') || 0);
+      const svc = (servicesCache || []).find(s => Number(s.id) === id);
+      if (action === 'edit' && svc) {
+        fillServiceForm(svc);
+        showServicePanel(true);
+      }
+      if (action === 'del') deleteServiceById(id);
+    });
+  }
+
+  // máscara simples de BRL no input de preço
+  const price = document.getElementById('servicePrice');
+  if (price && !price.dataset.bound) {
+    price.dataset.bound = '1';
+    price.addEventListener('blur', () => {
+      const cents = parseBRLToCents(price.value);
+      price.value = cents ? formatBRLFromCents(cents) : '';
+    });
+  }
+}
+
+// garante binding mesmo que initApp retorne cedo
+try { bindServicesEventsOnce(); } catch (_) {}
   let petEditIdLocal = null;
   function setEditMode(isEdit) {
     // Em edição: mantém Tutor/Telefone travados, mas permite editar Pet e Mimo
@@ -1099,62 +1330,14 @@ const formStatus = document.getElementById('formStatus');
     return data.bookings || [];
   }
   function atualizaEstatisticas(lista) {
-    const total = lista.length;
-    // Mantém contadores existentes (por serviço) para compatibilidade do painel
-// Mantém contadores existentes (por mimo/prize) para compatibilidade do painel
-    // Importante: o painel "Tosa/Hidratação/Foto/Vídeo/Patinhas" é sobre o MIMO (campo prize),
-    // não sobre o(s) serviço(s). Antes ele contava por a.service e acabava inflando/errando quando
-    // existe serviço "Patinhas" mas o mimo do agendamento é outro.
-    const contTosa = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('tosa higiênica')).length;
-    const contHidra = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('hidrata')).length;
-    const contFoto = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('foto')).length;
-    const contPatinhas = (lista || []).filter(a => String(a.prize || '').toLowerCase().includes('patinhas')).length;
-    statTotal.textContent = total;
-    statTosa.textContent = contTosa;
-    statHidratacao.textContent = contHidra;
-    statFotoVideo.textContent = contFoto;
-    statPatinhas.textContent = contPatinhas;
-    // ===== Mimos (dinâmico: lista em ordem de cadastro e contagem por agendamento filtrado) =====
-    const mimosEl = document.getElementById('statMimosList');
-    if (mimosEl) {
-      const list = Array.isArray(window.cacheMimos) ? window.cacheMimos.slice() : [];
-      // Ordena por cadastro (id asc) e filtra mimos ativos no período (se houver starts/ends)
-      list.sort((a,b) => Number(a.id||0) - Number(b.id||0));
-      const isActiveOnBookingDate = (m, bookingDateStr) => {
-        // Compat: mimos podem usar starts_at/ends_at ou start/end (ou null)
-        const s = m.starts_at || m.start || m.startsAt || null;
-        const e = m.ends_at || m.end || m.endsAt || null;
-        if (!bookingDateStr) return !!m.is_active;
-        // Se não houver período, considera apenas flag is_active
-        if (!s && !e) return !!m.is_active;
-        const bd = new Date(String(bookingDateStr) + "T00:00:00");
-        const sd = s ? new Date(s) : null;
-        const ed = e ? new Date(e) : null;
-        if (sd && bd < new Date(sd.toDateString())) return false;
-        if (ed && bd > new Date(ed.toDateString())) return false;
-        return !!m.is_active;
-      };
-      const countsByTitle = {};
-      (lista || []).forEach((a) => {
-        const prize = String(a.prize || "").trim();
-        if (!prize || prize.toLowerCase() === "sem mimo") return;
-        const mimo = list.find(m => String(m.title || m.name || "").trim() === prize);
-        if (!mimo) return;
-        if (!isActiveOnBookingDate(mimo, a.date)) return;
-        countsByTitle[prize] = (countsByTitle[prize] || 0) + 1;
-      });
-      const refDate = (filtroData && filtroData.value) ? String(filtroData.value).slice(0,10) : (new Date()).toISOString().slice(0,10);
-      const lines = list
-        .filter(m => isActiveOnBookingDate(m, refDate))
-        .map(m => {
-          const title = String(m.title || m.name || "").trim();
-          const c = countsByTitle[title] || 0;
-          return `${title}: ${c}`;
-        })
-        .filter(Boolean);
-      // Exibe em linhas (usa newline para manter layout atual sem quebrar CSS)
-      mimosEl.textContent = lines.length ? lines.join("\n") : "—";
-    }
+    const total = Array.isArray(lista) ? lista.length : 0;
+    // Avulso x Pacote: consideramos "pacote" quando existe package_sale_id (cada banho do pacote vira uma linha)
+    const totalPacotes = (Array.isArray(lista) ? lista : []).filter(a => a && a.package_sale_id != null).length;
+    const totalAvulsos = total - totalPacotes;
+
+    if (statTotal) statTotal.textContent = String(total);
+    if (statAvulsos) statAvulsos.textContent = String(totalAvulsos);
+    if (statPacotes) statPacotes.textContent = String(totalPacotes);
   }
   // ===== GRÁFICOS =====
   let statusChart = null;
@@ -1251,6 +1434,13 @@ const formStatus = document.getElementById('formStatus');
   // Cliente/Telefone
   formPhone.value = booking && booking.phone ? booking.phone : '';
   applyPhoneMask(formPhone); // garante máscara também ao carregar
+  // Tipo (avulso | pacote) em edição
+  const bk = document.getElementById('formBookingKind');
+  const pkgSel = document.getElementById('formPackageId');
+  const isPkg = !!(booking && booking.package_sale_id);
+  const kind = isPkg ? 'pacote' : 'avulso';
+  if (bk) bk.value = kind;
+  if (typeof updateBookingKindUI === 'function') updateBookingKindUI(kind);
   if (formNome) formNome.value = booking && (booking.customer_name || booking.name) ? (booking.customer_name || booking.name) : (formNome.value || '');
   // Carrega pets do cliente para permitir selecionar/validar porte
   const custId = booking && (booking.customer_id || booking.customerId) ? (booking.customer_id || booking.customerId) : null;
@@ -1261,6 +1451,15 @@ const formStatus = document.getElementById('formStatus');
       const pet = bookingPetsCache.find(x => String(x.id) === pid);
       currentPetSize = (pet && pet.size) ? String(pet.size) : '';
       refreshServiceOptionsInAgenda();
+      // Se for edição de pacote, após carregar o pet (porte), carrega e seleciona o pacote do registro.
+      if (isPkg && typeof refreshPackageSelectForBooking === 'function') {
+        Promise.resolve(refreshPackageSelectForBooking())
+          .then(() => {
+            if (pkgSel && booking && booking.package_id != null) pkgSel.value = String(booking.package_id);
+            if (pkgSel) pkgSel.disabled = true;
+          })
+          .catch(() => {});
+      }
     }).catch(()=>{});
   } else {
     bookingPetsCache = [];
@@ -1275,6 +1474,7 @@ const formStatus = document.getElementById('formStatus');
   bookingOriginalStatus.value = booking && booking.status ? booking.status : 'agendado';
   if (formPaymentStatus) formPaymentStatus.value = booking && booking.payment_status ? booking.payment_status : 'Não Pago';
   if (formPaymentMethod) formPaymentMethod.value = booking && booking.payment_method ? booking.payment_method : '';
+  if (formNotes) formNotes.value = booking && booking.notes ? booking.notes : '';
   // Serviço(s)
   clearSelectedServices();
   let servicesJson = booking && booking.services_json ? booking.services_json : null;
@@ -1292,6 +1492,53 @@ const formStatus = document.getElementById('formStatus');
   // Mimo (pode ser nulo)
   const prizeVal = booking && booking.prize ? booking.prize : 'Sem mimo';
   formPrize.value = prizeVal;
+  // Ajustes de UI/locks por tipo em edição (Pacote vs Avulso)
+  if (isPkg) {
+    // Garante que o select de pacotes esteja carregado e selecione o pacote do registro
+    if (typeof refreshPackageSelectForBooking === 'function') {
+      Promise.resolve(refreshPackageSelectForBooking())
+        .then(() => {
+          if (pkgSel && booking && booking.package_id != null) pkgSel.value = String(booking.package_id);
+          if (pkgSel) pkgSel.disabled = true;
+        })
+        .catch(() => {});
+    } else {
+      if (pkgSel && booking && booking.package_id != null) pkgSel.value = String(booking.package_id);
+      if (pkgSel) pkgSel.disabled = true;
+    }
+
+    // Travas: tudo travado exceto Data, Horário e Status
+    if (bk) bk.disabled = true;
+    if (formPetSelect) formPetSelect.disabled = true;
+    if (formPrize) formPrize.disabled = true;
+    if (formPaymentStatus) formPaymentStatus.disabled = true;
+    if (formPaymentMethod) formPaymentMethod.disabled = true;
+    if (formNotes) formNotes.disabled = false;
+
+    // Serviços não editáveis (e normalmente ocultos no modo pacote)
+    if (formService) formService.disabled = true;
+    if (btnAddService) btnAddService.disabled = true;
+    if (selectedServicesList) selectedServicesList.style.pointerEvents = 'none';
+
+    // Campos liberados
+    if (formDate) formDate.disabled = false;
+    if (formTime) formTime.disabled = false;
+    if (formStatus) formStatus.disabled = false;
+  } else {
+    // Avulso em edição: mantém fluxo padrão, mas não permite trocar o tipo
+    if (bk) bk.disabled = true;
+    if (pkgSel) { pkgSel.value = ''; pkgSel.disabled = true; }
+    if (formPaymentStatus) formPaymentStatus.disabled = false;
+    if (formPaymentMethod) formPaymentMethod.disabled = false;
+    if (formNotes) formNotes.disabled = false;
+    if (formService) formService.disabled = false;
+    if (btnAddService) btnAddService.disabled = false;
+    if (selectedServicesList) selectedServicesList.style.pointerEvents = '';
+    if (formDate) formDate.disabled = false;
+    if (formTime) formTime.disabled = false;
+    if (formStatus) formStatus.disabled = false;
+  }
+
   // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
   refreshBookingDateTimeState(id ? Number(id) : null);
 }
@@ -1308,7 +1555,7 @@ const formStatus = document.getElementById('formStatus');
   const serviceError = document.getElementById('serviceError');
   const btnServiceCancel = document.getElementById('btnServiceCancel');
   const btnServiceSave = document.getElementById('btnServiceSave');
-  const tbodyServices = document.getElementById('tbodyServices');
+  const tbodyServices = document.getElementById('tbodyServices'); 
   const servicesEmpty = document.getElementById('servicesEmpty');
   // Filtro de busca (Serviços)
   const filtroServicos = document.getElementById('filtroServicos');
@@ -1316,7 +1563,9 @@ const formStatus = document.getElementById('formStatus');
   const filtroCategoriaServicos = document.getElementById('filtroCategoriaServicos');const btnLimparServicos = document.getElementById('btnLimparServicos');
   let filtroServicosTxt = '';
   let filtroCategoriaServicosVal = '';
-  let servicesCache = [];
+
+  let packagesCache = [];
+
 function getServiceById(id){
   return servicesCache.find(s => String(s.id) === String(id));
 }
@@ -1576,9 +1825,16 @@ if (selectedServicesList) {
   }
   if (btnNovoServico) {
     btnNovoServico.addEventListener('click', () => {
+      // Toggle: clica para abrir, clica de novo para fechar
+      try {
+        if (serviceFormPanel && !serviceFormPanel.classList.contains('hidden')) {
+          clearServiceForm();
+          hideServiceForm();
+          return;
+        }
+      } catch (_) {}
       clearServiceForm();
-      showServiceForm();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      showServiceForm();window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
   if (btnServiceCancel) btnServiceCancel.addEventListener('click', () => { clearServiceForm(); hideServiceForm(); });
@@ -1757,9 +2013,16 @@ if (selectedServicesList) {
   }
   if (btnNovoBreed) {
     btnNovoBreed.addEventListener('click', () => {
+      // Toggle: clica para abrir, clica de novo para fechar
+      try {
+        if (breedFormPanel && !breedFormPanel.classList.contains('hidden')) {
+          clearBreedForm();
+          hideBreedForm();
+          return;
+        }
+      } catch (_) {}
       clearBreedForm();
-      showBreedForm();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      showBreedForm();window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
   if (btnBreedCancel) btnBreedCancel.addEventListener('click', () => { clearBreedForm(); hideBreedForm(); });
@@ -1901,28 +2164,55 @@ if (selectedServicesList) {
       if (estadoVazio) estadoVazio.style.display = isEmpty ? 'block' : 'none';
     }
   }
-  function renderAgendaList(lista) {
+  
+function renderAgendaList(lista) {
     tbodyAgenda.innerHTML = '';
     estadoVazio.style.display = lista.length ? 'none' : 'block';
     lista.forEach(a => {
       const tr = document.createElement('tr');
-      const tdData = document.createElement('td'); tdData.textContent = formatDataBr(a.date);
+      setRowTimeHighlight(tr, a.date, a.time);
+
+      const tdData = document.createElement('td');
+      tdData.innerHTML = `<div>${formatDataBr(a.date)}</div><div class="td-sub">${getWeekdayPt(a.date)}</div>`;
+
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
       const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
       const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
-      const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(a.phone);
+
+      const tdTel = document.createElement('td');
+      const waUrl = buildWhatsUrl(a.phone);
+      const telLabel = formatTelefone(a.phone);
+      tdTel.innerHTML = waUrl ? `<a class="wa-link" href="${waUrl}" target="_blank" rel="noopener">${telLabel}</a>` : telLabel;
+
       const svcInfo = getServicesInfoFromBooking(a);
       const tdServ = document.createElement('td'); tdServ.textContent = svcInfo.labels;
+
       const tdValTempo = document.createElement('td');
-      // Exibe todos os valores + total e todos os tempos + total (em um único bloco)
       const totalV = centsToBRL(Number(svcInfo.totalCents || 0));
       const totalT = String(Number(svcInfo.totalMin || 0)) + ' min';
-      const vPart = svcInfo.values ? (svcInfo.values + ' (Total: ' + totalV + ')') : ('Total: ' + totalV);
-      const tPart = svcInfo.times ? (svcInfo.times + ' (Total: ' + totalT + ')') : ('Total: ' + totalT);
-      tdValTempo.textContent = vPart + ' | ' + tPart;
-const tdMimo = document.createElement('td');
+      const vPart = svcInfo.values ? (svcInfo.values + ' (<strong class="totals">Total: ' + totalV + '</strong>)') : ('<strong class="totals">Total: ' + totalV + '</strong>');
+      const tPart = svcInfo.times ? (svcInfo.times + ' (<strong class="totals">Total: ' + totalT + '</strong>)') : ('<strong class="totals">Total: ' + totalT + '</strong>');
+      tdValTempo.innerHTML = vPart + ' | ' + tPart;
+
+      const tdMimo = document.createElement('td');
       tdMimo.textContent = a.prize || '-';
       tdMimo.className = 'td-mimo';
+
+      const tdPayStatus = document.createElement('td');
+      const psLabel = (a.payment_status || a.paymentStatus || a.pagamento || a.payment || '-');
+      const psClass = classPayment(psLabel);
+      const psIcon = (psClass === 'pay-paid') ? '✔' : (psClass === 'pay-unpaid' ? '✖' : '•');
+      tdPayStatus.innerHTML = `<span class="pay-badge ${psClass}">${psIcon} ${psLabel}</span>`;
+
+      const tdPayMethod = document.createElement('td');
+      const pmLabel = (a.payment_method || a.paymentMethod || a.forma_pagamento || a.payment_method || '-');
+      const pmIcon = iconForMethod(pmLabel);
+      tdPayMethod.innerHTML = pmIcon ? `<span class="pay-method"><span class="pay-icon">${pmIcon}</span><span>${pmLabel}</span></span>` : pmLabel;
+
+      const tdObs = document.createElement('td');
+      tdObs.textContent = a.notes || '';
+      tdObs.className = 'td-obs';
+
       const tdStatus = document.createElement('td');
       const spanStatus = document.createElement('span');
       const labelStatus = (a.status || 'agendado');
@@ -1930,19 +2220,7 @@ const tdMimo = document.createElement('td');
       spanStatus.className = 'td-status ' + classStatus(labelStatus);
       tdStatus.appendChild(spanStatus);
 
-      const tdPayStatus = document.createElement('td');
-      tdPayStatus.textContent = (a.payment_status || a.paymentStatus || a.pagamento || a.payment || '-');
-
-      const tdPayMethod = document.createElement('td');
-      tdPayMethod.textContent = (a.payment_method || a.paymentMethod || a.forma_pagamento || a.payment_method || '-');
-
-      const tdNotif = document.createElement('td');
-      tdNotif.textContent = a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-';
-      const tdObs = document.createElement('td');
-      tdObs.textContent = a.notes || '';
-      tdObs.className = 'td-obs';
       const tdAcoes = document.createElement('td');
-      // Menu de ações (kebab) — mantém as mesmas ações (Editar/Excluir) sem alterar lógica
       const divActions = document.createElement('div');
       divActions.className = 'actions actions-kebab';
 
@@ -1955,24 +2233,23 @@ const tdMimo = document.createElement('td');
       const kebabMenu = document.createElement('div');
       kebabMenu.className = 'kebab-menu hidden';
 
-      // Fecha o menu ao clicar fora
       const closeMenu = () => {
         kebabMenu.classList.add('hidden');
         kebabMenu.classList.remove('open');
         kebabMenu.style.display = 'none';
       };
+
       kebabBtn.addEventListener('click', (ev) => {
         ev.stopPropagation();
-        // fecha outros menus abertos
         document.querySelectorAll('.kebab-menu').forEach(m => {
           if (m !== kebabMenu) {
             m.classList.add('hidden');
             m.classList.remove('open');
+            m.style.display = 'none';
           }
         });
 
         const willOpen = kebabMenu.classList.contains('hidden');
-
         if (willOpen) {
           kebabMenu.classList.remove('hidden');
           kebabMenu.classList.add('open');
@@ -1984,7 +2261,7 @@ const tdMimo = document.createElement('td');
         }
 
         if (willOpen) {
-          // Renderiza o menu em "portal" (no <body>) para não ser cortado pelo overflow da tabela
+          // portal no body p/ não cortar por overflow
           try {
             if (!kebabMenu.dataset.portalAttached) {
               document.body.appendChild(kebabMenu);
@@ -2001,6 +2278,7 @@ const tdMimo = document.createElement('td');
           } catch (_) {}
         }
       });
+
       document.addEventListener('click', closeMenu);
 
       const btnEditar = document.createElement('button');
@@ -2008,14 +2286,36 @@ const tdMimo = document.createElement('td');
       btnEditar.className = 'kebab-item';
       btnEditar.type = 'button';
       btnEditar.addEventListener('click', async () => {
-        // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
         try { await loadOpeningHours(); } catch (e) {}
         try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
         mostrarFormAgenda();
         setEditMode(true);
         preencherFormEdicao(a);
-              closeMenu();
+        closeMenu();
       });
+
+      // WhatsApp somente no último banho do pacote
+      try {
+        const isPkg = (a && a.package_sale_id != null);
+        const seq = Number(a && a.package_seq);
+        const tot = Number(a && a.package_total);
+        const isLastBath = isPkg && Number.isFinite(seq) && Number.isFinite(tot) && seq === tot;
+        if (isLastBath) {
+          const btnWhatsLast = document.createElement('button');
+          btnWhatsLast.textContent = 'WhatsApp (último banho)';
+          btnWhatsLast.className = 'kebab-item';
+          btnWhatsLast.type = 'button';
+          btnWhatsLast.addEventListener('click', () => {
+            const nome = (a.customer_name || '').trim() || 'tudo bem?';
+            const pet = (a.pet_name || '').trim() || 'seu pet';
+            const msg = `Olá, ${nome}! Passando para confirmar o último banho do pacote do ${pet}. Qualquer dúvida, estou à disposição.`;
+            const url = buildWhatsUrl(a.phone, msg);
+            if (url) window.open(url, '_blank');
+            closeMenu();
+          });
+          kebabMenu.appendChild(btnWhatsLast);
+        }
+      } catch (_) {}
 
       const btnExcluir = document.createElement('button');
       btnExcluir.textContent = 'Excluir';
@@ -2028,14 +2328,16 @@ const tdMimo = document.createElement('td');
           await renderTabela();
           await loadDashboard();
         } catch (e) { alert(e.message); }
-              closeMenu();
+        closeMenu();
       });
 
       kebabMenu.appendChild(btnEditar);
       kebabMenu.appendChild(btnExcluir);
+
       divActions.appendChild(kebabBtn);
       divActions.appendChild(kebabMenu);
       tdAcoes.appendChild(divActions);
+
       tr.appendChild(tdData);
       tr.appendChild(tdHora);
       tr.appendChild(tdTutor);
@@ -2044,11 +2346,10 @@ const tdMimo = document.createElement('td');
       tr.appendChild(tdServ);
       tr.appendChild(tdValTempo);
       tr.appendChild(tdMimo);
-      tr.appendChild(tdStatus);
       tr.appendChild(tdPayStatus);
       tr.appendChild(tdPayMethod);
-      tr.appendChild(tdNotif);
       tr.appendChild(tdObs);
+      tr.appendChild(tdStatus);
       tr.appendChild(tdAcoes);
       tbodyAgenda.appendChild(tr);
     });
@@ -2069,7 +2370,8 @@ const tdMimo = document.createElement('td');
       timeWrap.textContent = `⏰ ${a.time || '-'}`;
       const dateWrap = document.createElement('div');
       dateWrap.className = 'agenda-card-date';
-      dateWrap.textContent = `📅 ${formatDataBr(a.date)}`;
+      const _dow = getWeekdayPt(a.date);
+      dateWrap.innerHTML = `📅 ${formatDataBr(a.date)}${_dow ? `<div style="font-size:12px;opacity:.8;margin-top:2px;">${_dow}</div>` : ''}`;
       left.appendChild(timeWrap);
       left.appendChild(dateWrap);
       const statusWrap = document.createElement('div');
@@ -2092,7 +2394,9 @@ const tdMimo = document.createElement('td');
       l2.innerHTML = `<span class="agenda-key">Pet:</span> <span class="agenda-muted">${(a.pet_name || '-')}</span>`;
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
-      l3.innerHTML = `<span class="agenda-key">Tel:</span> <span class="agenda-muted">${formatTelefone(a.phone)}</span>`;
+      const waUrl = buildWhatsUrl(a.phone);
+      const telLabel = formatTelefone(a.phone);
+      l3.innerHTML = `<span class="agenda-key">Tel:</span> ${waUrl ? `<a class="agenda-muted" href="${waUrl}" target="_blank" rel="noopener">${telLabel}</a>` : `<span class="agenda-muted">${telLabel}</span>`}`;
       const l4 = document.createElement('div');
       l4.className = 'agenda-line';
       l4.innerHTML = `<span class="agenda-key">Serviço(s):</span> <span class="agenda-val">${serviceLabel}</span>`;
@@ -2105,9 +2409,6 @@ const tdMimo = document.createElement('td');
       const l5 = document.createElement('div');
       l5.className = 'agenda-line';
       l5.innerHTML = `<span class="agenda-key">Mimo:</span> <span class="agenda-val" style="color:var(--turquesa)">${(a.prize || '-')}</span>`;
-      const l6 = document.createElement('div');
-      l6.className = 'agenda-line';
-      l6.innerHTML = `<span class="agenda-key">Notif:</span> <span class="agenda-muted">${a.last_notification_at ? formatDateTimeBr(a.last_notification_at) : '-'}</span>`;
       main.appendChild(l1);
       main.appendChild(l2);
       main.appendChild(l3);
@@ -2115,7 +2416,24 @@ const tdMimo = document.createElement('td');
       main.appendChild(l4b);
       main.appendChild(l4c);
       main.appendChild(l5);
-      main.appendChild(l6);
+
+      // Pagamento + Forma (mesmo conteúdo da lista)
+      const lPay = document.createElement('div');
+      lPay.className = 'agenda-line';
+      const psLabel = String(a.payment_status || '').trim() || '—';
+      const psClass = classPayment(psLabel);
+      const psIcon = (psClass === 'pay-paid') ? '✔' : (psClass === 'pay-unpaid' ? '✖' : '•');
+      lPay.innerHTML = `<span class="agenda-key">Pagamento:</span> <span class="pay-badge ${psClass}">${psIcon} ${escapeHtml(psLabel)}</span>`;
+
+      const lForma = document.createElement('div');
+      lForma.className = 'agenda-line';
+      const pm = String(a.payment_method || '').trim();
+      const pmIcon = iconForMethod(pm);
+      lForma.innerHTML = `<span class="agenda-key">Forma:</span> <span class="agenda-muted">${pmIcon ? pmIcon + ' ' : ''}${escapeHtml(pm || '—')}</span>`;
+
+      main.appendChild(lPay);
+      main.appendChild(lForma);
+
       const notes = document.createElement('div');
       notes.className = 'agenda-card-notes';
       notes.textContent = (a.notes || '').trim() ? a.notes : 'Sem observações.';
@@ -2178,11 +2496,9 @@ const tdMimo = document.createElement('td');
         estadoVazioCards.classList.remove('hidden');
         estadoVazioCards.textContent = 'Erro ao carregar agendamentos: ' + e.message;
       }
-      statTotal.textContent = '0';
-      statTosa.textContent = '0';
-      statHidratacao.textContent = '0';
-      statFotoVideo.textContent = '0';
-      statPatinhas.textContent = '0';
+      if (statTotal) statTotal.textContent = '0';
+      if (statAvulsos) statAvulsos.textContent = '0';
+      if (statPacotes) statPacotes.textContent = '0';
     }
   }
   function limparForm() {
@@ -2194,6 +2510,12 @@ const tdMimo = document.createElement('td');
   formPetSelect.innerHTML = '<option value="">(Sem pet informado)</option>';
   // Mimo default
   formPrize.value = 'Sem mimo';
+  // Tipo (avulso/pacote)
+  const bk = document.getElementById('formBookingKind');
+  const pkgSel = document.getElementById('formPackageId');
+  if (bk) bk.value = '';
+  if (pkgSel) { pkgSel.value = ''; pkgSel.disabled = true; pkgSel.innerHTML = '<option value="">Selecione um pacote...</option>'; }
+  if (typeof updateBookingKindUI === 'function') updateBookingKindUI('');
   // Multi-serviços
   formService.value = '';
   clearSelectedServices();
@@ -2209,11 +2531,124 @@ const tdMimo = document.createElement('td');
   formError.textContent = '';
   setEditMode(false);
 }
+  // Fecha o formulário de agendamento (compat: usado no fluxo de Pacotes)
+  function closeForm() {
+    try { limparForm(); } catch (e) {}
+    try { esconderFormAgenda(); } catch (e) {}
+  }
+
+
 async function salvarAgendamento() {
     formError.style.display = 'none';
     formError.textContent = '';
     const id = bookingId.value || null;
-    const originalStatus = bookingOriginalStatus.value || 'agendado';
+
+    // Helpers locais para manter os fluxos "avulso" e "pacote" isolados e evitar variáveis fora de escopo.
+    async function resolveCustomerByPhone(phone) {
+      if (!phone) return null;
+      try {
+        const lookup = await apiPost('/api/customers/lookup', { phone });
+        if (lookup && lookup.exists && lookup.customer) return lookup.customer;
+      } catch (_) {}
+      return null;
+    }
+
+    async function salvarAgendamentoPacote(pkgId) {
+      // Para fechar pacote precisamos: cliente (via telefone), pet, data e hora
+      const rawPhone = formPhone.value.trim();
+      const phone = sanitizePhone(rawPhone);
+
+      if (!phone) {
+        showHint('Preencha telefone (com DDD) para fechar o pacote.', 'error');
+        formPhone && formPhone.focus();
+        return;
+      }
+
+      const customer = await resolveCustomerByPhone(phone);
+      if (!customer || !customer.id) {
+        showHint('Cliente não cadastrado. Cadastre o cliente (e pets) em "Clientes & Pets" antes de fechar o pacote.', 'error');
+        return;
+      }
+
+      const customer_id = Number(customer.id);
+      const pet_id = formPetSelect && formPetSelect.value ? Number(formPetSelect.value) : null;
+      const start_date = String(formDate.value || '').slice(0, 10);
+      const time = String(formTime.value || '').slice(0, 5);
+
+      if (!customer_id || !start_date || !time) {
+        showHint('Preencha Cliente, Data e Hora para fechar o pacote.', 'error');
+        return;
+      }
+
+      try {
+        const payload = {
+          package_id: Number(pkgId),
+          customer_id,
+          pet_id,
+          start_date,
+          time: time,
+          // também mantém dados do pagamento/obs para o 1º agendamento (se você quiser usar no backend)
+          payment_status: formPaymentStatus ? String(formPaymentStatus.value || '').trim() : '',
+          payment_method: formPaymentMethod ? String(formPaymentMethod.value || '').trim() : '',
+          notes: formNotes ? String(formNotes.value || '') : ''
+        };
+
+        const resp = await apiPost('/api/package-sales', payload);
+
+        // Modal de loading + mensagem estruturada (WhatsApp) — apenas 1 modal (redirecionamento)
+        try {
+          const petName = (formPetSelect && formPetSelect.selectedIndex >= 0 && formPetSelect.options[formPetSelect.selectedIndex])
+            ? String(formPetSelect.options[formPetSelect.selectedIndex].text || '').split(' (')[0].trim()
+            : '';
+          const customerName = (customer && customer.name) ? String(customer.name) : (formNome ? String(formNome.value || '').trim() : '');
+          const sale = resp && resp.sale ? resp.sale : null;
+          const bookings = resp && Array.isArray(resp.bookings) ? resp.bookings : [];
+          const preview = resp && resp.preview ? resp.preview : null;
+          const msg = buildPackageWhatsText({ customerName, petName, sale, bookings, preview });
+
+          showPackageDispatchOverlay('Encaminhando Detalhes do Pacote.....');
+          // pequena pausa para renderizar o overlay antes de abrir o WhatsApp
+          setTimeout(async () => {
+            try { openWhatsAppWithText(phone, msg); } catch (e) {}
+            setTimeout(() => hidePackageDispatchOverlay(), 1200);
+            try { closeForm(); } catch (_) {}
+            try { await renderTabela(); } catch (_) {}
+            try { await loadDashboard(); } catch (_) {}
+          }, 150);
+        } catch (e) {
+          // se falhar a construção do texto, mantém o fluxo sem bloquear
+          try { closeForm(); } catch (_) {}
+          await renderTabela();
+          await loadDashboard();
+        }
+      } catch (e) {
+        showHint(e && e.message ? e.message : 'Erro ao fechar pacote.', 'error');
+      }
+    }
+    // Se for "Pacote" (fechar pacote e gerar agenda automática), só permite criação (sem editar)
+    const bookingKindEl = document.getElementById('formBookingKind');
+    const packageGroupEl = document.getElementById('packagePickerGroup');
+    const packageIdEl = document.getElementById('formPackageId');
+
+    
+    // Obrigatório selecionar Tipo em novo agendamento (para mostrar os campos corretos)
+    if (!id && bookingKindEl && !String(bookingKindEl.value || '').trim()) {
+      showHint('Selecione o tipo (Avulso ou Pacote) para continuar.', 'error');
+      bookingKindEl.focus();
+      return;
+    }
+const bookingKind = bookingKindEl ? String(bookingKindEl.value || 'avulso') : 'avulso';
+    if (bookingKind === 'pacote' && !id) {
+      const pkgId = packageIdEl ? Number(packageIdEl.value) : 0;
+      if (!pkgId) {
+        showHint('Selecione um pacote para fechar.', 'error');
+        if (packageIdEl) packageIdEl.focus();
+        return;
+      }
+      await salvarAgendamentoPacote(pkgId);
+      return;
+    }
+      const originalStatus = bookingOriginalStatus.value || 'agendado';
     const rawPhone = formPhone.value.trim();
     const phone = sanitizePhone(rawPhone);
     const nome = formNome.value.trim();
@@ -2400,6 +2835,16 @@ async function salvarAgendamento() {
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
   btnNovoAgendamento.addEventListener('click', async () => {
+    // Toggle: se o formulário já estiver aberto, fecha no mesmo botão.
+    try {
+      if (formPanel && !formPanel.classList.contains('hidden')) {
+        limparForm();
+        try { setEditMode(false); } catch (_) {}
+        esconderFormAgenda();
+        return;
+      }
+    } catch (_) {}
+
     limparForm();
     // Garantir caches carregados (horários e mimos) para o NOVO agendamento
     try { await loadOpeningHours(); } catch (e) {}
@@ -2636,6 +3081,105 @@ const cliState = document.getElementById('cliState') || document.getElementById(
     clientesCache = data.customers || [];
     renderClientes();
   }
+
+  // Modal: histórico de agendamentos por cliente
+  const custHistOverlay = document.getElementById('custHistOverlay');
+  const custHistClose = document.getElementById('custHistClose');
+  const custHistTitle = document.getElementById('custHistTitle');
+  const custHistSub = document.getElementById('custHistSub');
+  const custHistTbody = document.getElementById('custHistTbody');
+
+  function closeCustHistModal() {
+    if (!custHistOverlay) return;
+    custHistOverlay.classList.remove('pf-show');
+    custHistOverlay.style.display = 'none';
+    custHistOverlay.setAttribute('aria-hidden', 'true');
+    if (custHistTbody) custHistTbody.innerHTML = '';
+  }
+
+  async function openCustHistModal(customer) {
+    if (!custHistOverlay) return;
+    if (custHistTitle) custHistTitle.textContent = 'Histórico de agendamentos';
+    if (custHistSub) custHistSub.textContent = `${customer?.name || 'Cliente'} • ${formatTelefone(customer?.phone)} • ${Number(customer?.bookings_count || 0)} agendamento(s)`;
+    if (custHistTbody) custHistTbody.innerHTML = '<tr><td colspan="6" style="padding:10px;">Carregando...</td></tr>';
+
+    custHistOverlay.style.display = 'flex';
+    custHistOverlay.setAttribute('aria-hidden', 'false');
+    // animação
+    requestAnimationFrame(() => custHistOverlay.classList.add('pf-show'));
+
+    try {
+      const data = await apiGet('/api/bookings?customer_id=' + encodeURIComponent(customer.id));
+      const rows = data.bookings || [];
+      if (!custHistTbody) return;
+
+      if (!rows.length) {
+        custHistTbody.innerHTML = '<tr><td colspan="6" style="padding:10px;">Nenhum agendamento encontrado para este cliente.</td></tr>';
+        return;
+      }
+
+      custHistTbody.innerHTML = '';
+      rows.forEach(b => {
+        const tr = document.createElement('tr');
+        const tdDate = document.createElement('td');
+        tdDate.style.padding = '10px';
+        tdDate.style.borderBottom = '1px solid rgba(255,255,255,.06)';
+        tdDate.textContent = (window.PF_HELPERS?.formatDataBr ? PF_HELPERS.formatDataBr(b.date) : (b.date || '-'));
+
+        const tdTime = document.createElement('td');
+        tdTime.style.padding = '10px';
+        tdTime.style.borderBottom = '1px solid rgba(255,255,255,.06)';
+        tdTime.textContent = b.time || '-';
+
+        const tdPet = document.createElement('td');
+        tdPet.style.padding = '10px';
+        tdPet.style.borderBottom = '1px solid rgba(255,255,255,.06)';
+        tdPet.textContent = b.pet_name || '-';
+
+        const tdServices = document.createElement('td');
+        tdServices.style.padding = '10px';
+        tdServices.style.borderBottom = '1px solid rgba(255,255,255,.06)';
+        // b.services vem como jsonb (array); fallback para service_title
+        const svcArr = Array.isArray(b.services) ? b.services : [];
+        const svcTxt = svcArr.length
+          ? svcArr.map(s => s && (s.title || s.name)).filter(Boolean).join(' + ')
+          : (b.service_title || b.service || '-');
+        tdServices.textContent = svcTxt;
+
+        const tdStatus = document.createElement('td');
+        tdStatus.style.padding = '10px';
+        tdStatus.style.borderBottom = '1px solid rgba(255,255,255,.06)';
+        tdStatus.textContent = b.status || '-';
+
+        const tdPay = document.createElement('td');
+        tdPay.style.padding = '10px';
+        tdPay.style.borderBottom = '1px solid rgba(255,255,255,.06)';
+        const payStatus = b.payment_status || '-';
+        const payMethod = b.payment_method || '';
+        tdPay.textContent = payMethod ? `${payStatus} • ${payMethod}` : payStatus;
+
+        tr.appendChild(tdDate);
+        tr.appendChild(tdTime);
+        tr.appendChild(tdPet);
+        tr.appendChild(tdServices);
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdPay);
+        custHistTbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (custHistTbody) custHistTbody.innerHTML = `<tr><td colspan="6" style="padding:10px;">Erro ao carregar histórico: ${String(e.message || e)}</td></tr>`;
+    }
+  }
+
+  if (custHistClose) custHistClose.addEventListener('click', closeCustHistModal);
+  if (custHistOverlay) {
+    custHistOverlay.addEventListener('click', (ev) => {
+      if (ev.target === custHistOverlay) closeCustHistModal();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && custHistOverlay.style.display !== 'none') closeCustHistModal();
+    });
+  }
   function renderClientes() {
     const tbodyClientesEl = document.getElementById('tbodyClientes');
     if (!tbodyClientesEl) return;
@@ -2652,11 +3196,74 @@ const cliState = document.getElementById('cliState') || document.getElementById(
       const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(c.phone);
       const tdPetsCount = document.createElement('td');
       tdPetsCount.innerHTML = c.pets_count ? `<span class="badge-mini">${c.pets_count} pet(s)</span>` : '-';
-      const tdAcoes = document.createElement('td');
-      const divActions = document.createElement('div'); divActions.className = 'actions';
+
+      const tdBookingsCount = document.createElement('td');
+      tdBookingsCount.innerHTML = (c.bookings_count != null)
+        ? `<span class="badge-mini">${Number(c.bookings_count) || 0} ag.</span>`
+        : '-';
+
+         const tdAcoes = document.createElement('td');
+
+      const divActions = document.createElement('div');
+      divActions.className = 'actions actions-kebab';
+
+      const kebabBtn = document.createElement('button');
+      kebabBtn.type = 'button';
+      kebabBtn.className = 'kebab-btn';
+      kebabBtn.setAttribute('aria-label', 'Ações');
+      kebabBtn.textContent = '⋮';
+
+      const kebabMenu = document.createElement('div');
+      kebabMenu.className = 'kebab-menu hidden';
+
+      const closeMenu = () => {
+        kebabMenu.classList.add('hidden');
+        kebabMenu.classList.remove('open');
+        kebabMenu.style.display = 'none';
+      };
+
+      kebabBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        document.querySelectorAll('.kebab-menu').forEach(m => {
+          if (m !== kebabMenu) {
+            m.classList.add('hidden');
+            m.classList.remove('open');
+            m.style.display = 'none';
+          }
+        });
+
+        const willOpen = kebabMenu.classList.contains('hidden');
+        if (willOpen) {
+          kebabMenu.classList.remove('hidden');
+          kebabMenu.classList.add('open');
+          kebabMenu.style.display = 'block';
+        } else {
+          closeMenu();
+        }
+
+        if (willOpen) {
+          try {
+            if (!kebabMenu.dataset.portalAttached) {
+              document.body.appendChild(kebabMenu);
+              kebabMenu.dataset.portalAttached = '1';
+              kebabMenu.classList.add('kebab-menu-portal');
+            }
+            const rect = kebabBtn.getBoundingClientRect();
+            const menuW = 200;
+            kebabMenu.style.position = 'fixed';
+            kebabMenu.style.minWidth = menuW + 'px';
+            kebabMenu.style.zIndex = '999999';
+            kebabMenu.style.top = Math.round(rect.bottom + 6) + 'px';
+            kebabMenu.style.left = Math.round(Math.max(8, rect.right - menuW)) + 'px';
+          } catch (_) {}
+        }
+      });
+
+      document.addEventListener('click', closeMenu);
+
       const btnSel = document.createElement('button');
       btnSel.textContent = 'Selecionar';
-      btnSel.className = 'btn btn-small btn-secondary';
+      btnSel.className = 'kebab-item';
       btnSel.type = 'button';
       btnSel.addEventListener('click', async () => {
         clienteSelecionadoId = c.id;
@@ -2666,7 +3273,7 @@ initCepAutofillToCrudIfPresent();
         petsCard.classList.remove('hidden');
         cliPhone.value = formatTelefone(c.phone);
         cliName.value = c.name || '';
-        
+
         // Endereço: se não existir no cadastro, deve vir vazio (não "undefined"/"null")
    if (cliCep) cliCep.value = c.cep || '';
 if (cliStreet) cliStreet.value = c.street || '';
@@ -2677,10 +3284,21 @@ if (cliCity) cliCity.value = c.city || '';
 if (cliState) cliState.value = c.state || '';
 limparPetsForm();
         await loadPetsForClienteTab(c.id);
+        closeMenu();
       });
+
+      const btnHist = document.createElement('button');
+      btnHist.textContent = 'Histórico';
+      btnHist.className = 'kebab-item';
+      btnHist.type = 'button';
+      btnHist.addEventListener('click', async () => {
+        await openCustHistModal(c);
+        closeMenu();
+      });
+
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
-      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.className = 'kebab-item kebab-item-danger';
       btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
         if (!confirm('Excluir este cliente? (Os pets relacionados também poderão ser afetados)')) return;
@@ -2698,14 +3316,21 @@ limparPetsForm();
           await loadDashboard();
           await renderTabela();
         } catch (e) { alert(e.message); }
+        closeMenu();
       });
-      divActions.appendChild(btnSel);
-      divActions.appendChild(btnDel);
+
+      kebabMenu.appendChild(btnSel);
+      kebabMenu.appendChild(btnHist);
+      kebabMenu.appendChild(btnDel);
+
+      divActions.appendChild(kebabBtn);
+      divActions.appendChild(kebabMenu);
       tdAcoes.appendChild(divActions);
       tr.appendChild(tdId);
       tr.appendChild(tdNome);
       tr.appendChild(tdTel);
       tr.appendChild(tdPetsCount);
+      tr.appendChild(tdBookingsCount);
       tr.appendChild(tdAcoes);
       tbodyClientesEl.appendChild(tr);
     });
@@ -2806,10 +3431,67 @@ limparPetsForm();
       const tdPelagem = document.createElement('td'); tdPelagem.textContent = p.coat || '-';
       const tdInfo = document.createElement('td'); tdInfo.textContent = (p.notes || p.info) || '-';
       const tdAcoes = document.createElement('td');
-      const divActions = document.createElement('div'); divActions.className = 'actions';
+
+      const divActions = document.createElement('div');
+      divActions.className = 'actions actions-kebab';
+
+      const kebabBtn = document.createElement('button');
+      kebabBtn.type = 'button';
+      kebabBtn.className = 'kebab-btn';
+      kebabBtn.setAttribute('aria-label', 'Ações');
+      kebabBtn.textContent = '⋮';
+
+      const kebabMenu = document.createElement('div');
+      kebabMenu.className = 'kebab-menu hidden';
+
+      const closeMenu = () => {
+        kebabMenu.classList.add('hidden');
+        kebabMenu.classList.remove('open');
+        kebabMenu.style.display = 'none';
+      };
+
+      kebabBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        document.querySelectorAll('.kebab-menu').forEach(m => {
+          if (m !== kebabMenu) {
+            m.classList.add('hidden');
+            m.classList.remove('open');
+            m.style.display = 'none';
+          }
+        });
+
+        const willOpen = kebabMenu.classList.contains('hidden');
+        if (willOpen) {
+          kebabMenu.classList.remove('hidden');
+          kebabMenu.classList.add('open');
+          kebabMenu.style.display = 'block';
+        } else {
+          closeMenu();
+        }
+
+        if (willOpen) {
+          try {
+            if (!kebabMenu.dataset.portalAttached) {
+              document.body.appendChild(kebabMenu);
+              kebabMenu.dataset.portalAttached = '1';
+              kebabMenu.classList.add('kebab-menu-portal');
+            }
+            const rect = kebabBtn.getBoundingClientRect();
+            const menuW = 180;
+            kebabMenu.style.position = 'fixed';
+            kebabMenu.style.minWidth = menuW + 'px';
+            kebabMenu.style.zIndex = '999999';
+            kebabMenu.style.top = Math.round(rect.bottom + 6) + 'px';
+            kebabMenu.style.left = Math.round(Math.max(8, rect.right - menuW)) + 'px';
+          } catch (_) {}
+        }
+      });
+
+      document.addEventListener('click', closeMenu);
+
       const btnEdit = document.createElement('button');
       btnEdit.textContent = 'Editar';
-      btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.className = 'kebab-item';
       btnEdit.type = 'button';
       btnEdit.addEventListener('click', () => {
         petEditIdLocal = p.id;
@@ -2818,10 +3500,12 @@ limparPetsForm();
         if (petSize) petSize.value = p.size || '';
         if (petCoat) petCoat.value = p.coat || '';
         petInfo.value = (p.notes || p.info) || '';
+        closeMenu();
       });
+
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
-      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.className = 'kebab-item kebab-item-danger';
       btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
         if (!confirm('Excluir este pet?')) return;
@@ -2832,9 +3516,14 @@ limparPetsForm();
           await loadDashboard();
           await renderTabela();
         } catch (e) { alert(e.message); }
+        closeMenu();
       });
-      divActions.appendChild(btnEdit);
-      divActions.appendChild(btnDel);
+
+      kebabMenu.appendChild(btnEdit);
+      kebabMenu.appendChild(btnDel);
+
+      divActions.appendChild(kebabBtn);
+      divActions.appendChild(kebabMenu);
       tdAcoes.appendChild(divActions);
       tr.appendChild(tdId);
       tr.appendChild(tdNome);
@@ -2894,6 +3583,14 @@ if (!name || !breed) {
   btnPetLimpar.addEventListener('click', limparPetsForm);
   btnPetSalvar.addEventListener('click', salvarPet);
   btnNovoPet.addEventListener('click', () => {
+    // Toggle: clica para abrir, clica de novo para fechar
+    try {
+      if (petsCard && !petsCard.classList.contains('hidden')) {
+        limparPetsForm();
+        petsCard.classList.add('hidden');
+        return;
+      }
+    } catch(e) {}
     // garante que o painel de pets está visível e prepara formulário para novo cadastro
     petsCard.classList.remove('hidden');
     limparPetsForm();
@@ -2901,8 +3598,20 @@ if (!name || !breed) {
     try { petsCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
   });
   btnNovoCliente.addEventListener('click', () => {
-    initCepAutofillToCrudIfPresent();
-    modoNovoCliente = true;
+    // Toggle: clica para abrir, clica de novo para fechar
+    try {
+      if (clienteFormBlock && !clienteFormBlock.classList.contains('hidden')) {
+        clienteSelecionadoId = null;
+        badgeClienteSelecionado.classList.add('hidden');
+        cliError.style.display = 'none';
+        clienteFormBlock.classList.add('hidden');
+        petsCard.classList.add('hidden');
+        tbodyPets.innerHTML = '';
+        limparPetsForm();
+        return;
+      }
+    } catch(e) {}
+    initCepAutofillToCrudIfPresent();modoNovoCliente = true;
 modoNovoClienteCRUD = true;
 attachCepMaskIfPresent();
 attachCepMaskToCrudIfPresent();
@@ -3278,3 +3987,452 @@ attachCepMaskToCrudIfPresent();
     const cap = parseInt(oh.max_per_half_hour, 10);
     return Number.isFinite(cap) && cap > 0 ? cap : 1;
   }
+
+/* =========================
+   PACOTES (Admin) - por porte
+========================= */
+
+function formatBRLFromCents(c){
+  const v = (Number(c)||0)/100;
+  return v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+}
+
+function safeJson(v, fallback){
+  try {
+    if (Array.isArray(v)) return v;
+    if (!v) return fallback;
+    if (typeof v === 'object') return v;
+    return JSON.parse(v);
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function getSelectedPetPorte(){
+  // Para filtrar pacotes no agendamento, usamos o porte do pet selecionado.
+  // O select correto no admin é #formPetSelect (agendamento).
+  const sel = document.getElementById('formPetSelect');
+  const petId = (sel && sel.value) ? Number(sel.value) : null;
+  if (!petId) return '';
+
+  // No agendamento, a lista correta é bookingPetsCache; mantém fallback em petsCache por segurança.
+  const listA = Array.isArray(bookingPetsCache) ? bookingPetsCache : [];
+  const listB = Array.isArray(petsCache) ? petsCache : [];
+  const pet = listA.find(p => Number(p.id) === petId) || listB.find(p => Number(p.id) === petId);
+  if (!pet) return '';
+
+  // No DB, "size" é o porte (Pequeno/Médio/Grande). Mantém compatibilidade com "porte".
+  const raw = pet.size || pet.porte || '';
+  return raw ? String(raw) : '';
+}
+async function loadPackages(){
+  // carrega e renderiza tabela de pacotes
+  try {
+    const resp = await apiGet('/api/packages');
+    packagesCache = (resp && resp.packages) ? resp.packages : [];
+  } catch (_) {
+    packagesCache = [];
+  }
+  renderPackagesTable();
+  // se estiver no modo pacote, atualiza select
+  try { await refreshPackageSelectForBooking(); } catch (_) {}
+}
+
+function renderPackagesTable(){
+  const tbody = document.getElementById('tbodyPackages');
+  const empty = document.getElementById('packagesEmpty');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+  const rows = (packagesCache || []);
+  if (!rows.length) {
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  for (const p of rows) {
+    const pr = p.preview || {};
+    const tr = document.createElement('tr');
+
+    const statusTxt = (String(p.is_active) === 'true' || p.is_active === true) ? 'Ativo' : 'Inativo';
+
+    tr.innerHTML = `
+      <td>${escapeHtml(p.title || '')}</td>
+      <td>${escapeHtml(p.type || '')}</td>
+      <td>${escapeHtml(p.porte || '')}</td>
+      <td>${Number(p.validity_days || 0)}</td>
+      <td>${Number(p.bath_qty || 0)}</td>
+      <td>${Number(p.bath_discount_percent || 0)}%</td>
+      <td>${formatBRLFromCents(pr.total_pacote_cents || 0)}</td>
+      <td>${formatBRLFromCents(pr.total_avulso_cents || 0)}</td>
+      <td><strong>${formatBRLFromCents(pr.economia_cents || 0)}</strong></td>
+      <td>${statusTxt}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-secondary btn-sm" data-act="edit" data-id="${p.id}">Editar</button>
+        <button class="btn btn-danger btn-sm" data-act="del" data-id="${p.id}">Excluir</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  tbody.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', async (ev) => {
+      const id = Number(ev.currentTarget.getAttribute('data-id'));
+      const act = ev.currentTarget.getAttribute('data-act');
+      if (act === 'edit') openPackageForm(id);
+      if (act === 'del') deletePackage(id);
+    });
+  });
+}
+
+function openPackageForm(id=null){
+  const card = document.getElementById('packageFormCard');
+  if (!card) return;
+  card.style.display = 'block';
+
+  const pkg = id ? (packagesCache||[]).find(p => Number(p.id) === Number(id)) : null;
+
+  document.getElementById('pkgId').value = pkg ? pkg.id : '';
+  document.getElementById('pkgTitle').value = pkg ? (pkg.title || '') : '';
+  document.getElementById('pkgType').value = pkg ? (pkg.type || 'mensal') : 'mensal';
+  document.getElementById('pkgPorte').value = pkg ? (pkg.porte || '') : '';
+  document.getElementById('pkgIsActive').value = (pkg ? String(pkg.is_active) : 'true');
+
+  // só abre campos adicionais depois de selecionar porte
+  const more = document.getElementById('pkgMoreFields');
+  const porteVal = document.getElementById('pkgPorte').value;
+  if (more) more.style.display = porteVal ? 'block' : 'none';
+
+  document.getElementById('pkgValidityDays').value = pkg ? Number(pkg.validity_days || 30) : 30;
+  document.getElementById('pkgBathQty').value = pkg ? Number(pkg.bath_qty || 4) : 4;
+  document.getElementById('pkgBathDiscount').value = pkg ? Number(pkg.bath_discount_percent || 0) : 20;
+
+  // popular listas filtradas
+  refreshPackageFormFilters();
+
+  // selecionar banho + inclusos se edição
+  if (pkg) {
+    const bathSel = document.getElementById('pkgBathService');
+    if (bathSel) bathSel.value = String(pkg.bath_service_id || '');
+
+    const inc = safeJson(pkg.includes_json, []);
+    const incIds = inc.map(x => x && x.service_id != null ? Number(x.service_id) : null).filter(Boolean);
+    document.querySelectorAll('#pkgIncludedList input[type="checkbox"]').forEach(chk => {
+      chk.checked = incIds.includes(Number(chk.value));
+    });
+  }
+
+  recalcPackagePreview();
+}
+
+function closePackageForm(){
+  const card = document.getElementById('packageFormCard');
+  if (card) card.style.display = 'none';
+}
+
+function refreshPackageFormFilters(){
+  const porte = String(document.getElementById('pkgPorte').value || '');
+  const more = document.getElementById('pkgMoreFields');
+  if (more) more.style.display = porte ? 'block' : 'none';
+
+  // banhos do porte
+  const bathSel = document.getElementById('pkgBathService');
+  if (bathSel) {
+    bathSel.innerHTML = '';
+    const opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = porte ? 'Selecione o serviço de banho...' : 'Selecione o porte primeiro...';
+    bathSel.appendChild(opt0);
+
+    if (porte) {
+      const baths = (servicesCache || []).filter(s =>
+        String(s.category || '').toLowerCase() === 'banho' &&
+        String(s.porte || '') === porte &&
+        (s.is_active === true || String(s.is_active) === 'true')
+      );
+      for (const s of baths) {
+        const o = document.createElement('option');
+        o.value = String(s.id);
+        o.textContent = `${s.title} — ${formatBRLFromCents(s.value_cents)} | ${Number(s.duration_min||0)} min`;
+        bathSel.appendChild(o);
+      }
+    }
+  }
+
+  // inclusos do porte (não banho)
+  const incWrap = document.getElementById('pkgIncludedList');
+  if (incWrap) {
+    incWrap.innerHTML = '';
+    if (porte) {
+      const inc = (servicesCache || []).filter(s =>
+        String(s.porte || '') === porte &&
+        String(s.category || '').toLowerCase() !== 'banho' &&
+        (s.is_active === true || String(s.is_active) === 'true')
+      );
+      for (const s of inc) {
+        const id = `pkgInc_${s.id}`;
+        const lbl = document.createElement('label');
+        lbl.setAttribute('for', id);
+        lbl.innerHTML = `<input type="checkbox" id="${id}" value="${s.id}"> ${escapeHtml(s.title)} <span style="opacity:.65;">(${formatBRLFromCents(s.value_cents)})</span>`;
+        incWrap.appendChild(lbl);
+      }
+    } else {
+      incWrap.innerHTML = '<div style="opacity:.7; font-size:13px;">Selecione o porte para listar os serviços inclusos.</div>';
+    }
+  }
+}
+
+function getPackageFormPayload(){
+  const title = String(document.getElementById('pkgTitle').value || '').trim();
+  const type = String(document.getElementById('pkgType').value || 'mensal');
+  const porte = String(document.getElementById('pkgPorte').value || '').trim();
+  const is_active = String(document.getElementById('pkgIsActive').value || 'true') === 'true';
+
+  const validity_days = Number(document.getElementById('pkgValidityDays').value || 30);
+  const bath_qty = Number(document.getElementById('pkgBathQty').value || 0);
+  const bath_discount_percent = Number(document.getElementById('pkgBathDiscount').value || 0);
+  const bath_service_id = Number(document.getElementById('pkgBathService').value || 0);
+
+  const includes = [];
+  document.querySelectorAll('#pkgIncludedList input[type="checkbox"]').forEach(chk => {
+    if (chk.checked) includes.push({ service_id: Number(chk.value) });
+  });
+
+  return { title, type, porte, validity_days, bath_qty, bath_discount_percent, bath_service_id, includes, is_active };
+}
+
+function recalcPackagePreview(){
+  const box = document.getElementById('pkgEconomyPreview');
+  if (!box) return;
+
+  const porte = String(document.getElementById('pkgPorte').value || '').trim();
+  const bathId = Number(document.getElementById('pkgBathService').value || 0);
+  const bathQty = Number(document.getElementById('pkgBathQty').value || 0);
+  const discPct = Number(document.getElementById('pkgBathDiscount').value || 0);
+
+  if (!porte || !bathId || !bathQty) {
+    box.textContent = 'Selecione o porte e o serviço de banho para ver o resumo.';
+    return;
+  }
+
+  const bath = (servicesCache||[]).find(s => Number(s.id) === bathId);
+  const bathUnit = Number(bath?.value_cents || 0);
+  const bathDiscounted = Math.round(bathUnit * (1 - (discPct/100)));
+
+  let incReal = 0;
+  const incTitles = [];
+  document.querySelectorAll('#pkgIncludedList input[type="checkbox"]').forEach(chk => {
+    if (!chk.checked) return;
+    const s = (servicesCache||[]).find(x => Number(x.id) === Number(chk.value));
+    if (!s) return;
+    incReal += Number(s.value_cents || 0);
+    incTitles.push(s.title);
+  });
+
+  const totalAvulso = (bathQty * bathUnit) + incReal;
+  const totalPacote = (bathQty * bathDiscounted);
+  const econ = totalAvulso - totalPacote;
+
+  const incText = incTitles.length ? incTitles.map(t=>escapeHtml(t)).join(', ') : 'Nenhum';
+  box.innerHTML = `
+    <div><strong>${escapeHtml(porte)}</strong></div>
+    <div style="margin-top:6px; opacity:.85;">Inclui: ${incText}</div>
+    <div class="kpi">
+      <span class="pill">Pacote: ${formatBRLFromCents(totalPacote)}</span>
+      <span class="pill">Avulso real: ${formatBRLFromCents(totalAvulso)}</span>
+      <span class="pill">Economia: ${formatBRLFromCents(econ)}</span>
+    </div>
+    <div style="margin-top:8px; font-size:12px; opacity:.75;">
+      Banho avulso: ${formatBRLFromCents(bathUnit)} | Banho no pacote: ${formatBRLFromCents(bathDiscounted)} | Banhos: ${bathQty}
+    </div>
+  `;
+}
+
+async function savePackage(){
+  const id = document.getElementById('pkgId').value ? Number(document.getElementById('pkgId').value) : null;
+  const payload = getPackageFormPayload();
+
+  if (!payload.title) return showHint('Informe o nome do pacote.', 'error');
+  if (!payload.porte) return showHint('Selecione o porte.', 'error');
+  if (!payload.bath_service_id) return showHint('Selecione o serviço de banho.', 'error');
+
+  try {
+    if (!id) {
+      await apiPost('/api/packages', payload);
+      showHint('Pacote criado com sucesso!', 'success');
+    } else {
+      await apiPut(`/api/packages/${id}`, payload);
+      showHint('Pacote atualizado com sucesso!', 'success');
+    }
+    closePackageForm();
+    await loadPackages();
+  } catch (e) {
+    showHint(e && e.message ? e.message : 'Erro ao salvar pacote.', 'error');
+  }
+}
+
+async function deletePackage(id){
+  if (!id) return;
+  if (!confirm('Excluir este pacote?')) return;
+  try {
+    await apiDelete(`/api/packages/${id}`);
+    showHint('Pacote excluído.', 'success');
+    await loadPackages();
+  } catch (e) {
+    showHint(e && e.message ? e.message : 'Erro ao excluir pacote.', 'error');
+  }
+}
+
+
+function updateBookingKindUI(kind){
+  // Gate (tudo abaixo de "Tipo")
+  const gate = document.getElementById('bookingKindDependentFields') || document.getElementById('bookingKindGate');
+
+  // Pacotes
+  const grpPkg = document.getElementById('packagePickerGroup');
+  const pkgSel = document.getElementById('formPackageId');
+
+  // Avulso: seleção de serviços
+  const avulsoOnly = document.getElementById('bookingAvulsoOnly');
+  const servicePicker = document.getElementById('service-picker') || document.getElementById('servicePicker') || document.querySelector('.service-picker');
+  const selectedWrap = document.getElementById('selectedServicesWrap');
+  const metaValue = document.getElementById('formServiceValue');
+  const metaDur = document.getElementById('formServiceDuration');
+
+  const k = String(kind || '');
+
+  // ADMIN: em Avulso, permitir selecionar datas passadas (retroativo). Em Pacote, mantém bloqueio no passado.
+  const _dateEl = document.getElementById('formDate');
+  if (_dateEl) _dateEl.min = (k === 'avulso') ? '' : todayISO;
+
+  // Se não selecionou tipo, esconde tudo abaixo (gate) e reseta áreas específicas
+  const showGate = (k === 'avulso' || k === 'pacote');
+  if (gate) gate.style.display = showGate ? 'block' : 'none';
+
+  // Default: esconde blocos condicionais
+  if (grpPkg) grpPkg.style.display = 'none';
+  if (avulsoOnly) avulsoOnly.style.display = 'none';
+  if (servicePicker) servicePicker.style.display = 'none';
+  if (selectedWrap) selectedWrap.style.display = 'none';
+
+  // Reseta metas (sempre que muda o tipo)
+  if (metaValue) metaValue.value = '';
+  if (metaDur) metaDur.value = '';
+
+  if (!showGate) {
+    if (pkgSel) { pkgSel.disabled = true; }
+    return;
+  }
+
+  if (k === 'avulso') {
+    // Avulso: mostra serviços, esconde pacotes
+    if (avulsoOnly) avulsoOnly.style.display = 'block';
+    if (servicePicker) servicePicker.style.display = 'block';
+    if (pkgSel) { pkgSel.value = ''; pkgSel.disabled = true; }
+
+  } else if (k === 'pacote') {
+    // Pacote: mostra pacotes, esconde serviços avulsos
+    if (grpPkg) grpPkg.style.display = 'block';
+
+    // Em pacote, serviços vêm do pacote. Limpa qualquer seleção avulsa.
+    try {
+      if (typeof selectedServiceIds !== 'undefined') {
+        selectedServiceIds = [];
+        if (typeof refreshSelectedServicesUI === 'function') refreshSelectedServicesUI();
+      }
+    } catch (e) {}
+
+    // Status: em novo agendamento de pacote começa em "confirmado"; em edição não sobrescreve
+    const st = document.getElementById('formStatus');
+    const bid = document.getElementById('bookingId');
+    const isEditing = !!(bid && String(bid.value || '').trim());
+    if (st && !isEditing) st.value = 'confirmado';
+  }
+}
+
+async function refreshPackageSelectForBooking(){
+  const kindEl = document.getElementById('formBookingKind');
+  const pkgSel = document.getElementById('formPackageId');
+  const grp = document.getElementById('packagePickerGroup');
+  if (!kindEl || !pkgSel || !grp) return;
+
+  const kind = String(kindEl.value || '');
+  if (typeof updateBookingKindUI === 'function') updateBookingKindUI(kind);
+  grp.style.display = (kind === 'pacote') ? 'block' : 'none';
+
+  if (!kind) {
+    // nada selecionado ainda: não carrega pacotes
+        pkgSel.innerHTML = '<option value="">Selecione o tipo primeiro.</option>';
+    return;
+  }
+
+  if (kind !== 'pacote') return;
+
+  const porte = getSelectedPetPorte();
+  if (!porte) {
+        pkgSel.innerHTML = '<option value="">Selecione um pet (com porte) para listar pacotes.</option>';
+    return;
+  }
+
+  const resp = await apiGet(`/api/packages?porte=${encodeURIComponent(porte)}`);
+  const pkgs = (resp && resp.packages) ? resp.packages : [];
+
+  pkgSel.innerHTML = '<option value="">Selecione um pacote...</option>';
+  pkgs.forEach(p => {
+    const pr = p.preview || {};
+    const o = document.createElement('option');
+    o.value = String(p.id);
+    o.textContent = `${p.title} (${p.type}) — ${formatBRLFromCents(pr.total_pacote_cents || 0)} | economia ${formatBRLFromCents(pr.economia_cents || 0)}`;
+    pkgSel.appendChild(o);
+  });
+
+  if (!pkgs.length) {
+        pkgSel.innerHTML = '<option value="">Nenhum pacote encontrado para este porte.</option>';
+  } else {
+    pkgSel.disabled = false;
+  }
+}
+
+/* bindings */
+(function bindPackagesUI(){
+  const btnNew = document.getElementById('btnNewPackage');
+  const btnCancel = document.getElementById('btnCancelPackage');
+  const btnSave = document.getElementById('btnSavePackage');
+  const porteSel = document.getElementById('pkgPorte');
+  const typeSel = document.getElementById('pkgType');
+
+  if (btnNew) btnNew.addEventListener('click', () => openPackageForm(null));
+  if (btnCancel) btnCancel.addEventListener('click', closePackageForm);
+  if (btnSave) btnSave.addEventListener('click', savePackage);
+
+  if (porteSel) porteSel.addEventListener('change', () => { refreshPackageFormFilters(); recalcPackagePreview(); });
+
+  if (typeSel) typeSel.addEventListener('change', () => {
+    // defaults por tipo
+    const t = String(typeSel.value || 'mensal');
+    const bathQty = document.getElementById('pkgBathQty');
+    const disc = document.getElementById('pkgBathDiscount');
+    const vig = document.getElementById('pkgValidityDays');
+    if (t === 'mensal') { if (bathQty) bathQty.value = 4; if (disc) disc.value = 20; if (vig) vig.value = 30; }
+    if (t === 'quinzenal') { if (bathQty) bathQty.value = 2; if (disc) disc.value = 15; if (vig) vig.value = 30; }
+    recalcPackagePreview();
+  });
+
+  ['pkgBathQty','pkgBathDiscount','pkgBathService'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', recalcPackagePreview);
+    if (el) el.addEventListener('change', recalcPackagePreview);
+  });
+
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t && t.closest && t.closest('#pkgIncludedList')) recalcPackagePreview();
+  });
+
+  // booking kind
+  const bookingKindEl = document.getElementById('formBookingKind');
+  if (bookingKindEl) bookingKindEl.addEventListener('change', refreshPackageSelectForBooking);
+    const formPetSelect = document.getElementById('formPetSelect');
+  if (formPetSelect) formPetSelect.addEventListener('change', refreshPackageSelectForBooking);
+})();

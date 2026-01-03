@@ -63,13 +63,15 @@
       box-shadow: 0 0 0 2px rgba(1, 173, 183, 0.16);
     }
 
+  label {margin-bottom: 5px; margin-top: 5px;}
+
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 4px;
-      padding: 10px;
-      border-radius: 1000px;
+      padding: 13px;
+      border-radius: 10px;
       border: none;
       background: linear-gradient(135deg, var(--turquesa), var(--coral));
       color: white;
@@ -178,7 +180,7 @@ input[type="time"],
 select,
 textarea {
   padding: 10px;          /* espaçamento interno uniforme */
-  margin-bottom: 10px;    /* espaçamento externo entre campos */
+  margin-bottom: 0px;    /* espaçamento externo entre campos */
   border-radius: 10px;
   border: 1px solid #d7dde0;
   font-size: 13px;
@@ -252,7 +254,10 @@ textarea {
       border: 1px solid #e0edf0;
     }
     .form-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
-    .form-row-2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+    .form-row-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+    .form-row-2cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 8px; }
+    .form-row-1 { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 8px; }
+    .form-row-2 { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
     .form-group { display: flex; flex-direction: column; gap: 3px; }
     #adminApp label {
       font-size: 12px;
@@ -273,7 +278,7 @@ textarea {
     }
     textarea { min-height: 48px; resize: vertical; }
 
-    .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+    .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
     .error-msg { font-size: 12px; color: #c62828; margin-top: 4px; }
 
     .stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; font-size: 12px; }
@@ -387,14 +392,14 @@ textarea {
       align-items: center;
       border: 1px solid #dde5e8;
       background: #ffffff;
-      border-radius: 999px;
+      border-radius: 10px;
       overflow: hidden;
       box-shadow: 0 6px 18px rgba(0,0,0,0.05);
     }
     .toggle-btn {
       border: none;
       background: transparent;
-      padding: 8px 12px;
+      padding: 12px 12px;
       font-size: 12px;
       cursor: pointer;
       color: #607d8b;
@@ -833,7 +838,7 @@ textarea {
   width: min(520px, calc(100vw - 32px));
   border-radius: 16px;
   border: 1px solid rgba(255,255,255,.12);
-  background: rgba(15, 23, 42, .92);
+  background:#F1F6F7;
   box-shadow: 0 18px 50px rgba(0,0,0,.45);
   padding: 14px 14px 12px;
   transform: translateY(6px);
@@ -866,7 +871,7 @@ textarea {
   display: grid;
   place-items: center;
   font-size: 16px;
-  border: 1px solid rgba(255,255,255,.12);
+  border: 1px solid rgba(0,0,0,.92);
   background: rgba(255,255,255,.06);
 }
 
@@ -875,7 +880,7 @@ textarea {
   font-size: 13px;
   letter-spacing: .2px;
   text-transform: uppercase;
-  color: rgba(255,255,255,.90);
+  color: rgba(0,0,0,.90);
   margin: 0 0 4px 0;
 }
 
@@ -883,14 +888,14 @@ textarea {
   margin: 0;
   font-size: 14px;
   line-height: 1.35;
-  color: rgba(255,255,255,.86);
+  color: rgba(0,0,0,.90);
   white-space: pre-line;
 }
 
 .pf-hint-x {
   border: 0;
   background: transparent;
-  color: rgba(255,255,255,.75);
+  color: rgba(0,0,0,.90);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
@@ -1171,3 +1176,82 @@ input[name="duration_min"],
 }
 
 .main-content .tab-view{ width: 100%; box-sizing: border-box; }
+
+
+/* =========================
+   PACOTES (Admin)
+========================= */
+.checkbox-grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap:8px 12px;
+  padding:10px;
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:10px;
+  background:#fff;
+  max-height:220px;
+  overflow:auto;
+}
+.checkbox-grid label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+}
+.economy-preview{
+  font-size:13px;
+  line-height:1.5;
+}
+.economy-preview .kpi{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:8px;
+}
+.economy-preview .pill{
+  padding:6px 10px;
+  border-radius:999px;
+  background:#E0F4F6;
+  color:#1AB1BB;
+  font-weight:700;
+  font-size:12px;
+}
+
+
+/* Destaque para totais (Valor/Tempo) na lista de agendamentos */
+#agendaListWrapper td .totals{
+  font-weight: 800;
+  color: #014C5F;
+}
+
+
+/* ===== PATCH: Destaques agenda (antecedência) ===== */
+.row-soon-green { background: rgba(0, 200, 83, 0.12) !important; }
+.row-soon-yellow { background: rgba(255, 193, 7, 0.16) !important; }
+.row-soon-red { background: rgba(244, 67, 54, 0.14) !important; }
+
+/* Subtexto na data (dia da semana) */
+.td-sub { font-size: 12px; opacity: 0.75; margin-top: 2px; text-transform: capitalize; }
+
+/* Link WhatsApp no telefone */
+.wa-link { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Pagamento (badge) */
+.pay-badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1; }
+.pay-paid { background: rgba(0, 200, 83, 0.18); color: #0b6b2f; }
+.pay-unpaid { background: rgba(244, 67, 54, 0.18); color: #b71c1c; }
+.pay-unknown { background: rgba(120, 120, 120, 0.15); color: #555; }
+
+/* Forma de pagamento com ícone */
+.pay-method { display: inline-flex; gap: 6px; align-items: center; }
+.pay-icon { font-size: 14px; line-height: 1; }
+
+/* Menu kebab (se ainda não existir no CSS base) */
+.actions-kebab { display: flex; justify-content: center; }
+.kebab-btn { border: 1px solid rgba(0,0,0,.12); background: #fff; border-radius: 10px; padding: 4px 10px; cursor: pointer; }
+.kebab-menu { background: #fff; border: 1px solid rgba(0,0,0,.12); border-radius: 12px; box-shadow: 0 10px 24px rgba(0,0,0,.12); padding: 8px; }
+.kebab-item { width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+.kebab-item:hover { background: rgba(0,0,0,.06); }
+.kebab-item-danger { color: #c62828; }
+.kebab-item-danger:hover { background: rgba(244,67,54,.12); }
+.hidden { display: none !important; }

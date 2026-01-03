@@ -109,6 +109,24 @@ async function initDb() {
   `);
   await query(`CREATE INDEX IF NOT EXISTS pets_customer_idx ON pets (customer_id);`);
 
+
+/* -------------------------
+   dog_breeds (Raças de Cães)
+------------------------- */
+await query(`
+  CREATE TABLE IF NOT EXISTS dog_breeds (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    history TEXT,
+    size TEXT NOT NULL,
+    coat TEXT NOT NULL,
+    characteristics TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
+await query(`CREATE INDEX IF NOT EXISTS dog_breeds_name_idx ON dog_breeds (name);`);
   // PATCH compat: garante colunas de auditoria mesmo em bancos antigos
   await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
   await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
@@ -436,6 +454,124 @@ async function initDb() {
     }
     console.log('✔ opening_hours seeded');
   }
+
+  
+  /* -------------------------
+     PACOTES (por porte) + VENDAS DE PACOTE
+  ------------------------- */
+  // Migração: versões antigas podem ter coluna `frequency` em vez de `type`
+  await query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='service_packages' AND column_name='frequency'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='service_packages' AND column_name='type'
+      )
+      THEN
+        ALTER TABLE service_packages RENAME COLUMN frequency TO type;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='service_packages' AND column_name='package_type'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='service_packages' AND column_name='type'
+      )
+      THEN
+        ALTER TABLE service_packages RENAME COLUMN package_type TO type;
+      END IF;
+    END $$;
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS service_packages (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'mensal', -- mensal | quinzenal
+      porte TEXT NOT NULL,                -- Pequeno | Médio | Grande
+      validity_days INTEGER NOT NULL DEFAULT 30,
+      bath_qty INTEGER NOT NULL DEFAULT 4,
+      bath_discount_percent INTEGER NOT NULL DEFAULT 0,
+      bath_service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE RESTRICT,
+      includes_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  // Migração: versões antigas do schema podem não ter `bath_service_id`
+  // (em algumas versões anteriores havia bath_service_id_p/m/g). Aqui garantimos
+  // a coluna e tentamos popular automaticamente quando possível.
+  await query(`ALTER TABLE service_packages ADD COLUMN IF NOT EXISTS bath_service_id INTEGER;`);
+  await query(`
+    DO $$
+    BEGIN
+      -- Se existirem colunas antigas bath_service_id_p/m/g, tenta mapear para bath_service_id
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='service_packages' AND column_name='bath_service_id_p'
+      ) THEN
+        UPDATE service_packages
+           SET bath_service_id = CASE
+             WHEN porte = 'Pequeno' THEN bath_service_id_p
+             WHEN porte = 'Médio' THEN bath_service_id_m
+             WHEN porte = 'Grande' THEN bath_service_id_g
+             ELSE bath_service_id
+           END
+         WHERE bath_service_id IS NULL;
+      END IF;
+    END $$;
+  `);
+  await query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='service_packages' AND column_name='type'
+      ) THEN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_indexes
+          WHERE schemaname='public' AND tablename='service_packages' AND indexname='service_packages_type_idx'
+        ) THEN
+          CREATE INDEX service_packages_type_idx ON service_packages (type);
+        END IF;
+      END IF;
+    END $$;
+  `);
+  await query(`ALTER TABLE service_packages ADD COLUMN IF NOT EXISTS porte TEXT NOT NULL DEFAULT '';`);
+  await query(`CREATE INDEX IF NOT EXISTS service_packages_porte_idx ON service_packages (porte);`);
+
+await query(`
+    CREATE TABLE IF NOT EXISTS package_sales (
+      id SERIAL PRIMARY KEY,
+      package_id INTEGER NOT NULL REFERENCES service_packages(id) ON DELETE RESTRICT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      pet_id INTEGER REFERENCES pets(id) ON DELETE SET NULL,
+      porte TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      time TEXT NOT NULL,
+      expires_date TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'vigente', -- vigente | vencido | cancelado
+      total_cents INTEGER NOT NULL DEFAULT 0,
+      payment_status TEXT NOT NULL DEFAULT 'Pago',
+      payment_method TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS package_sales_customer_idx ON package_sales (customer_id);`);
+  await query(`CREATE INDEX IF NOT EXISTS package_sales_pet_idx ON package_sales (pet_id);`);
+
+  // vincular agendamentos ao pacote
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS package_sale_id INTEGER REFERENCES package_sales(id) ON DELETE SET NULL;`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS package_seq INTEGER;`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS package_total INTEGER;`);
 
   console.log('✔ initDb finalizado');
 }
