@@ -1158,6 +1158,33 @@
   let pixPollTimer = null;
   let currentPixBookingId = null;
 
+
+  // Persistência para retomar confirmação do Pix (caso o navegador pause/recarregue)
+  const PF_PIX_PENDING_KEY = 'pf_pix_pending';
+
+  function savePendingPix(payload) {
+    try {
+      const data = Object.assign({ created_at: Date.now() }, payload || {});
+      localStorage.setItem(PF_PIX_PENDING_KEY, JSON.stringify(data));
+    } catch (_) {}
+  }
+
+  function loadPendingPix() {
+    try {
+      const raw = localStorage.getItem(PF_PIX_PENDING_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || !data.booking_id) return null;
+      // expira em 12h (evita loops antigos)
+      const age = Date.now() - (Number(data.created_at) || 0);
+      if (age > 12 * 60 * 60 * 1000) { localStorage.removeItem(PF_PIX_PENDING_KEY); return null; }
+      return data;
+    } catch (_) { return null; }
+  }
+
+  function clearPendingPix() {
+    try { localStorage.removeItem(PF_PIX_PENDING_KEY); } catch (_) {}
+  }
   function stopPixPolling() {
     if (pixPollTimer) {
       clearInterval(pixPollTimer);
@@ -1168,6 +1195,7 @@
   function resetPixUI() {
     stopPixPolling();
     currentPixBookingId = null;
+    clearPendingPix();
     if (pixCopyPaste) pixCopyPaste.value = '';
     if (pixQrImg) pixQrImg.src = '';
     if (pixStatusMsg) pixStatusMsg.textContent = '';
@@ -1227,6 +1255,90 @@
   const sortingScreen = document.getElementById('sortingScreen');
   const successScreen = document.getElementById('successScreen');
 
+
+  async function resumePendingPixIfAny() {
+    const pending = loadPendingPix();
+    if (!pending || !pending.booking_id) return;
+
+    // Evita conflitar com um Pix recém-gerado nesta sessão
+    if (currentPixBookingId && Number(currentPixBookingId) === Number(pending.booking_id)) return;
+
+    const bookingId = Number(pending.booking_id);
+    if (!bookingId) { clearPendingPix(); return; }
+
+    // Se o usuário recarregar/voltar depois de pagar, o navegador pode ter pausado os timers.
+    // Aqui retomamos a checagem e, ao confirmar, abrimos o WhatsApp automaticamente.
+    try {
+      pfToast('Retomando confirmação do Pix...', 'info', 1800);
+    } catch (_) {}
+
+    stopPixPolling();
+    currentPixBookingId = bookingId;
+
+    // Mostra o box do Pix apenas se ele existir na tela (sem alterar layout)
+    try {
+      if (pixPaymentBox) pixPaymentBox.classList.remove('hidden');
+      if (pixStatusMsg) pixStatusMsg.textContent = 'Aguardando confirmação do pagamento Pix...';
+    } catch (_) {}
+
+    pixPollTimer = setInterval(async () => {
+      try {
+        const resp = await apiGet(`/api/payments/mercadopago/bookings/${bookingId}/sync?t=${Date.now()}`);
+        const b = resp && resp.booking ? resp.booking : null;
+        const ps = String((b && b.payment_status) || '').toLowerCase();
+        const st = String((b && b.status) || '').toLowerCase();
+
+        const approved = (ps === 'pago' || ps === 'paid' || ps === 'approved' || st === 'confirmado' || st === 'approved');
+        const rejected = (ps === 'recusado' || ps === 'rejected' || ps === 'cancelled');
+
+        if (approved) {
+          stopPixPolling();
+          if (pixStatusMsg) pixStatusMsg.textContent = 'Pagamento confirmado! Finalizando...';
+          pfToast('Pagamento Pix confirmado!', 'success', 2000);
+
+          const payload = (pending && pending.wp_payload) ? pending.wp_payload : {};
+          const message = buildWhatsappMessage(payload) + "\n\nPagamento: PIX CONFIRMADO ✅";
+          const url = buildWhatsappUrl(message);
+
+          clearPendingPix();
+
+          try {
+            sortingScreen.classList.remove('hidden');
+            setTimeout(() => {
+              sortingScreen.classList.add('hidden');
+              successScreen.classList.remove('hidden');
+            }, 850);
+          } catch (_) {}
+
+          setTimeout(() => { window.open(url, '_blank'); }, 650);
+          setTimeout(() => { window.location.href = '/'; }, 1300);
+          return;
+        }
+
+        if (rejected) {
+          stopPixPolling();
+          clearPendingPix();
+          if (pixStatusMsg) pixStatusMsg.textContent = 'Pagamento recusado/cancelado. Gere um novo Pix ou escolha cartão no balcão.';
+          pfToast('Pix recusado/cancelado', 'error', 2500);
+          return;
+        }
+
+        if (ps === 'aguardando pagamento' || ps === 'pending' || ps === 'in_process' || ps === 'in process') {
+          if (pixStatusMsg) pixStatusMsg.textContent = 'Aguardando pagamento... (atualizando automaticamente)';
+        }
+      } catch (_) {
+        // mantém aguardando
+      }
+    }, 2500);
+
+    // fallback: após 6 min, para e orienta (sem travar)
+    setTimeout(() => {
+      if (currentPixBookingId === bookingId) {
+        stopPixPolling();
+        if (pixStatusMsg) pixStatusMsg.textContent = 'Ainda não identificamos o pagamento. Se já pagou, aguarde mais alguns instantes ou fale com a gente pelo WhatsApp.';
+      }
+    }, 360000);
+  }
   const today = new Date().toISOString().split('T')[0];
   dateInput.min = today;
 
@@ -1273,6 +1385,34 @@
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
     return data;
+  }
+
+  /* ===== WhatsApp (cliente) ===== */
+  const PF_WHATSAPP_NUMBER = '5516981535338'; // PetFunny – Banho & Tosa
+
+  function buildWhatsappUrl(message) {
+    const txt = encodeURIComponent(String(message || ''));
+    // wa.me funciona bem em mobile e desktop (web.whatsapp)
+    return `https://wa.me/${PF_WHATSAPP_NUMBER}?text=${txt}`;
+  }
+
+  function buildWhatsappMessage({ customerName, phone, petName, servicesText, date, time, prizeKey, notes } = {}) {
+    const name = String(customerName || '').trim() || 'Olá!';
+    const pet = String(petName || '').trim() || 'seu pet';
+    const serv = String(servicesText || '').trim() || '—';
+    const dt = (date && time) ? `${String(date)} às ${String(time)}` : (date ? String(date) : '—');
+
+    const lines = [];
+    lines.push(`Olá, ${name}!`);
+    lines.push(`Aqui é do *PetFunny – Banho & Tosa*.`);
+    lines.push('');
+    lines.push(`Quero confirmar o agendamento do(a) *${pet}*.`);
+    lines.push(`• Serviço(s): ${serv}`);
+    lines.push(`• Data/Hora: ${dt}`);
+    if (prizeKey) lines.push(`• Mimo da roleta: ${String(prizeKey)}`);
+    if (notes) lines.push(`• Obs.: ${String(notes)}`);
+    if (phone) lines.push(`• WhatsApp do tutor(a): ${String(phone)}`);
+    return lines.join('\n');
   }
 
 
@@ -2362,6 +2502,21 @@
         const pix = await apiPost('/api/payments/mercadopago/pix', { booking_id: bookingId });
 
         currentPixBookingId = bookingId;
+        // guarda contexto para retomar a confirmação caso o navegador pause/recarregue
+        savePendingPix({
+          booking_id: bookingId,
+          wp_payload: {
+            customerName: currentCustomer && currentCustomer.name ? currentCustomer.name : '',
+            phone: currentCustomer && currentCustomer.phone ? currentCustomer.phone : '',
+            petName,
+            servicesText,
+            date,
+            time,
+            prizeKey: selectedPrize && selectedPrize.key ? selectedPrize.key : '',
+            notes
+          }
+        });
+
 
         // QR base64 -> imagem
         if (pix && pix.qr_code_base64) {
@@ -2390,6 +2545,7 @@
               pfToast('Pagamento Pix confirmado!', 'success', 2000);
 
               btnConfirmBooking.disabled = false;
+              clearPendingPix();
               resetPixUI();
 
               // Continua o fluxo normal: WhatsApp + retorno ao início
@@ -2422,15 +2578,20 @@
                 successScreen.classList.add('hidden');
                 try { localStorage.removeItem('petfunny_prize'); } catch {}
                 window.location.href = '/';
-              }, 1300);// Atualiza texto de status enquanto aguarda (evita parecer "travado")
-if (ps === 'recusado' || ps === 'rejected' || ps === 'cancelled') {
-  stopPixPolling();
-  btnConfirmBooking.disabled = false;
-  pixStatusMsg.textContent = 'Pagamento recusado/cancelado. Você pode gerar um novo Pix ou escolher pagamento no balcão.';
-  pfToast('Pix recusado/cancelado', 'error', 2500);
-} else if (ps === 'aguardando pagamento' || ps === 'pending' || ps === 'in_process' || ps === 'in process') {
-  pixStatusMsg.textContent = 'Aguardando pagamento... (atualizando automaticamente)';
-}
+              }, 1300);
+
+              return;
+            }
+
+            // Atualiza texto de status enquanto aguarda (evita parecer "travado")
+            if (ps === 'recusado' || ps === 'rejected' || ps === 'cancelled') {
+              stopPixPolling();
+              clearPendingPix();
+              btnConfirmBooking.disabled = false;
+              pixStatusMsg.textContent = 'Pagamento recusado/cancelado. Você pode gerar um novo Pix ou escolher pagamento no balcão.';
+              pfToast('Pix recusado/cancelado', 'error', 2500);
+            } else if (ps === 'aguardando pagamento' || ps === 'pending' || ps === 'in_process' || ps === 'in process') {
+              pixStatusMsg.textContent = 'Aguardando pagamento... (atualizando automaticamente)';
             }
           } catch (e) {
             // mantém aguardando
@@ -2490,6 +2651,9 @@ if (ps === 'recusado' || ps === 'rejected' || ps === 'cancelled') {
       step4Error.classList.remove('hidden');
     }
   });
+  // Se houver um Pix pendente (ex.: usuário pagou no app do banco e voltou), retoma automaticamente
+  resumePendingPixIfAny();
+
 
   createPetFields();
   resetTimeSelects();
@@ -2516,27 +2680,6 @@ if (ps === 'recusado' || ps === 'rejected' || ps === 'cancelled') {
     "https://www.instagram.com/petfunny"
   ]
 }
-
-      successScreen.classList.remove('hidden');
-
-      // Toast visual
-      pfToast(
-        'Agendamento enviado com sucesso! Te chamamos no WhatsApp 🐾',
-        'success',
-        2200
-      );
-
-      // Aguarda mais tempo antes de abrir o WhatsApp
-      setTimeout(() => {
-        window.open(url, '_blank');
-      }, 2000); // ⬅️ tempo maior aqui (2s)
-
-      // Aguarda mais um pouco e volta para o início
-      setTimeout(() => {
-        successScreen.classList.add('hidden');
-        try { localStorage.removeItem('petfunny_prize'); } catch {}
-        window.location.href = '/';
-      }, 3500); // ⬅️ retorno após WhatsApp
 
 </script>
 
