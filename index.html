@@ -1269,7 +1269,7 @@
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') url.searchParams.append(k, v);
     });
-    const resp = await fetch(url.toString());
+    const resp = await fetch(url.toString(), { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.error || 'Erro ao buscar dados.');
     return data;
@@ -2379,12 +2379,12 @@
         stopPixPolling();
         pixPollTimer = setInterval(async () => {
           try {
-            const resp = await apiGet(`/api/payments/mercadopago/bookings/${bookingId}/sync`);
+            const resp = await apiGet(`/api/payments/mercadopago/bookings/${bookingId}/sync?t=${Date.now()}`);
             const b = resp && resp.booking ? resp.booking : null;
             const ps = String((b && b.payment_status) || '').toLowerCase();
             const st = String((b && b.status) || '').toLowerCase();
 
-            if (ps === 'pago' || st === 'confirmado' || ps === 'approved') {
+            if (ps === 'pago' || ps === 'pago ' || ps === 'paid' || ps === 'approved' || st === 'confirmado' || st === 'confirmado ' || st === 'approved') {
               stopPixPolling();
               pixStatusMsg.textContent = 'Pagamento confirmado! Finalizando...';
               pfToast('Pagamento Pix confirmado!', 'success', 2000);
@@ -2422,7 +2422,15 @@
                 successScreen.classList.add('hidden');
                 try { localStorage.removeItem('petfunny_prize'); } catch {}
                 window.location.href = '/';
-              }, 1300);
+              }, 1300);// Atualiza texto de status enquanto aguarda (evita parecer "travado")
+if (ps === 'recusado' || ps === 'rejected' || ps === 'cancelled') {
+  stopPixPolling();
+  btnConfirmBooking.disabled = false;
+  pixStatusMsg.textContent = 'Pagamento recusado/cancelado. Você pode gerar um novo Pix ou escolher pagamento no balcão.';
+  pfToast('Pix recusado/cancelado', 'error', 2500);
+} else if (ps === 'aguardando pagamento' || ps === 'pending' || ps === 'in_process' || ps === 'in process') {
+  pixStatusMsg.textContent = 'Aguardando pagamento... (atualizando automaticamente)';
+}
             }
           } catch (e) {
             // mantém aguardando
