@@ -1218,10 +1218,9 @@ app.get('/api/payments/mercadopago/bookings/:id/sync', async (req, res) => {
     await db.query(
       `UPDATE bookings
          SET mp_status = $2,
-               payment_method = COALESCE(payment_method, 'pix'),
+               payment_method = COALESCE(NULLIF(payment_method, ''), 'pix'),
              payment_status = $3,
              status = $4,
-             payment_method = COALESCE(payment_method, 'pix'),
              mp_paid_at = CASE WHEN $5 THEN NOW() ELSE mp_paid_at END
        WHERE id = $1`,
       [bookingId, status, payment_status, booking_status, isApproved]
