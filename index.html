@@ -685,8 +685,8 @@
             <div class="field-group">
               <div class="field-label">Escolha o dia</div>
               <div class="field-help">
-                Atendemos de <strong>segunda a sexta, das 07:30 às 17:30</strong>, e
-                <strong>aos sábados, das 07:30 às 13:00</strong>.
+                <span id="openingHoursInline">Atendemos de <strong>segunda a sexta, das 07:30 às 17:30</strong>, e
+                <strong>aos sábados, das 07:30 às 13:00</strong>.</span>
               </div>
               <input type="date" id="dateInput" />
             </div>
@@ -787,11 +787,11 @@
     <div class="overlay-title">Sorteando o mimo do seu pet...</div>
     <div class="overlay-subtitle">
       Segura a ansiedade! Estamos girando a Roleta de Mimos pra ver qual carinho extra ele vai ganhar hoje. 🐶✨
-    </div>
+    </div><br />&nbsp;
     <div style="position: relative; display:inline-block;">
       <div class="overlay-wheel"></div>
       <div class="overlay-pointer"></div>
-    </div>
+    </div><br />&nbsp;
     <div class="overlay-dots">
       <div class="overlay-dot"></div><div class="overlay-dot"></div><div class="overlay-dot"></div>
     </div>
@@ -916,6 +916,54 @@
         return groups.map(g => `${rangeLabel(g.start, g.end)}: ${g.open} às ${g.close}`).join(' • ');
       }
 
+      function buildHoursSentence(rows){
+        const clean = (Array.isArray(rows) ? rows : [])
+          .map(r => ({
+            dow: Number(r.dow),
+            is_closed: !!r.is_closed,
+            open_time: r.open_time ? String(r.open_time).slice(0,5) : null,
+            close_time: r.close_time ? String(r.close_time).slice(0,5) : null
+          }))
+          .filter(r => Number.isFinite(r.dow) && r.dow >= 0 && r.dow <= 6)
+          .sort((a,b) => a.dow - b.dow);
+
+        const openRows = clean.filter(r => !r.is_closed && r.open_time && r.close_time);
+        if (!openRows.length) return '';
+
+        // agrupa dias consecutivos com mesmos horários
+        const groups = [];
+        let cur = null;
+        for (const r of openRows) {
+          if (!cur) { cur = { start: r.dow, end: r.dow, open: r.open_time, close: r.close_time }; continue; }
+          const sameTime = (r.open_time === cur.open && r.close_time === cur.close);
+          const consecutive = (r.dow === cur.end + 1);
+          if (sameTime && consecutive) cur.end = r.dow;
+          else { groups.push(cur); cur = { start: r.dow, end: r.dow, open: r.open_time, close: r.close_time }; }
+        }
+        if (cur) groups.push(cur);
+
+        function dayNameLower(dow){
+          const names = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+          return names[dow] || 'dia';
+        }
+
+        function groupPhrase(g){
+          const time = `das ${g.open} às ${g.close}`;
+          if (g.start === g.end) {
+            if (g.start === 6) return `aos sábados, ${time}`;
+            if (g.start === 0) return `aos domingos, ${time}`;
+            return `na ${dayNameLower(g.start)}, ${time}`;
+          }
+          return `de ${dayNameLower(g.start)} a ${dayNameLower(g.end)}, ${time}`;
+        }
+
+        const parts = groups.map(g => `<strong>${groupPhrase(g)}</strong>`);
+        if (parts.length === 1) return `Atendemos ${parts[0]}.`;
+        if (parts.length === 2) return `Atendemos ${parts[0]}, e ${parts[1]}.`;
+        return `Atendemos ${parts.slice(0,-1).join(', ')}, e ${parts[parts.length-1]}.`;
+      }
+
+
       async function load(){
         try {
           const url = (API_BASE_URL || '') + '/api/opening-hours';
@@ -925,6 +973,13 @@
           const rows = (data && (data.opening_hours || data.rows || data.data)) || (Array.isArray(data) ? data : []);
           const label = buildHoursLabel(rows);
           if (label && typeof label === 'string') hoursEl.textContent = label;
+
+          // Também atualiza o texto auxiliar no passo "Escolha o dia" (sem mudar layout)
+          const inlineEl = document.getElementById('openingHoursInline');
+          if (inlineEl) {
+            const sentence = buildHoursSentence(rows);
+            if (sentence) inlineEl.innerHTML = sentence;
+          }
         } catch (e) {
           // Mantém o texto padrão já renderizado no HTML para evitar qualquer quebra de layout
         }
