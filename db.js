@@ -91,7 +91,10 @@ async function initDb() {
       ADD COLUMN IF NOT EXISTS city TEXT,
       ADD COLUMN IF NOT EXISTS state TEXT;
   `);
-  await query(`CREATE INDEX IF NOT EXISTS customers_phone_idx ON customers (phone);`);
+  await query("CREATE INDEX IF NOT EXISTS customers_phone_idx ON customers (phone);");
+  // Automação WhatsApp: opt-out
+  await query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS opt_out_whatsapp BOOLEAN NOT NULL DEFAULT FALSE;`);
+
 
   await query(`
     CREATE TABLE IF NOT EXISTS pets (
@@ -107,9 +110,7 @@ async function initDb() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
-  await query(`CREATE INDEX IF NOT EXISTS pets_customer_idx ON pets (customer_id);`);
-
-
+  await query("CREATE INDEX IF NOT EXISTS pets_customer_idx ON pets (customer_id);");
 /* -------------------------
    dog_breeds (Raças de Cães)
 ------------------------- */
@@ -126,7 +127,7 @@ await query(`
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 `);
-await query(`CREATE INDEX IF NOT EXISTS dog_breeds_name_idx ON dog_breeds (name);`);
+  await query("CREATE INDEX IF NOT EXISTS dog_breeds_name_idx ON dog_breeds (name);");
   // PATCH compat: garante colunas de auditoria mesmo em bancos antigos
   await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
   await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`);
@@ -296,12 +297,10 @@ await query(`CREATE INDEX IF NOT EXISTS dog_breeds_name_idx ON dog_breeds (name)
 
 
   // índices úteis
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_service_id ON bookings(service_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_bookings_date_time ON bookings(date, time);`);
-
-
+  await query("CREATE INDEX IF NOT EXISTS idx_bookings_customer_id ON bookings(customer_id);");
+  await query("CREATE INDEX IF NOT EXISTS idx_bookings_pet_id ON bookings(pet_id);");
+  await query("CREATE INDEX IF NOT EXISTS idx_bookings_service_id ON bookings(service_id);");
+  await query("CREATE INDEX IF NOT EXISTS idx_bookings_date_time ON bookings(date, time);");
   /* -------------------------
      MIMOS (novo)
   ------------------------- */
@@ -546,8 +545,7 @@ await query(`CREATE INDEX IF NOT EXISTS dog_breeds_name_idx ON dog_breeds (name)
     END $$;
   `);
   await query(`ALTER TABLE service_packages ADD COLUMN IF NOT EXISTS porte TEXT NOT NULL DEFAULT '';`);
-  await query(`CREATE INDEX IF NOT EXISTS service_packages_porte_idx ON service_packages (porte);`);
-
+  await query("CREATE INDEX IF NOT EXISTS service_packages_porte_idx ON service_packages (porte);");
 await query(`
     CREATE TABLE IF NOT EXISTS package_sales (
       id SERIAL PRIMARY KEY,
@@ -565,10 +563,151 @@ await query(`
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
-  await query(`CREATE INDEX IF NOT EXISTS package_sales_customer_idx ON package_sales (customer_id);`);
-  await query(`CREATE INDEX IF NOT EXISTS package_sales_pet_idx ON package_sales (pet_id);`);
+  await query("CREATE INDEX IF NOT EXISTS package_sales_customer_idx ON package_sales (customer_id);");
+  await query("CREATE INDEX IF NOT EXISTS package_sales_pet_idx ON package_sales (pet_id);");
+  /* -------------------------
+     AUTOMAÇÕES (WhatsApp)
+  ------------------------- */
+  await query(`
+    CREATE TABLE IF NOT EXISTS message_templates (
+      id SERIAL PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      channel TEXT NOT NULL DEFAULT 'whatsapp',
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
 
-  // vincular agendamentos ao pacote
+  await query(`
+    CREATE TABLE IF NOT EXISTS automation_rules (
+      id SERIAL PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      trigger TEXT NOT NULL,
+      delay_minutes INTEGER NOT NULL DEFAULT 0,
+      cooldown_days INTEGER NOT NULL DEFAULT 0,
+      audience_filter JSONB NOT NULL DEFAULT '{}'::jsonb,
+      template_id INTEGER REFERENCES message_templates(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query("CREATE INDEX IF NOT EXISTS automation_rules_trigger_idx ON automation_rules (trigger);");
+  /* -------------------------
+     EVENTOS + FILA (WhatsApp)
+     - motor de eventos → message_queue → envio (manual link no MVP)
+  ------------------------- */
+  await query(`
+    CREATE TABLE IF NOT EXISTS automation_events (
+      id SERIAL PRIMARY KEY,
+      type TEXT NOT NULL,
+      payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+      occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query("CREATE INDEX IF NOT EXISTS automation_events_type_idx ON automation_events (type);");
+  await query("CREATE INDEX IF NOT EXISTS automation_events_occurred_idx ON automation_events (occurred_at);");
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS message_queue (
+      id SERIAL PRIMARY KEY,
+      channel TEXT NOT NULL DEFAULT 'whatsapp',
+      status TEXT NOT NULL DEFAULT 'queued', -- queued | sending | sent | failed | cancelled
+      to_phone TEXT NOT NULL,
+      customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+      rule_id INTEGER REFERENCES automation_rules(id) ON DELETE SET NULL,
+      template_id INTEGER REFERENCES message_templates(id) ON DELETE SET NULL,
+      event_id INTEGER REFERENCES automation_events(id) ON DELETE SET NULL,
+      scheduled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      sent_at TIMESTAMPTZ,
+      body TEXT NOT NULL,
+      wa_link TEXT, -- link wa.me para envio manual (MVP)
+      provider TEXT NOT NULL DEFAULT 'manual_link',
+      meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+      error TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query("CREATE INDEX IF NOT EXISTS message_queue_status_sched_idx ON message_queue (status, scheduled_at);");
+  await query("CREATE INDEX IF NOT EXISTS message_queue_customer_idx ON message_queue (customer_id);");
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS message_delivery_log (
+      id SERIAL PRIMARY KEY,
+      customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+      to_phone TEXT NOT NULL,
+      rule_id INTEGER REFERENCES automation_rules(id) ON DELETE SET NULL,
+      template_id INTEGER REFERENCES message_templates(id) ON DELETE SET NULL,
+      event_id INTEGER REFERENCES automation_events(id) ON DELETE SET NULL,
+      message_queue_id INTEGER REFERENCES message_queue(id) ON DELETE SET NULL,
+      status TEXT NOT NULL, -- sent | failed | cancelled
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      meta JSONB NOT NULL DEFAULT '{}'::jsonb
+    );
+  `);
+  await query("CREATE INDEX IF NOT EXISTS message_delivery_log_customer_rule_idx ON message_delivery_log (customer_id, rule_id, sent_at);");
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_inbound (
+      id SERIAL PRIMARY KEY,
+      from_phone TEXT NOT NULL,
+      body TEXT NOT NULL,
+      received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      matched_command TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query("CREATE INDEX IF NOT EXISTS whatsapp_inbound_from_idx ON whatsapp_inbound (from_phone, received_at);");
+
+  // Seeds idempotentes (somente se estiver vazio)
+  const tplCount = await get(`SELECT COUNT(*)::int AS n FROM message_templates;`);
+  if ((tplCount?.n || 0) === 0) {
+    await run(
+      `INSERT INTO message_templates (code, channel, body) VALUES
+        ('TPL_APPT_CONFIRM','whatsapp',$1),
+        ('TPL_APPT_REMINDER','whatsapp',$2),
+        ('TPL_POST_SERVICE','whatsapp',$3),
+        ('TPL_RETENTION','whatsapp',$4),
+        ('TPL_REFERRAL','whatsapp',$5)
+      `,
+      [
+        "Oi {{customer_name}}! 🐾\nSeu agendamento no PetFunny está confirmado:\n\n• Pet: {{pet_name}}\n• Serviço: {{service_summary}}\n• Data/hora: {{date_br}} às {{time_br}}\n\nSe precisar reagendar, responda *REAGENDAR*.",
+        "Oi {{customer_name}}! 🐾\nPassando pra lembrar do agendamento do(a) {{pet_name}}:\n\nAmanhã ({{date_br}}) às {{time_br}}.\n\nResponda:\n1️⃣ Confirmar\n2️⃣ Reagendar",
+        "Oi {{customer_name}}! 🐾\nComo foi a experiência do(a) {{pet_name}} hoje no PetFunny?\n\nResponda com uma nota de 1 a 5 ⭐\n(1 = não gostei | 5 = amei)",
+        "Oi {{customer_name}}! 🐾\nJá faz {{days_since_last}} dias desde o último banho do(a) {{pet_name}}.\n\nQuer que eu te mande os melhores horários pra esta semana?",
+        "Oi {{customer_name}}! 🐾\nSe você gostou do PetFunny, posso te pedir uma ajuda?\n\nIndicando um amigo do bairro, você ganha um mimo na próxima visita.\n\nSeu código: *{{ref_code}}*\nQuer que eu te mande uma mensagem prontinha pra encaminhar?"
+      ]
+    );
+  }
+
+  const ruleCount = await get(`SELECT COUNT(*)::int AS n FROM automation_rules;`);
+  if ((ruleCount?.n || 0) === 0) {
+    const tpls = await all(`SELECT id, code FROM message_templates;`);
+    const idByCode = new Map(tpls.map(t => [t.code, t.id]));
+    await run(
+      `INSERT INTO automation_rules (code, name, is_enabled, trigger, delay_minutes, cooldown_days, audience_filter, template_id)
+       VALUES
+        ('APPT_CONFIRM_D0','Confirmação imediata (D0)', TRUE,'appointment_created',0,0,'{}'::jsonb,$1),
+        ('APPT_REMINDER_D1','Lembrete 24h antes (D-1)', TRUE,'appointment_reminder_24h',0,0,'{}'::jsonb,$2),
+        ('POST_SERVICE_D0','Pós-atendimento (D0 + 1h)', TRUE,'appointment_completed',60,3,'{}'::jsonb,$3),
+        ('RETENTION_D15','Retenção (D+15)', TRUE,'retention_15',0,7,'{}'::jsonb,$4),
+        ('REFERRAL_D1','Indique & Ganhe (D+1)', TRUE,'first_visit_completed',1440,30,'{}'::jsonb,$5)
+      `,
+      [
+        idByCode.get('TPL_APPT_CONFIRM') || null,
+        idByCode.get('TPL_APPT_REMINDER') || null,
+        idByCode.get('TPL_POST_SERVICE') || null,
+        idByCode.get('TPL_RETENTION') || null,
+        idByCode.get('TPL_REFERRAL') || null,
+      ]
+    );
+  }
+
+    // vincular agendamentos ao pacote
   await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS package_sale_id INTEGER REFERENCES package_sales(id) ON DELETE SET NULL;`);
   await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS package_seq INTEGER;`);
   await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS package_total INTEGER;`);

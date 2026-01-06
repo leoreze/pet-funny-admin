@@ -470,7 +470,7 @@
     }
     .footer-logo { max-width: 140px; height: auto; }
     .footer-info {
-      font-size: 12px;
+      font-size: 14px;
       color: #455a64;
       display: flex;
       flex-direction: column;
@@ -487,7 +487,7 @@
       margin-top: 2px;
     }
     .footer-social-label {
-      font-size: 12px;
+      font-size: 14px;
       color: #455a64;
       font-weight: 600;
       margin-right: 4px;
@@ -502,7 +502,7 @@
       background: #f3f7f8;
       color: #37474f;
       text-decoration: none;
-      font-size: 12px;
+      font-size: 14px;
       transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
       white-space: nowrap;
     }
@@ -512,7 +512,7 @@
       transform: translateY(-1px);
     }
 
-    .footer-bottom { font-size: 11px; color: #78909c; text-align: center; margin-top: 4px; }
+    .footer-bottom { font-size: 14px; color: #78909c; text-align: center; margin-top: 4px; }
 
     @media (max-width: 720px) {
       .card { padding: 18px 14px 18px; }
@@ -523,7 +523,7 @@
 <body>
 
 <header class="top-brand">
-  <img src="roleta-de-mimos-logo.svg" alt="Roleta de Mimos – Pet Funny" />
+  <img src="roleta-de-mimos-logo.svg" width="200" alt="Roleta de Mimos – Pet Funny" />
 </header>
 
 <section id="onboarding" class="onboarding">
@@ -789,15 +789,21 @@
 
 <footer class="site-footer">
   <div class="footer-inner">
-    <div class="footer-top">
-      <img src="pet-funny-logo.svg" alt="Pet Funny" class="footer-logo" />
-      <div class="footer-info">
-        <strong>Pet Funny • Banho &amp; Tosa</strong>
-        <span>Rua Virgílio de Carvalho Neves Neto, 794 – Ribeirão Preto / SP</span>
-        <span>Horário: Seg–Sex: 07:30 às 17:30 • Sábado: 07:30 às 13:00</span>
-        <span>WhatsApp: (16) 98153-5338</span>
 
-        <!-- REDES SOCIAIS (NOVO) -->
+    <div class="footer-top footer-line">
+  <img src="pet-funny-logo.svg" alt="Pet Funny" class="footer-logo" />
+
+  <div class="footer-copy">
+    © <span id="footerYear"></span> Pet Funny • Roleta de Mimos. Todos os direitos reservados.
+  </div>
+
+  <div class="footer-info">
+    <strong>Pet Funny • Banho &amp; Tosa</strong>
+    <span>Rua Virgílio de Carvalho Neves Neto, 794 – Ribeirão Preto / SP</span>
+    <span>Horário: <span id="footerHoursText"></span></span>
+    <span>WhatsApp: (16) 98153-5338</span>
+
+   <!-- REDES SOCIAIS (NOVO) -->
         <div class="footer-social" aria-label="Redes sociais Pet Funny">
           <span class="footer-social-label">Redes:</span>
           <a class="social-link" href="https://www.youtube.com/@petfunnyrp" target="_blank" rel="noopener noreferrer" aria-label="YouTube Pet Funny">
@@ -811,13 +817,11 @@
           </a>
         </div>
         <!-- /REDES SOCIAIS (NOVO) -->
-
-      </div>
-    </div>
-    <div class="footer-bottom">
-      © 2024 Pet Funny • Roleta de Mimos. Todos os direitos reservados.
-    </div>
   </div>
+</div>
+
+
+ 
 </footer>
 
 <div itemscope itemtype="https://schema.org/PetStore">
@@ -829,6 +833,81 @@
 
 <script>
   const API_BASE_URL = ''; // mesmo host/porta do backend
+
+
+  /* ===== Footer dinâmico (cliente): ano vigente + horário do cadastro ===== */
+  (function initClientFooterDynamic(){
+    try {
+      const yearEl = document.getElementById('footerYear');
+      if (yearEl) yearEl.textContent = String(new Date().getFullYear());
+
+      const hoursEl = document.getElementById('footerHoursText');
+      if (!hoursEl) return;
+
+      function dayName(dow){
+        return ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][dow] || 'Dia';
+      }
+      function dayShort(dow){
+        return ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dow] || 'Dia';
+      }
+      function rangeLabel(startDow, endDow){
+        if (startDow === endDow) return dayName(startDow);
+        return dayShort(startDow) + '–' + dayShort(endDow);
+      }
+
+      function buildHoursLabel(rows){
+        const clean = (Array.isArray(rows) ? rows : [])
+          .map(r => ({
+            dow: Number(r.dow),
+            is_closed: !!r.is_closed,
+            open_time: r.open_time ? String(r.open_time).slice(0,5) : null,
+            close_time: r.close_time ? String(r.close_time).slice(0,5) : null
+          }))
+          .filter(r => Number.isFinite(r.dow) && r.dow >= 0 && r.dow <= 6)
+          .sort((a,b) => a.dow - b.dow);
+
+        const openRows = clean.filter(r => !r.is_closed && r.open_time && r.close_time);
+        if (!openRows.length) return 'Fechado';
+
+        const groups = [];
+        let cur = null;
+        for (const r of openRows) {
+          if (!cur) {
+            cur = { start: r.dow, end: r.dow, open: r.open_time, close: r.close_time };
+            continue;
+          }
+          const sameTime = (r.open_time === cur.open && r.close_time === cur.close);
+          const consecutive = (r.dow === cur.end + 1);
+          if (sameTime && consecutive) {
+            cur.end = r.dow;
+          } else {
+            groups.push(cur);
+            cur = { start: r.dow, end: r.dow, open: r.open_time, close: r.close_time };
+          }
+        }
+        if (cur) groups.push(cur);
+
+        // Monta string tipo: "Seg–Sex: 07:30 às 17:30 • Sábado: 07:30 às 13:00"
+        return groups.map(g => `${rangeLabel(g.start, g.end)}: ${g.open} às ${g.close}`).join(' • ');
+      }
+
+      async function load(){
+        try {
+          const url = (API_BASE_URL || '') + '/api/opening-hours';
+          const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          const data = await resp.json();
+          const rows = (data && (data.opening_hours || data.rows || data.data)) || (Array.isArray(data) ? data : []);
+          const label = buildHoursLabel(rows);
+          if (label && typeof label === 'string') hoursEl.textContent = label;
+        } catch (e) {
+          // Mantém o texto padrão já renderizado no HTML para evitar qualquer quebra de layout
+        }
+      }
+
+      load();
+    } catch(_) {}
+  })();
 
   /* ===== Toast (cliente) — feedback rápido sem alterar layout ===== */
   function pfToast(message, type = 'success', timeout = 2400) {
@@ -1243,7 +1322,9 @@
   }
 
 
-    function renderServiceSelect(services) {
+  function renderServiceSelect(services) {
+    const current = serviceSelect ? String(serviceSelect.value || '') : '';
+
     serviceSelect.innerHTML = '';
 
     const opt0 = document.createElement('option');
@@ -1251,31 +1332,52 @@
     opt0.textContent = 'Selecione o serviço...';
     serviceSelect.appendChild(opt0);
 
-    (services || []).forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = String(s.id);
-
-      opt.dataset.title = String(s.title || '');
-      opt.dataset.valueCents = String(s.value_cents ?? '');
-      opt.dataset.durationMin = String(s.duration_min ?? s.tempo_min ?? '');
-
-      const priceLabel = (s.value_cents !== undefined && s.value_cents !== null && s.value_cents !== '')
-        ? ` • ${formatCentsBRL(s.value_cents)}`
-        : '';
-
-      const dur = Number(s.duration_min ?? s.tempo_min);
-      const durLabel = (Number.isFinite(dur) && dur > 0) ? ` • ${dur} min` : '';
-
-      opt.textContent = `${s.title}${priceLabel}${durLabel}`;
-      serviceSelect.appendChild(opt);
-    });
-
     if (!services || !services.length) {
       serviceSelect.disabled = true;
       serviceSelect.innerHTML = '<option value="">Nenhum serviço cadastrado</option>';
-    } else {
-      serviceSelect.disabled = false;
+      return;
     }
+
+    // Igual ao Admin: agrupa por categoria usando <optgroup>
+    const grouped = {};
+    (services || []).forEach(svc => {
+      const cat = String(svc.category || 'Outros').trim() || 'Outros';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(svc);
+    });
+
+    Object.keys(grouped)
+      .sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'))
+      .forEach(category => {
+        const og = document.createElement('optgroup');
+        og.label = category;
+
+        grouped[category].forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = String(s.id);
+
+          opt.dataset.title = String(s.title || '');
+          opt.dataset.valueCents = String(s.value_cents ?? '');
+          opt.dataset.durationMin = String(s.duration_min ?? s.tempo_min ?? '');
+
+          const priceLabel = (s.value_cents !== undefined && s.value_cents !== null && s.value_cents !== '')
+            ? ` • ${formatCentsBRL(s.value_cents)}`
+            : '';
+
+          const dur = Number(s.duration_min ?? s.tempo_min);
+          const durLabel = (Number.isFinite(dur) && dur > 0) ? ` • ${dur} min` : '';
+
+          opt.textContent = `${s.title}${priceLabel}${durLabel}`;
+          og.appendChild(opt);
+        });
+
+        serviceSelect.appendChild(og);
+      });
+
+    serviceSelect.disabled = false;
+
+    // Mantém seleção, se existir
+    if (current) serviceSelect.value = current;
   }
 
   function initMultiServicesUI() {

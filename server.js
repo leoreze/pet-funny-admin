@@ -120,6 +120,29 @@ app.get('/api/customers', async (req, res) => {
   }
 });
 
+// Get customer by id (para modal de informações)
+app.get('/api/customers/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    const row = await db.get(
+      `SELECT c.*,
+              (SELECT COUNT(*) FROM pets p WHERE p.customer_id = c.id) AS pets_count,
+              (SELECT COUNT(*) FROM bookings b WHERE b.customer_id = c.id) AS bookings_count
+         FROM customers c
+        WHERE c.id = $1`,
+      [id]
+    );
+    if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
+    res.json({ customer: row });
+  } catch (err) {
+    console.error('Erro ao buscar customer por id:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar cliente.' });
+  }
+});
+
+
 // Lookup by phone
 app.post('/api/customers/lookup', async (req, res) => {
   try {
@@ -208,6 +231,31 @@ app.get('/api/pets', async (req, res) => {
     res.status(500).json({ error: 'Erro interno ao buscar pets.' });
   }
 });
+
+// Get pet by id (para modal de informações)
+app.get('/api/pets/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    const row = await db.get(
+      `SELECT p.*,
+              COALESCE(p.notes,'') AS info,
+              c.name AS customer_name,
+              c.phone AS customer_phone
+         FROM pets p
+         LEFT JOIN customers c ON c.id = p.customer_id
+        WHERE p.id = $1`,
+      [id]
+    );
+    if (!row) return res.status(404).json({ error: 'Pet não encontrado.' });
+    res.json({ pet: row });
+  } catch (err) {
+    console.error('Erro ao buscar pet por id:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar pet.' });
+  }
+});
+
 
 // Create pet
 app.post('/api/pets', async (req, res) => {
@@ -693,7 +741,9 @@ app.get('/api/bookings', async (req, res) => {
       date_from,
       date_to,
       customer_id,
-      pet_id
+      pet_id,
+      limit,
+      offset
     } = req.query;
 
     // Compatibilidade: front antigo usa `search` e `date`
@@ -746,7 +796,16 @@ app.get('/api/bookings', async (req, res) => {
       where.push(`b.pet_id = $${params.length}`);
     }
 
-    const sql = `
+    // Paginação opcional (para não quebrar compatibilidade: se não vier `limit`, retorna tudo)
+    // Quando `limit` vem, buscamos `limit + 1` para calcular `has_more`.
+    const parsedLimit = (limit != null && String(limit).trim() !== '') ? Number(limit) : null;
+    const parsedOffset = (offset != null && String(offset).trim() !== '') ? Number(offset) : 0;
+
+    const usePaging = Number.isFinite(parsedLimit) && parsedLimit > 0;
+    const safeLimit = usePaging ? Math.min(500, Math.max(1, parsedLimit)) : null;
+    const safeOffset = (Number.isFinite(parsedOffset) && parsedOffset >= 0) ? parsedOffset : 0;
+
+    const sqlBase = `
       SELECT
         b.*,
         c.name AS customer_name,
@@ -773,7 +832,23 @@ app.get('/api/bookings', async (req, res) => {
       ORDER BY b.date DESC, b.time DESC, b.id DESC
     `;
 
-    const rows = await db.all(sql, params);
+    let sql = sqlBase;
+    if (usePaging) {
+      // LIMIT/OFFSET com placeholders preservando params já existentes
+      params.push(safeLimit + 1); // busca 1 a mais para saber se há mais
+      sql += ` LIMIT $${params.length}`;
+      params.push(safeOffset);
+      sql += ` OFFSET $${params.length}`;
+    }
+
+    let rows = await db.all(sql, params);
+
+    if (usePaging) {
+      const has_more = rows.length > safeLimit;
+      if (has_more) rows = rows.slice(0, safeLimit);
+      return res.json({ bookings: rows, limit: safeLimit, offset: safeOffset, has_more });
+    }
+
     res.json({ bookings: rows });
   } catch (err) {
     console.error('Erro ao listar bookings:', err);
@@ -1279,6 +1354,537 @@ app.put('/api/opening-hours', async (req, res) => {
 
 
 
+
+
+/* =========================
+   AUTOMATION (WhatsApp)
+========================= */
+
+app.get('/api/automation/rules', async (req, res) => {
+  try {
+    const rows = await db.all(`
+      SELECT r.*, t.code AS template_code
+      FROM automation_rules r
+      LEFT JOIN message_templates t ON t.id = r.template_id
+      ORDER BY r.id
+    `);
+    res.json({ rules: rows });
+  } catch (err) {
+    console.error('Erro ao listar automation_rules:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar regras.' });
+  }
+});
+
+app.put('/api/automation/rules/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    const body = req.body || {};
+    const is_enabled = !!body.is_enabled;
+    const name = String(body.name || '').trim();
+    const trigger = String(body.trigger || '').trim();
+    const delay_minutes = Number.isFinite(Number(body.delay_minutes)) ? Number(body.delay_minutes) : 0;
+    const cooldown_days = Number.isFinite(Number(body.cooldown_days)) ? Number(body.cooldown_days) : 0;
+    const template_id = body.template_id == null ? null : Number(body.template_id);
+    const audience_filter = body.audience_filter && typeof body.audience_filter === 'object'
+      ? body.audience_filter
+      : {};
+
+    const existing = await db.get('SELECT * FROM automation_rules WHERE id=$1', [id]);
+    if (!existing) return res.status(404).json({ error: 'Regra não encontrada.' });
+
+    const upd = await db.get(
+      `UPDATE automation_rules
+       SET is_enabled=$2,
+           name=COALESCE(NULLIF($3,''), name),
+           trigger=COALESCE(NULLIF($4,''), trigger),
+           delay_minutes=$5,
+           cooldown_days=$6,
+           audience_filter=$7,
+           template_id=$8,
+           updated_at=NOW()
+       WHERE id=$1
+       RETURNING *`,
+      [id, is_enabled, name, trigger, delay_minutes, cooldown_days, JSON.stringify(audience_filter), template_id]
+    );
+
+    res.json({ rule: upd });
+  } catch (err) {
+    console.error('Erro ao atualizar automation_rules:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar regra.' });
+  }
+});
+
+app.get('/api/automation/templates', async (req, res) => {
+  try {
+    const rows = await db.all(`SELECT * FROM message_templates ORDER BY id;`);
+    res.json({ templates: rows });
+  } catch (err) {
+    console.error('Erro ao listar message_templates:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar templates.' });
+  }
+});
+
+app.put('/api/automation/templates/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    const body = req.body || {};
+    const code = String(body.code || '').trim();
+    const channel = String(body.channel || 'whatsapp').trim() || 'whatsapp';
+    const templateBody = String(body.body || '').trim();
+    if (!templateBody) return res.status(400).json({ error: 'Body é obrigatório.' });
+
+    const existing = await db.get('SELECT * FROM message_templates WHERE id=$1', [id]);
+    if (!existing) return res.status(404).json({ error: 'Template não encontrado.' });
+
+    const upd = await db.get(
+      `UPDATE message_templates
+       SET code = COALESCE(NULLIF($2,''), code),
+           channel = COALESCE(NULLIF($3,''), channel),
+           body = $4,
+           updated_at = NOW()
+       WHERE id=$1
+       RETURNING *`,
+      [id, code, channel, templateBody]
+    );
+
+    res.json({ template: upd });
+  } catch (err) {
+    console.error('Erro ao atualizar message_templates:', err);
+    res.status(500).json({ error: 'Erro interno ao salvar template.' });
+  }
+});
+
+
+
+/* =========================
+   EVENTS → QUEUE → WHATSAPP (MVP manual link)
+   - POST /api/events
+   - Gera message_queue automaticamente a partir de automation_rules + message_templates
+   - Worker (setInterval) processa fila e gera link wa.me (envio manual no MVP)
+   - Opt-out real por resposta "PARAR" (POST /api/whatsapp/inbound)
+========================= */
+
+function stripDiacritics(s) {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+function normalizeCommand(text) {
+  return stripDiacritics(String(text || ''))
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, ' ');
+}
+
+function normalizeWhatsAppPhone(phoneDigits) {
+  const d = sanitizePhone(phoneDigits);
+  if (!d) return null;
+  // Brasil: se vier sem DDI (55), prefixa.
+  if (d.length === 11 && !d.startsWith('55')) return '55' + d;
+  if (d.length === 10 && !d.startsWith('55')) return '55' + d; // sem 9º dígito (legado)
+  // se já vier com 55 (13) ou outro padrão, mantém
+  return d;
+}
+
+function formatDateBr(isoYmd) {
+  const s = String(isoYmd || '').trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return s;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+function safeJsonArray(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try {
+    const j = typeof v === 'string' ? JSON.parse(v) : v;
+    return Array.isArray(j) ? j : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function renderTemplateBody(body, vars) {
+  const tpl = String(body || '');
+  return tpl.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+    const v = vars && Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : '';
+    return (v == null) ? '' : String(v);
+  });
+}
+
+async function buildContextForEvent(eventType, payload) {
+  // payload pode conter booking_id / customer_id / pet_id etc.
+  const ctx = {
+    event_type: eventType,
+    ref_code: '',
+    customer_name: '',
+    pet_name: '',
+    service_summary: '',
+    date_br: '',
+    time_br: '',
+    days_since_last: '',
+  };
+
+  const bookingId = payload?.booking_id != null ? Number(payload.booking_id) : null;
+  const customerId = payload?.customer_id != null ? Number(payload.customer_id) : null;
+
+  if (bookingId) {
+    const b = await db.get(
+      `SELECT b.*, c.id AS customer_id, c.name AS customer_name, c.phone AS customer_phone,
+              p.name AS pet_name
+         FROM bookings b
+         JOIN customers c ON c.id = b.customer_id
+         LEFT JOIN pets p ON p.id = b.pet_id
+        WHERE b.id = $1`,
+      [bookingId]
+    );
+    if (b) {
+      ctx.customer_name = b.customer_name || '';
+      ctx.pet_name = b.pet_name || '';
+      ctx.date_br = formatDateBr(b.date);
+      ctx.time_br = String(b.time || '').slice(0, 5);
+      ctx.ref_code = String(b.customer_id || '');
+
+      // service summary (prioridade: services_json -> booking_services -> texto legado)
+      let labels = [];
+      const sj = safeJsonArray(b.services_json);
+      for (const it of sj) {
+        const t = (it && (it.title || it.label || it.name)) ? String(it.title || it.label || it.name) : '';
+        if (t.trim()) labels.push(t.trim());
+      }
+
+      if (labels.length === 0) {
+        const rows = await db.all(
+          `SELECT s.title
+             FROM booking_services bs
+             JOIN services s ON s.id = bs.service_id
+            WHERE bs.booking_id = $1
+            ORDER BY s.title`,
+          [bookingId]
+        );
+        labels = rows.map(r => String(r.title || '').trim()).filter(Boolean);
+      }
+
+      if (labels.length === 0 && b.service) labels = [String(b.service).trim()].filter(Boolean);
+
+      ctx.service_summary = labels.join(', ');
+
+      // dias desde último agendamento (best-effort: último concluído/confirmado anterior)
+      try {
+        const last = await db.get(
+          `SELECT b2.date
+             FROM bookings b2
+            WHERE b2.customer_id = $1
+              AND b2.id <> $2
+              AND COALESCE(b2.status,'') IN ('concluido','concluído','finalizado','confirmado')
+            ORDER BY b2.created_at DESC
+            LIMIT 1`,
+          [Number(b.customer_id), bookingId]
+        );
+        if (last?.date && /^\d{4}-\d{2}-\d{2}$/.test(String(last.date))) {
+          const d1 = new Date(String(last.date) + 'T00:00:00');
+          const d2 = new Date(String(b.date) + 'T00:00:00');
+          const diff = Math.round((d2 - d1) / (24 * 3600 * 1000));
+          if (Number.isFinite(diff) && diff >= 0) ctx.days_since_last = String(diff);
+        }
+      } catch (_) {}
+    }
+  }
+
+  // fallback: customer_id direto
+  if (!ctx.customer_name && customerId) {
+    const c = await db.get(`SELECT id, name, phone FROM customers WHERE id=$1`, [customerId]);
+    if (c) {
+      ctx.customer_name = c.name || '';
+      ctx.ref_code = String(c.id || '');
+    }
+  }
+
+  return ctx;
+}
+
+async function shouldSkipByCooldown({ customer_id, rule_id, cooldown_days }) {
+  const cd = Number(cooldown_days || 0);
+  if (!customer_id || !rule_id || !cd) return false;
+  const row = await db.get(
+    `SELECT 1
+       FROM message_delivery_log
+      WHERE customer_id = $1
+        AND rule_id = $2
+        AND sent_at >= (NOW() - ($3::text || ' days')::interval)
+      LIMIT 1`,
+    [Number(customer_id), Number(rule_id), cd]
+  );
+  return !!row;
+}
+
+async function enqueueForEvent(eventRow) {
+  const eventType = String(eventRow.type || '').trim();
+  const payload = eventRow.payload || {};
+
+  const rules = await db.all(
+    `SELECT r.*, t.body AS template_body, t.channel AS template_channel
+       FROM automation_rules r
+       JOIN message_templates t ON t.id = r.template_id
+      WHERE r.is_enabled = TRUE
+        AND r.trigger = $1
+      ORDER BY r.id`,
+    [eventType]
+  );
+
+  if (!rules.length) return { enqueued: 0, skipped: 0 };
+
+  const ctx = await buildContextForEvent(eventType, payload);
+
+  // resolve destinatário
+  let customer = null;
+  if (payload?.customer_id) {
+    customer = await db.get(`SELECT * FROM customers WHERE id=$1`, [Number(payload.customer_id)]);
+  } else if (payload?.booking_id) {
+    customer = await db.get(
+      `SELECT c.*
+         FROM bookings b
+         JOIN customers c ON c.id = b.customer_id
+        WHERE b.id = $1`,
+      [Number(payload.booking_id)]
+    );
+  }
+
+  const toPhoneRaw = customer?.phone || payload?.to_phone || payload?.phone || '';
+  const toPhone = normalizeWhatsAppPhone(toPhoneRaw);
+  const customerId = customer?.id || null;
+
+  let enqueued = 0;
+  let skipped = 0;
+
+  for (const r of rules) {
+    // opt-out
+    if (customer?.opt_out_whatsapp) { skipped++; continue; }
+
+    // cooldown
+    const skip = await shouldSkipByCooldown({ customer_id: customerId, rule_id: r.id, cooldown_days: r.cooldown_days });
+    if (skip) { skipped++; continue; }
+
+    if (!toPhone) { skipped++; continue; }
+
+    const scheduledAt = new Date(Date.now() + (Number(r.delay_minutes || 0) * 60 * 1000));
+
+    const body = renderTemplateBody(r.template_body, {
+      ...ctx,
+      // aliases comuns
+      customer: ctx.customer_name,
+      pet: ctx.pet_name,
+    });
+
+    const waText = encodeURIComponent(body);
+    const waLink = `https://wa.me/${toPhone}?text=${waText}`;
+
+    await db.get(
+      `INSERT INTO message_queue
+         (channel, status, to_phone, customer_id, rule_id, template_id, event_id, scheduled_at, body, wa_link, provider, meta, created_at, updated_at)
+       VALUES
+         ('whatsapp','queued',$1,$2,$3,$4,$5,$6,$7,$8,'manual_link',$9,NOW(),NOW())
+       RETURNING id`,
+      [
+        toPhone,
+        customerId,
+        r.id,
+        r.template_id,
+        eventRow.id,
+        scheduledAt.toISOString(),
+        body,
+        waLink,
+        JSON.stringify({ trigger: eventType, rule_code: r.code })
+      ]
+    );
+
+    enqueued++;
+  }
+
+  return { enqueued, skipped };
+}
+
+async function processMessageQueueOnce() {
+  const maxPerTick = Number(process.env.QUEUE_WORKER_MAX_PER_TICK || 10);
+  const rows = await db.all(
+    `UPDATE message_queue q
+        SET status='sending', updated_at=NOW()
+      WHERE q.id IN (
+        SELECT id
+          FROM message_queue
+         WHERE status = 'queued'
+           AND scheduled_at <= NOW()
+         ORDER BY scheduled_at ASC, id ASC
+         LIMIT $1
+         FOR UPDATE SKIP LOCKED
+      )
+      RETURNING q.id, q.customer_id, q.to_phone, q.rule_id, q.template_id, q.event_id, q.body, q.wa_link`,
+    [maxPerTick]
+  );
+
+  for (const m of rows) {
+    try {
+      // MVP: envio manual via link (marca como "sent" para controle de cooldown e auditoria)
+      await db.run(
+        `UPDATE message_queue
+            SET status='sent', sent_at=NOW(), updated_at=NOW()
+          WHERE id=$1`,
+        [m.id]
+      );
+
+      await db.run(
+        `INSERT INTO message_delivery_log
+          (customer_id, to_phone, rule_id, template_id, event_id, message_queue_id, status, sent_at, meta)
+         VALUES ($1,$2,$3,$4,$5,$6,'sent',NOW(),$7::jsonb)`,
+        [
+          m.customer_id,
+          m.to_phone,
+          m.rule_id,
+          m.template_id,
+          m.event_id,
+          m.id,
+          JSON.stringify({ provider: 'manual_link', wa_link: m.wa_link || null })
+        ]
+      );
+    } catch (e) {
+      await db.run(
+        `UPDATE message_queue
+            SET status='failed', error=$2, updated_at=NOW()
+          WHERE id=$1`,
+        [m.id, String(e && e.message ? e.message : e)]
+      );
+      await db.run(
+        `INSERT INTO message_delivery_log
+          (customer_id, to_phone, rule_id, template_id, event_id, message_queue_id, status, sent_at, meta)
+         VALUES ($1,$2,$3,$4,$5,$6,'failed',NOW(),$7::jsonb)`,
+        [
+          m.customer_id,
+          m.to_phone,
+          m.rule_id,
+          m.template_id,
+          m.event_id,
+          m.id,
+          JSON.stringify({ error: String(e && e.message ? e.message : e) })
+        ]
+      );
+    }
+  }
+
+  return rows.length;
+}
+
+// POST /api/events: cria evento e enfileira mensagens
+app.post('/api/events', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const type = String(body.type || '').trim();
+    if (!type) return res.status(400).json({ error: 'type é obrigatório.' });
+
+    const payload = (body.payload && typeof body.payload === 'object') ? body.payload : {};
+    const occurred_at = body.occurred_at ? new Date(body.occurred_at) : new Date();
+    if (Number.isNaN(occurred_at.getTime())) return res.status(400).json({ error: 'occurred_at inválido.' });
+
+    const ev = await db.get(
+      `INSERT INTO automation_events (type, payload, occurred_at)
+       VALUES ($1,$2::jsonb,$3)
+       RETURNING *`,
+      [type, JSON.stringify(payload), occurred_at.toISOString()]
+    );
+
+    const result = await enqueueForEvent(ev);
+
+    res.json({ event: ev, queue: result });
+  } catch (err) {
+    console.error('Erro ao processar /api/events:', err);
+    res.status(500).json({ error: 'Erro interno ao registrar evento.' });
+  }
+});
+
+// Inbox (webhook) – MVP para capturar respostas e aplicar opt-out por "PARAR"
+app.post('/api/whatsapp/inbound', async (req, res) => {
+  try {
+    const from = normalizeWhatsAppPhone(req.body.from || req.body.phone || '');
+    const text = String(req.body.text || req.body.body || '').trim();
+    if (!from || !text) return res.status(400).json({ error: 'from e text são obrigatórios.' });
+
+    const cmd = normalizeCommand(text);
+    let matched = null;
+
+    if (cmd === 'PARAR') {
+      matched = 'PARAR';
+      // Atualiza opt-out do cliente (se existir)
+      const phoneNoDdi = from.startsWith('55') ? from.slice(2) : from;
+      await db.run(
+        `UPDATE customers
+            SET opt_out_whatsapp = TRUE,
+                updated_at = NOW()
+          WHERE phone = $1`,
+        [phoneNoDdi]
+      );
+
+      // Cancela pendências na fila
+      await db.run(
+        `UPDATE message_queue
+            SET status='cancelled', updated_at=NOW(), error=COALESCE(error,'Opt-out PARAR')
+          WHERE to_phone = $1
+            AND status IN ('queued','sending')`,
+        [from]
+      );
+    }
+
+    await db.run(
+      `INSERT INTO whatsapp_inbound (from_phone, body, received_at, matched_command)
+       VALUES ($1,$2,NOW(),$3)`,
+      [from, text, matched]
+    );
+
+    res.json({ ok: true, matched_command: matched });
+  } catch (err) {
+    console.error('Erro em /api/whatsapp/inbound:', err);
+    res.status(500).json({ error: 'Erro interno ao processar inbound.' });
+  }
+});
+
+// (Opcional, debug): listar fila
+app.get('/api/message-queue', async (req, res) => {
+  try {
+    const status = String(req.query.status || '').trim();
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
+    const params = [];
+    let where = '';
+    if (status) {
+      params.push(status);
+      where = `WHERE q.status = $${params.length}`;
+    }
+    params.push(limit);
+
+    const rows = await db.all(
+      `SELECT q.*,
+              c.name AS customer_name,
+              r.code AS rule_code,
+              t.code AS template_code
+         FROM message_queue q
+         LEFT JOIN customers c ON c.id = q.customer_id
+         LEFT JOIN automation_rules r ON r.id = q.rule_id
+         LEFT JOIN message_templates t ON t.id = q.template_id
+         ${where}
+        ORDER BY q.id DESC
+        LIMIT $${params.length}`,
+      params
+    );
+    res.json({ queue: rows });
+  } catch (err) {
+    console.error('Erro ao listar message_queue:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar fila.' });
+  }
+});
+
+
 /* =========================
    START
 ========================= */
@@ -1287,7 +1893,20 @@ const port = process.env.PORT || 3000;
 (async () => {        
   try {
     await db.initDb();
-    app.listen(port, () => console.log('PetFunny API rodando na porta', port));
+    app.listen(port, () => {
+      console.log('PetFunny API rodando na porta', port);
+
+      // Worker da fila (MVP): marca como "sent" e registra link wa.me
+      const enabled = String(process.env.QUEUE_WORKER_ENABLED || 'true').toLowerCase() !== 'false';
+      const intervalMs = Math.max(5000, Number(process.env.QUEUE_WORKER_INTERVAL_MS || 15000));
+      if (enabled) {
+        // primeira passada logo após subir
+        processMessageQueueOnce().catch(() => {});
+        setInterval(() => {
+          processMessageQueueOnce().catch(() => {});
+        }, intervalMs);
+      }
+    });
   } catch (e) {
     console.error('Erro fatal ao inicializar banco:', e);
     process.exit(1);

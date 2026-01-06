@@ -45,15 +45,15 @@
       padding: 22px 20px 18px;
     }
     .login-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: #16363c; }
-    .login-subtitle { font-size: 13px; color: #607d8b; margin-bottom: 16px; }
+    .login-subtitle { font-size: 14px; color: #607d8b; margin-bottom: 16px; }
     .login-field { margin-bottom: 10px; }
-    .login-label { font-size: 12px; font-weight: 500; margin-bottom: 4px; color: #455a64; }
+    .login-label { font-size: 14px; font-weight: 500; margin-bottom: 4px; color: #455a64; }
     .login-input {
       width: 100%;
       border-radius: 12px;
       border: 1px solid #d4dde0;
       padding: 8px 10px;
-      font-size: 13px;
+      font-size: 14px;
       transition: border-color 0.12s ease, box-shadow 0.12s ease;
       font-family: inherit;
     }
@@ -75,7 +75,7 @@
       border: none;
       background: linear-gradient(135deg, var(--turquesa), var(--coral));
       color: white;
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       text-transform: uppercase;
@@ -106,10 +106,10 @@
       text-transform: none;
       letter-spacing: 0.04em;
     }
-    .btn-small { font-size: 10px; padding: 4px 8px; box-shadow: none; }
+    .btn-small { font-size: 14px; padding: 4px 8px; box-shadow: none; }
 
-    .login-footer-hint { font-size: 11px; color: #90a4ae; margin-top: 10px; }
-    .login-error { font-size: 12px; color: #c62828; margin-top: 6px; }
+    .login-footer-hint { font-size: 14px; color: #90a4ae; margin-top: 10px; }
+    .login-error { font-size: 14px; color: #c62828; margin-top: 6px; }
 
     /* ADMIN APP */
     #adminApp { flex: 1; display: none; padding: 12px 16px 16px; }
@@ -141,14 +141,14 @@
       color: var(--turquesa);
     }
     .logo-sub {
-      font-size: 11px;
+      font-size: 14px;
       text-transform: uppercase;
       letter-spacing: 0.14em;
       color: #777;
     }
 
     .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .filters-group { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+    .filters-group { display: flex; align-items: center; gap: 6px; font-size: 14px; }
 
     /* Toolbars por aba */
     .agenda-filters {
@@ -176,6 +176,7 @@
 
 input[type="date"],
 input[type="text"],
+input[type="number"],
 input[type="time"],
 select,
 textarea {
@@ -183,9 +184,23 @@ textarea {
   margin-bottom: 0px;    /* espaçamento externo entre campos */
   border-radius: 10px;
   border: 1px solid #d7dde0;
-  font-size: 13px;
+  font-size: 14px;
   min-width: 120px;
   font-family: inherit;
+}
+
+/* Padronização visual do input[type=number]
+   - Remove setas/spinners nativos para manter consistência com os demais inputs
+   - Mantém type=number para não quebrar validação/funcionalidades existentes
+*/
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+  appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 
@@ -195,7 +210,7 @@ textarea {
       box-shadow: 0 0 0 2px rgba(1, 173, 183, 0.18);
     }
 
-    .section-title { font-size: 14px; font-weight: 600; margin: 8px 0 4px; color: #444; }
+    .section-title { font-size: 20px; font-weight: 600; margin: 8px 0 4px; color: #444; }
     .section-title-row {
       display: flex;
       align-items: center;
@@ -218,7 +233,7 @@ textarea {
       background: transparent;
       padding: 6px 10px;
       border-radius: 999px;
-      font-size: 12px;
+      font-size: 14px;
       cursor: pointer;
       color: #607d8b;
       display: inline-flex;
@@ -260,7 +275,7 @@ textarea {
     .form-row-2 { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
     .form-group { display: flex; flex-direction: column; gap: 3px; }
     #adminApp label {
-      font-size: 12px;
+      font-size: 14px;
       font-weight: 800;
       letter-spacing: 0.02em;
       color: #37474f;
@@ -268,6 +283,29 @@ textarea {
       align-items: center;
       gap: 6px;
     }
+
+    /* Bolinha azul antes de todos os labels */
+label {
+  position: relative;
+  padding-left: 12px;
+  display: inline-block;
+  font-weight: 600;
+
+}
+
+label::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background-color: #01ADB7; /* azul PetFunny */
+  border-radius: 50%;
+}
+
+
     #adminApp label::before {
       content: "";
       width: 8px;
@@ -279,9 +317,9 @@ textarea {
     textarea { min-height: 48px; resize: vertical; }
 
     .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-    .error-msg { font-size: 12px; color: #c62828; margin-top: 4px; }
+    .error-msg { font-size: 14px; color: #c62828; margin-top: 4px; }
 
-    .stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; font-size: 12px; }
+    .stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; font-size: 14px; }
     .stats-item {
       background: #f7fbfc;
       border-radius: 14px;
@@ -300,7 +338,7 @@ textarea {
       overflow: hidden;
       background: #fdfefe;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
     thead { background: #f2f7f8; }
     th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid #ecf1f3; }
     th { font-weight: 600; color: #555; white-space: nowrap; }
@@ -313,7 +351,7 @@ textarea {
 
     .td-status {
       font-weight: 600;
-      font-size: 11px;
+      font-size: 14px;
       padding: 4px 8px;
       border-radius: 999px;
       display: inline-block;
@@ -330,11 +368,11 @@ textarea {
     .status-cancelado { background: #ffebee; color: #c62828; }
 
     .actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .empty { padding: 18px; text-align: center; font-size: 13px; color: #777; }
+    .empty { padding: 18px; text-align: center; font-size: 14px; color: #777; }
 
     .footer {
       margin-top: 12px;
-      font-size: 11px;
+      font-size: 14px;
       color: #888;
       display: flex;
       justify-content: space-between;
@@ -350,7 +388,7 @@ textarea {
       border: 1px solid #e1e8eb;
     }
     .subcard-title {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       margin-bottom: 6px;
       color: #37474f;
@@ -370,7 +408,7 @@ textarea {
       max-height: 260px;
       overflow-y: auto;
     }
-    .subtable-wrapper table { font-size: 11px; }
+    .subtable-wrapper table { font-size: 14px; }
 
     .badge-mini {
       display: inline-flex;
@@ -380,7 +418,7 @@ textarea {
       border-radius: 999px;
       background: rgba(1,173,183,0.1);
       color: #015d63;
-      font-size: 10px;
+      font-size: 14px;
       font-weight: 600;
       text-transform: uppercase;
     }
@@ -400,7 +438,7 @@ textarea {
       border: none;
       background: transparent;
       padding: 12px 12px;
-      font-size: 12px;
+      font-size: 14px;
       cursor: pointer;
       color: #607d8b;
       display: inline-flex;
@@ -445,16 +483,22 @@ textarea {
       justify-content: space-between;
       gap: 10px;
     }
-    .agenda-card-time {
+    
+     .agenda-card-top-right{
+       display:flex;
+       align-items:flex-start;
+       gap:8px;
+     }
+.agenda-card-time {
       font-weight: 800;
-      font-size: 14px;
+      font-size: 20px;
       color: #16363c;
       display: inline-flex;
       align-items: center;
       gap: 8px;
     }
     .agenda-card-date {
-      font-size: 11px;
+      font-size: 26px;
       color: #78909c;
       margin-top: 2px;
     }
@@ -462,7 +506,7 @@ textarea {
       display: grid;
       grid-template-columns: 1fr;
       gap: 6px;
-      font-size: 12px;
+      font-size: 14px;
       color: #37474f;
     }
     .agenda-line {
@@ -472,7 +516,7 @@ textarea {
       flex-wrap: wrap;
     }
     .agenda-key {
-      font-size: 11px;
+      font-size: 14px;
       color: #78909c;
       min-width: 72px;
     }
@@ -489,7 +533,7 @@ textarea {
       border: 1px dashed #d7e9ec;
       border-radius: 12px;
       padding: 8px;
-      font-size: 12px;
+      font-size: 14px;
       color: #455a64;
       min-height: 38px;
     }
@@ -539,14 +583,14 @@ textarea {
     }
     .footer-logo { max-width: 140px; height: auto; }
     .footer-info {
-      font-size: 12px;
+      font-size: 14px;
       color: #455a64;
       display: flex;
       flex-direction: column;
       gap: 2px;
     }
-    .footer-info strong { font-size: 13px; color: #263238; }
-    .footer-bottom { font-size: 11px; color: #78909c; text-align: center; margin-top: 4px; }
+    .footer-info strong { font-size: 14px; color: #263238; }
+    .footer-bottom { font-size: 14px; color: #78909c; text-align: center; margin-top: 4px; }
 
     /* Inputs datetime no mesmo padrão visual */
   .dt-input {
@@ -751,7 +795,7 @@ textarea {
 
 /* Logo-sub inline */
 .logo-inline{
-  font-size: 13px;
+  font-size: 14px;
   opacity: .75;
   white-space: nowrap;
 }
@@ -817,7 +861,7 @@ textarea {
 /* ===== Stats - Mimos dinâmicos ===== */
 .stats-mimos-list{
   margin-top:6px;
-  font-size:13px;
+  font-size:14px;
   line-height:1.35;
   white-space:pre-line;
 }
@@ -877,7 +921,7 @@ textarea {
 
 .pf-hint-title {
   font-weight: 800;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: .2px;
   text-transform: uppercase;
   color: rgba(0,0,0,.90);
@@ -953,7 +997,7 @@ textarea {
 
 /* PF: notas pequenas em formulários */
 #adminApp .pf-field-note{
-  font-size: 11px;
+  font-size: 14px;
   color: #78909c;
   margin-top: 2px;
 }
@@ -1126,7 +1170,7 @@ input[name="duration_min"],
 }
 
 .kebab-menu {
-  position: fixed; /* garante ficar acima da tabela */
+  position: absolute; /* garante ficar acima da tabela */
   min-width: 140px;
   background: #ffffff;
   border: 1px solid #dde5e8;
@@ -1147,7 +1191,7 @@ input[name="duration_min"],
   gap: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   color: #37474f;
   white-space: nowrap;
@@ -1196,10 +1240,10 @@ input[name="duration_min"],
   display:flex;
   align-items:center;
   gap:8px;
-  font-size:13px;
+  font-size:14px;
 }
 .economy-preview{
-  font-size:13px;
+  font-size:14px;
   line-height:1.5;
 }
 .economy-preview .kpi{
@@ -1214,7 +1258,7 @@ input[name="duration_min"],
   background:#E0F4F6;
   color:#1AB1BB;
   font-weight:700;
-  font-size:12px;
+  font-size:14px;
 }
 
 
@@ -1231,13 +1275,13 @@ input[name="duration_min"],
 .row-soon-red { background: rgba(244, 67, 54, 0.14) !important; }
 
 /* Subtexto na data (dia da semana) */
-.td-sub { font-size: 12px; opacity: 0.75; margin-top: 2px; text-transform: capitalize; }
+.td-sub { font-size: 14px; opacity: 0.75; margin-top: 2px; text-transform: capitalize; }
 
 /* Link WhatsApp no telefone */
 .wa-link { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 
 /* Pagamento (badge) */
-.pay-badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1; }
+.pay-badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 14px; font-weight: 700; line-height: 1; }
 .pay-paid { background: rgba(0, 200, 83, 0.18); color: #0b6b2f; }
 .pay-unpaid { background: rgba(244, 67, 54, 0.18); color: #b71c1c; }
 .pay-unknown { background: rgba(120, 120, 120, 0.15); color: #555; }
@@ -1247,7 +1291,7 @@ input[name="duration_min"],
 .pay-icon { font-size: 14px; line-height: 1; }
 
 /* Menu kebab (se ainda não existir no CSS base) */
-.actions-kebab { display: flex; justify-content: center; }
+.actions-kebab { display: flex; justify-content: flex-end; align-items: center; width: 100%; }
 .kebab-btn { border: 1px solid rgba(0,0,0,.12); background: #fff; border-radius: 10px; padding: 4px 10px; cursor: pointer; }
 .kebab-menu { background: #fff; border: 1px solid rgba(0,0,0,.12); border-radius: 12px; box-shadow: 0 10px 24px rgba(0,0,0,.12); padding: 8px; }
 .kebab-item { width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
@@ -1255,3 +1299,301 @@ input[name="duration_min"],
 .kebab-item-danger { color: #c62828; }
 .kebab-item-danger:hover { background: rgba(244,67,54,.12); }
 .hidden { display: none !important; }
+
+/* =====================
+   Modal (Admin) - Agendamentos
+   Sobreposição sem alterar layout da página.
+====================== */
+#bookingModal.pf-modal { position: fixed; inset: 0; z-index: 999999; }
+.pf-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+.pf-modal__dialog {
+  position: relative;
+  margin: 24px auto;
+  width: min(980px, calc(100vw - 24px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.pf-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.pf-modal__title { font-weight: 800; font-size: 16px; color: #014C5F; }
+.pf-modal__close {
+  border: 0;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #014C5F;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.pf-modal__close:hover { background: rgba(0,0,0,.06); }
+.pf-modal__body { padding: 14px 16px 18px; }
+.pf-modal__success { padding: 18px 6px 6px; }
+.pf-modal__successText { font-weight: 800; font-size: 16px; margin-bottom: 12px; }
+.pf-modal__successActions { display: flex; justify-content: flex-end; }
+
+/* Garante que o form-panel não fique “colado” no modal */
+#bookingModal .form-panel { margin: 0; }
+
+
+/* =====================
+   Modal (Admin) - Clientes & Pets
+   Padronizado com o modal de Agendamentos (Novo Agendamento)
+====================== */
+
+/* Overlay/backdrop */
+.pf-modal-overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 12px;
+  background: rgba(0,0,0,.45);
+}
+.pf-modal-overlay.hidden{ display:none !important; }
+
+/* Dialog */
+.pf-modal-overlay > .pf-modal{
+  position: relative;
+  margin: 0 auto;
+  width: min(980px, calc(100vw - 24px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+
+/* Header */
+.pf-modal-header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.pf-modal-header h3{
+  margin: 0;
+  font-weight: 800;
+  font-size: 16px;
+  color: #014C5F;
+}
+
+/* Close button */
+.pf-modal-close{
+  border: 0;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #014C5F;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.pf-modal-close:hover{ background: rgba(0,0,0,.06); }
+
+/* Body */
+.pf-modal-body{ padding: 14px 16px 18px; }
+
+/* Ajustes defensivos: evita “colar” conteúdo antigo no dialog */
+#customerModalHost .form-panel,
+#petsModalHost .form-panel,
+#serviceModalHost .form-panel{ margin: 0; }
+
+/* ======================
+   Clientes & Pets (Admin) - full width list + modals
+====================== */
+#tab-clientes .two-cols{ grid-template-columns: 1fr !important; }
+#tab-clientes .subcard{ width: 100%; }
+/* Mantém o card de pets oculto no layout (ele é movido para o modal via JS quando necessário) */
+#tab-clientes #petsCard.hidden{ display:none; }
+
+
+
+/* ======================
+   Aliases para padronizar cabeçalho dos modais (Clientes/Pets)
+   Mantém compatibilidade com markup antigo (.pf-modal-head/.pf-modal-x etc.)
+====================== */
+
+/* Estrutura */
+.pf-modal-head{ /* alias de .pf-modal-header */
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:14px 16px;
+  border-bottom:1px solid rgba(0,0,0,.08);
+}
+.pf-modal-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.pf-modal-ic{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  background: rgba(1,173,183,.12);
+  font-size:18px;
+  flex:0 0 auto;
+}
+.pf-modal-title{
+  margin:0;
+  font-weight:800;
+  font-size:16px;
+  line-height:1.15;
+  color:inherit;
+}
+.pf-modal-sub{
+  margin:3px 0 0;
+  font-size:14px;
+  opacity:.75;
+  line-height:1.2;
+}
+
+/* Botão fechar (X) */
+.pf-modal-x{ /* alias de .pf-modal-close */
+  width:34px;
+  height:34px;
+  border:0;
+  background:transparent;
+  border-radius:10px;
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  font-size:20px;
+  line-height:1;
+  color:inherit;
+}
+.pf-modal-x:hover{ background: rgba(0,0,0,.06); }
+
+/* Garante que o host do formulário ocupe espaço no modal */
+#customerModalHost, #petsModalHost{ display:block; width:100%; }
+
+
+/* =====================
+   Clickable names (Agendamentos): Cliente/Pet
+   ====================== */
+.pf-linklike{
+  color:#014C5F;
+  cursor:pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.pf-linklike:hover{ opacity:.85; }
+
+/* Modal Info (Cliente/Pet) */
+.pf-info-grid{
+  display:grid;
+  grid-template-columns: 160px 1fr;
+  gap: 8px 12px;
+  font-size:14px;
+}
+.pf-info-grid .k{ font-weight:800; color:#014C5F; }
+.pf-info-grid .v{ color:#263238; word-break: break-word; }
+.pf-info-muted{ font-size:13px; color:#78909c; margin-top:6px; }
+
+
+/* ===== NOVO: Calendário da Agenda ===== */
+
+.calendar-wrapper{ margin-top:10px; background:#ffffff; border:1px solid #e3eaec; border-radius:16px; padding:10px; box-shadow:0 10px 22px rgba(0,0,0,0.06); }
+.calendar-toolbar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+.cal-label{ font-weight:800; color:#16363c; font-size:16px; padding:6px 10px; border-radius:12px; background:rgba(1,173,183,0.10); }
+.calendar-week{ display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px; margin-bottom:8px; }
+.calendar-week div{ text-align:center; font-size:13px; color:#607d8b; font-weight:700; }
+.calendar-grid{ display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px; }
+.cal-cell{ border:1px solid #e3eaec; border-radius:14px; background:#fff; min-height:74px; padding:8px; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer; transition:transform .05s ease; }
+.cal-cell:hover{ transform: translateY(-1px); }
+.cal-out{ opacity:0.35; }
+.cal-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.cal-day{ font-weight:900; color:#16363c; font-size:16px; }
+.cal-badge{ display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 8px; border-radius:999px; background:rgba(1,173,183,0.14); color:#015d63; font-weight:800; font-size:13px; }
+.cal-selected{ outline:2px solid rgba(1,173,183,0.65); outline-offset:2px; }
+.cal-sub{ font-size:12px; color:#78909c; margin-top:6px; }
+.calendar-daylist{ margin-top:12px; border-top:1px dashed #d7e9ec; padding-top:10px; }
+.calendar-daylist-title{ font-weight:800; color:#16363c; margin-bottom:8px; }
+.calendar-mini-item{ background:#f7fbfc; border:1px solid #e1e8eb; border-radius:14px; padding:10px; display:flex; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.calendar-mini-left{ display:flex; flex-direction:column; gap:2px; }
+.calendar-mini-time{ font-weight:900; color:#16363c; }
+.calendar-mini-main{ font-size:14px; color:#37474f; }
+.calendar-mini-muted{ font-size:13px; color:#607d8b; }
+
+
+/* Coluna de ações alinhada à direita (padrão) */
+td.td-actions { text-align: right; }
+
+
+
+/* ===== Agenda (Admin): destaque por status + colunas em negrito ===== */
+#tbodyAgenda td.agenda-bold { font-weight: 700; }
+#tbodyAgenda td.agenda-bold-date > div:first-child { font-weight: 700; }
+
+/* Linha com background por status (mantém layout, apenas cor de fundo) */
+#tbodyAgenda tr.status-agendado { background: #fff3cd66; }
+#tbodyAgenda tr.status-confirmado { background: #e3f2fd66; }
+#tbodyAgenda tr.status-recebido { background: #ede7f666; }
+#tbodyAgenda tr.status-em-servico { background: #fff8e166; }
+#tbodyAgenda tr.status-concluido { background: #e8f5e966; }
+#tbodyAgenda tr.status-entregue { background: #e0f7fa66; }
+#tbodyAgenda tr.status-cancelado { background: #ffebee66; }
+
+#tbodyAgenda tr.status-agendado:hover { background: #fff3cd99; }
+#tbodyAgenda tr.status-confirmado:hover { background: #e3f2fd99; }
+#tbodyAgenda tr.status-recebido:hover { background: #ede7f699; }
+#tbodyAgenda tr.status-em-servico:hover { background: #fff8e199; }
+#tbodyAgenda tr.status-concluido:hover { background: #e8f5e999; }
+#tbodyAgenda tr.status-entregue:hover { background: #e0f7fa99; }
+#tbodyAgenda tr.status-cancelado:hover { background: #ffebee99; }
+
+
+
+/* ===== PetFunny: faixa de status na primeira coluna (Agendamentos) ===== */
+#agendaListWrapper table thead th.status-strip-col {
+  width: 8px;
+  padding: 0;
+}
+#tbodyAgenda td.status-strip {
+  width: 8px;
+  min-width: 8px;
+  padding: 0;
+}
+#tbodyAgenda td.status-strip.status-agendado { background: #fff3cd; }
+#tbodyAgenda td.status-strip.status-confirmado { background: #e3f2fd; }
+#tbodyAgenda td.status-strip.status-recebido { background: #ede7f6; }
+#tbodyAgenda td.status-strip.status-em-servico { background: #fff8e1; }
+#tbodyAgenda td.status-strip.status-concluido { background: #e8f5e9; }
+#tbodyAgenda td.status-strip.status-entregue { background: #e0f7fa; }
+#tbodyAgenda td.status-strip.status-cancelado { background: #ffebee; }
+
+/* desativa o esquema antigo de background na linha (mantém apenas a faixa) */
+#tbodyAgenda tr.status-agendado,
+#tbodyAgenda tr.status-confirmado,
+#tbodyAgenda tr.status-recebido,
+#tbodyAgenda tr.status-em-servico,
+#tbodyAgenda tr.status-concluido,
+#tbodyAgenda tr.status-entregue,
+#tbodyAgenda tr.status-cancelado {
+  background: transparent !important;
+}
+
+
+/* Clientes e Pets: lista de clientes sem rolagem (deixa crescer) */
+#clientesListWrapper{
+  max-height: none;
+  overflow-y: visible;
+  overflow: visible;
+}

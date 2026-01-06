@@ -33,7 +33,10 @@
       search: $('mimosSearch'),
       btnClearSearch: $('btnMimosClearSearch') || $('btnLimparBuscaMimos'),
       formWrap: $('mimoFormWrap'),
-      btnCloseForm: $('btnFecharMimoForm'),
+      // modal (novo padrão)
+      modal: $('mimoModal'),
+      modalHost: $('mimoModalHost'),
+      modalClose: $('mimoModalClose'),
 
       title: $('mimoTitle'),
       desc: $('mimoDesc'),
@@ -63,8 +66,8 @@
     let cacheMimos = window.cacheMimos;
 
     
-    // Flag interno de abertura do formulário (não depende de computedStyle)
-    let formOpen = (els.formWrap.style.display !== 'none');
+    // Estado do formulário
+    let modalOpen = false;
 // ---------- Helpers ----------
     function setMsg(text, isError) {
       if (!els.msg) return;
@@ -144,26 +147,40 @@
     }
 
     // ---------- UI state ----------
-    function isFormOpen() {
-      return formOpen;
+    function ensureFormInModal() {
+      if (!els.formWrap) return;
+      if (els.modalHost && els.formWrap.parentElement !== els.modalHost) {
+        try { els.modalHost.appendChild(els.formWrap); } catch (_) {}
+      }
     }
 
-    function setNovoButton(open) {
-      els.btnNovo.textContent = open ? '✖ FECHAR' : '+ NOVO MIMO';
+    function showMimoModal(show) {
+      if (!els.modal) {
+        // fallback: mantém compatibilidade com versões antigas (form inline)
+        if (els.formWrap) els.formWrap.style.display = show ? 'block' : 'none';
+        modalOpen = !!show;
+        return;
+      }
+
+      ensureFormInModal();
+      els.modal.classList.toggle('hidden', !show);
+      els.modal.setAttribute('aria-hidden', show ? 'false' : 'true');
+
+      if (els.formWrap) {
+        // Quando dentro do modal, sempre controlamos a visibilidade pelo show/hide
+        // para evitar que o formulário fique "aberto" em background.
+        els.formWrap.style.display = show ? 'block' : 'none';
+      }
+      modalOpen = !!show;
+
+      if (show) {
+        const first = els.title || els.desc;
+        if (first) { try { first.focus(); } catch (_) {} }
+      }
     }
 
-    function openForm() {
-      els.formWrap.style.display = 'block';
-      formOpen = true;
-      setNovoButton(true);
-    }
-
-    function closeForm() {
-      els.formWrap.style.display = 'none';
-      formOpen = false;
-      setNovoButton(false);
-      currentEditId = null;
-    }
+    function openForm() { showMimoModal(true); }
+    function closeForm() { showMimoModal(false); currentEditId = null; }
 
     function clearForm() {
       currentEditId = null;
@@ -297,12 +314,92 @@
         tr.appendChild(tdActive);
 
         const tdActions = document.createElement('td');
+        // Ações: menu 3 pontinhos (kebab) — mesmo padrão do restante do admin
+        const divActions = document.createElement('div');
+        divActions.className = 'actions actions-kebab';
+
+        const kebabBtn = document.createElement('button');
+        kebabBtn.type = 'button';
+        kebabBtn.className = 'kebab-btn';
+        kebabBtn.setAttribute('aria-label', 'Ações');
+        kebabBtn.textContent = '⋮';
+
+        const kebabMenu = document.createElement('div');
+        kebabMenu.className = 'kebab-menu hidden';
+
+        const closeMenu = () => {
+          kebabMenu.classList.add('hidden');
+          kebabMenu.classList.remove('open');
+          kebabMenu.style.display = 'none';
+        };
+
+        // fecha os demais
+        const closeOtherMenus = () => {
+          document.querySelectorAll('.kebab-menu').forEach((mm) => {
+            if (mm !== kebabMenu) {
+              mm.classList.add('hidden');
+              mm.classList.remove('open');
+              mm.style.display = 'none';
+            }
+          });
+        };
+
+        kebabBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          closeOtherMenus();
+          const willOpen = kebabMenu.classList.contains('hidden');
+          if (willOpen) {
+            kebabMenu.classList.remove('hidden');
+            kebabMenu.classList.add('open');
+            kebabMenu.style.display = 'block';
+          } else {
+            closeMenu();
+          }
+
+          if (willOpen) {
+            // portal no body p/ não cortar por overflow do wrapper da tabela
+            try {
+              if (!kebabMenu.dataset.portalAttached) {
+                document.body.appendChild(kebabMenu);
+                kebabMenu.dataset.portalAttached = '1';
+                kebabMenu.classList.add('kebab-menu-portal');
+              }
+              const rect = kebabBtn.getBoundingClientRect();
+              const menuW = 180;
+              kebabMenu.style.position = 'fixed';
+              kebabMenu.style.minWidth = menuW + 'px';
+              kebabMenu.style.zIndex = '999999';
+              kebabMenu.style.top = Math.round(rect.bottom + 6) + 'px';
+              kebabMenu.style.left = Math.round(Math.max(8, rect.right - menuW)) + 'px';
+            } catch (_) {}
+          }
+        });
+
+        // binder global 1x para fechar menus ao clicar fora
+        if (!document.body.dataset.pfKebabGlobalBound) {
+          document.body.dataset.pfKebabGlobalBound = '1';
+          document.addEventListener('click', () => {
+            document.querySelectorAll('.kebab-menu').forEach((mm) => {
+              mm.classList.add('hidden');
+              mm.classList.remove('open');
+              mm.style.display = 'none';
+            });
+          });
+          window.addEventListener('scroll', () => {
+            document.querySelectorAll('.kebab-menu').forEach((mm) => {
+              mm.classList.add('hidden');
+              mm.classList.remove('open');
+              mm.style.display = 'none';
+            });
+          }, true);
+        }
 
         const btnEdit = document.createElement('button');
-        btnEdit.type = 'button';
-        btnEdit.className = 'btn';
         btnEdit.textContent = 'Editar';
+        btnEdit.className = 'kebab-item';
+        btnEdit.type = 'button';
         btnEdit.addEventListener('click', () => {
+          closeMenu();
           currentEditId = m.id;
           if (els.title) els.title.value = m.title || '';
           if (els.desc) els.desc.value = m.description || '';
@@ -315,25 +412,30 @@
         });
 
         const btnDel = document.createElement('button');
-        btnDel.type = 'button';
-        btnDel.className = 'btn btn-danger';
         btnDel.textContent = 'Excluir';
-        btnDel.style.marginLeft = '6px';
+        btnDel.className = 'kebab-item kebab-item-danger';
+        btnDel.type = 'button';
         btnDel.addEventListener('click', async () => {
+          closeMenu();
           const ok = confirm(`Excluir o mimo "${m.title}"?`);
           if (!ok) return;
           try {
             setMsg('Excluindo...', false);
             await apiDeleteMimo(m.id);
             await reloadMimos();
-            setMsg('Mimo excluído.', false);
+            setMsg('', false);
+            if (typeof showHint === 'function') showHint('Mimo excluído com sucesso...', 'success', 'Mimos');
           } catch (err) {
             setMsg(err.message || 'Erro ao excluir.', true);
+            if (typeof showHint === 'function') showHint(err.message || 'Erro ao excluir.', 'error', 'Mimos', { time: 3200 });
           }
         });
 
-        tdActions.appendChild(btnEdit);
-        tdActions.appendChild(btnDel);
+        kebabMenu.appendChild(btnEdit);
+        kebabMenu.appendChild(btnDel);
+        divActions.appendChild(kebabBtn);
+        divActions.appendChild(kebabMenu);
+        tdActions.appendChild(divActions);
         tr.appendChild(tdActions);
 
         els.tbody.appendChild(tr);
@@ -378,38 +480,59 @@
 
         const payload = { title, description, value_cents, starts_at, ends_at, is_active };
 
-        if (currentEditId) await apiUpdateMimo(currentEditId, payload);
+        const isEdit = !!currentEditId;
+        if (isEdit) await apiUpdateMimo(currentEditId, payload);
         else await apiCreateMimo(payload);
 
         await reloadMimos();
         clearForm();
         closeForm();
+
+        // Mensagem padronizada (pfHint) com timer, após o fechamento do modal.
+        const msg = isEdit ? 'Mimo alterado com sucesso!' : 'Novo Mimo criado com sucesso!';
+        if (typeof showHint === 'function') {
+          setTimeout(() => {
+            showHint(msg, 'success', 'Mimos', { time: 2600 });
+          }, 50);
+        }
       } catch (err) {
         setMsg(err.message || 'Erro ao salvar.', true);
+        if (typeof showHint === 'function') showHint(err.message || 'Erro ao salvar.', 'error', 'Mimos', { time: 3200 });
       }
     }
 
     // ---------- Events ----------
     moneyMaskAttach(els.value);
     buildEmojiPanel();
-    setNovoButton(formOpen);
-
-    els.btnNovo.addEventListener('click', () => {
-      if (formOpen) {
+    // Modal close (overlay click + X)
+    if (els.modal && !els.modal.dataset.boundClose) {
+      els.modal.dataset.boundClose = '1';
+      els.modal.addEventListener('click', (e) => {
+        if (e.target === els.modal) {
+          clearForm();
+          closeForm();
+        }
+      });
+    }
+    if (els.modalClose && !els.modalClose.dataset.bound) {
+      els.modalClose.dataset.bound = '1';
+      els.modalClose.addEventListener('click', () => {
         clearForm();
         closeForm();
-        return;
-      }
+      });
+    }
+
+    // Botão Novo Mimo: sempre abre modal (sem toggle / sem alterar layout)
+    els.btnNovo.addEventListener('click', () => {
       clearForm();
       openForm();
       els.title?.focus();
     });
 
-    if (els.btnCloseForm) {
-      els.btnCloseForm.addEventListener('click', () => {
-        clearForm();
-        closeForm();
-      });
+    // compat: se existir botão antigo de fechar no form (não deve existir mais), mantém
+    if (els.btnCloseForm && !els.btnCloseForm.dataset.bound) {
+      els.btnCloseForm.dataset.bound = '1';
+      els.btnCloseForm.addEventListener('click', () => { clearForm(); closeForm(); });
     }
 
     if (els.save) els.save.addEventListener('click', handleSave);

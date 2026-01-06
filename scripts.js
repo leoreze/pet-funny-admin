@@ -25,20 +25,36 @@ const API_BASE_URL = '';
    - Compat: alguns fluxos antigos chamam showHint(msg, type)
    - Se existir pfHint (modal toast do sistema), usa ele.
 ========================= */
-function showHint(msg, type = 'info', title = '') {
+function showHint(msg, type = 'info', title = '', opts = null) {
   try {
+    // compat: showHint(msg, type, {time:...})
+    if (title && typeof title === 'object' && opts == null) {
+      opts = title;
+      title = '';
+    }
     const t = String(type || 'info').toLowerCase();
     const mapped = (t === 'error' || t === 'danger') ? 'error'
       : (t === 'success') ? 'success'
-      : (t === 'warning' || t === 'warn') ? 'warning'
+      : (t === 'warning' || t === 'warn') ? 'warn'
+      : (t === 'info') ? 'info'
       : 'info';
+
+    const o = (opts && typeof opts === 'object') ? opts : {};
+    const time = Number.isFinite(Number(o.time))
+      ? Number(o.time)
+      : (mapped === 'error' ? 3800 : (mapped === 'warn' ? 2800 : (mapped === 'info' ? 2400 : 2200)));
+
+    const defaultTitle = (mapped === 'error') ? 'Erro'
+      : (mapped === 'warn') ? 'Atenção'
+      : (mapped === 'success') ? 'Sucesso'
+      : 'Aviso';
 
     if (typeof window.pfHint === 'function') {
       window.pfHint({
         type: mapped,
-        title: title || (mapped === 'error' ? 'Erro' : 'OK'),
+        title: title || defaultTitle,
         msg: String(msg || ''),
-        time: mapped === 'error' ? 3800 : 2200
+        time
       });
       return;
     }
@@ -46,6 +62,74 @@ function showHint(msg, type = 'info', title = '') {
   // fallback absoluto
   try { alert(String(msg || '')); } catch (_) {}
 }
+
+
+/* =========================
+   MENU 3 PONTINHOS (Ações)
+   - Utilizado em Serviços e Pacotes
+   - Mantém layout; apenas controla z-index/posicionamento e fechamento.
+========================= */
+if (typeof window.hidePfMenu !== 'function') {
+  window.hidePfMenu = function hidePfMenu(menuEl) {
+    try {
+      if (!menuEl) return;
+      menuEl.classList.add('hidden');
+      menuEl.setAttribute('aria-hidden', 'true');
+    } catch (_) {}
+  };
+}
+
+if (typeof window.togglePfMenu !== 'function') {
+  window.togglePfMenu = function togglePfMenu(menuEl, anchorEl) {
+    try {
+      if (!menuEl) return;
+
+      // fecha outros menus abertos
+      document.querySelectorAll('.pf-menu:not(.hidden)').forEach((m) => {
+        if (m !== menuEl) window.hidePfMenu(m);
+      });
+
+      const willOpen = menuEl.classList.contains('hidden');
+
+      if (!willOpen) {
+        window.hidePfMenu(menuEl);
+        return;
+      }
+
+      // abre e posiciona
+      menuEl.classList.remove('hidden');
+      menuEl.setAttribute('aria-hidden', 'false');
+
+      if (anchorEl && typeof anchorEl.getBoundingClientRect === 'function') {
+        const r = anchorEl.getBoundingClientRect();
+
+        // posicionamento fixo para não "cortar" dentro do card/tabela
+        menuEl.style.position = 'fixed';
+        menuEl.style.top = `${Math.round(r.bottom + 6)}px`;
+        menuEl.style.left = `${Math.round(r.right - menuEl.offsetWidth)}px`;
+        menuEl.style.zIndex = '9999';
+      }
+    } catch (_) {}
+  };
+
+  // fecha ao clicar fora / scroll / resize
+  if (!window.__pfMenuGlobalListeners__) {
+    window.__pfMenuGlobalListeners__ = true;
+
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.pf-menu:not(.hidden)').forEach((m) => window.hidePfMenu(m));
+    });
+
+    window.addEventListener('scroll', () => {
+      document.querySelectorAll('.pf-menu:not(.hidden)').forEach((m) => window.hidePfMenu(m));
+    }, { passive: true });
+
+    window.addEventListener('resize', () => {
+      document.querySelectorAll('.pf-menu:not(.hidden)').forEach((m) => window.hidePfMenu(m));
+    });
+  }
+}
+
 
 /* =========================
    UX LISTAGEM AGENDAMENTOS (Admin)
@@ -468,69 +552,91 @@ function openWhatsAppWithText(phoneRaw, text){
   /* ===== Validação de Data/Horário (mesmas regras do index.html) ===== */
   const todayISO = new Date().toISOString().split('T')[0];
   function validarDiaHora(dateStr, timeStr) {
-    if (!dateStr || !timeStr) return 'Informe a data e o horário.';
+  if (!dateStr || !timeStr) return 'Informe a data e o horário.';
 
-    // Determina o dia da semana em São Paulo (evita bug de fuso em alguns browsers)
-    const dDow = new Date(dateStr + 'T00:00:00-03:00');
-    if (Number.isNaN(dDow.getTime())) return 'Data inválida.';
-    const dow = dDow.getUTCDay(); // 0=Dom..6=Sáb (São Paulo)
+  // Parse local datetime (browser) for validation of time slot
+  const date = new Date(dateStr + 'T' + timeStr + ':00');
+  if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
 
-    // Lê horário de funcionamento configurado (menu "Horário de Funcionamento")
-    const oh = Array.isArray(openingHoursCache)
-      ? openingHoursCache.find(x => Number(x.dow) === Number(dow))
-      : null;
+  const parts = String(timeStr).split(':');
+  const hh = parseInt(parts[0], 10);
+  const mm = parseInt(parts[1] || '0', 10);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Horário inválido.';
 
-    const isClosed = oh ? (
-      oh.is_closed === true ||
-      oh.is_closed === 1 ||
-      oh.is_closed === '1' ||
-      oh.is_closed === 't' ||
-      oh.is_closed === 'true'
-    ) : null;
+  // Somente horários em meia hora (00 ou 30)
+  if (!(mm === 0 || mm === 30)) return 'Escolha um horário fechado (minutos 00 ou 30).';
 
-    // Fallback (se ainda não carregou/foi configurado)
-    const openStr = (oh && !isClosed) ? String(oh.open_time || '07:30') : '07:30';
-    const closeStr = (oh && !isClosed) ? String(oh.close_time || (dow === 6 ? '13:00' : '17:30')) : (dow === 6 ? '13:00' : '17:30');
+  const minutos = hh * 60 + mm;
 
-    if (isClosed === true || (oh && isClosed) || (!oh && dow === 0)) {
-      // Mantém mensagens alinhadas ao comportamento do cliente
-      if (dow === 0) return 'Atendemos apenas de segunda a sábado.';
-      return 'Dia fechado para agendamentos.';
-    }
+  // Detecta admin para permitir retroativo no admin (novo e edição),
+  // mantendo bloqueio de passado no fluxo do cliente.
+  const isAdmin =
+    (typeof window !== 'undefined' &&
+      window.location &&
+      /\/admin(\/|$)/.test(window.location.pathname || ''));
 
-    const m = /^([01]\d|2[0-3]):[0-5]\d$/.exec(String(timeStr || '').trim());
-    if (!m) return 'Horário inválido.';
-
-    const t = parseInt(timeStr.slice(0, 2), 10) * 60 + parseInt(timeStr.slice(3, 5), 10);
-    const open = hhmmToMinutes(normalizeHHMM(openStr));
-    const close = hhmmToMinutes(normalizeHHMM(closeStr));
-
-    if (!Number.isFinite(open) || !Number.isFinite(close) || close <= open) return 'Horário de funcionamento inválido.';
-    if (t < open || t >= close) {
-      // Mantém o padrão antigo de texto, mas com horários dinâmicos
-      if (dow >= 1 && dow <= 5) return `Segunda a sexta: horários entre ${minutesToHHMM(open)} e ${minutesToHHMM(close)}.`;
-      if (dow === 6) return `Sábado: horários entre ${minutesToHHMM(open)} e ${minutesToHHMM(close)}.`;
-      return `Horários entre ${minutesToHHMM(open)} e ${minutesToHHMM(close)}.`;
-    }
-
-    // Admin também deve seguir a regra do cliente: somente 00 ou 30
-    if ((t - open) % 30 !== 0) return 'Escolha um horário fechado (minutos 00 ou 30).';
-
-    // Não permite agendar no passado (comparando data/hora local)
-    // EXCEÇÃO (ADMIN): em agendamento AVULSO, permitir registrar datas/horários passados (retroativo).
-    const date = new Date(dateStr + 'T' + timeStr + ':00');
-    if (Number.isNaN(date.getTime())) return 'Data ou horário inválidos.';
-
-    const kindEl = document.getElementById('formBookingKind');
-    const kind = kindEl ? String(kindEl.value || '') : '';
-    const allowPast = (kind === 'avulso');
-    if (!allowPast) {
-      const now = new Date();
-      if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
-    }
-
-    return null;
+  // Preferir horário configurado (menu "Horário de Funcionamento")
+  let range = null;
+  if (typeof buildRangeForDate === 'function') {
+    try { range = buildRangeForDate(dateStr); } catch (e) { range = null; }
   }
+
+  if (range) {
+    if (range.closed) {
+      // Mensagem amigável com o dia, quando possível
+      try {
+        const d0 = new Date(dateStr + 'T00:00:00-03:00');
+        const dow0 = d0.getUTCDay();
+        const diaNome = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][dow0] || 'Dia';
+        return range.label || (diaNome + ': dia fechado para agendamentos.');
+      } catch (e) {
+        return range.label || 'Dia fechado para agendamentos.';
+      }
+    }
+    const startMin = Number(range.startMin);
+    const endMin = Number(range.endMin);
+    if (Number.isFinite(startMin) && Number.isFinite(endMin)) {
+      if (minutos < startMin || minutos > endMin) {
+        // Mensagem já vem pronta do range (ex.: "Sábado: horários entre 07:30 e 18:00.")
+        {
+        // Monta a mensagem padrão respeitando o horário configurado
+        const fmt = (m) => {
+          const h = Math.floor(m / 60);
+          const mi = m % 60;
+          return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+        };
+        let diaNome = 'Dia';
+        try {
+          const d0 = new Date(dateStr + 'T00:00:00-03:00');
+          const dow0 = d0.getUTCDay();
+          diaNome = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][dow0] || 'Dia';
+        } catch (e) {}
+        return range.label || (diaNome + ': horários entre ' + fmt(startMin) + ' e ' + fmt(endMin) + '.');
+      }
+      }
+    }
+  } else {
+    // Fallback (caso o cache/config não esteja carregado ainda)
+    const diaSemana = date.getDay();
+    const inicio = 7 * 60 + 30;
+    if (diaSemana === 0) return 'Atendemos apenas de segunda a sábado.';
+    if (diaSemana >= 1 && diaSemana <= 5) {
+      const fim = 17 * 60 + 30;
+      if (minutos < inicio || minutos > fim) return 'Segunda a sexta: horários entre 07:30 e 17:30.';
+    } else if (diaSemana === 6) {
+      const fim = 13 * 60;
+      if (minutos < inicio || minutos > fim) return 'Sábado: horários entre 07:30 e 13:00.';
+    }
+  }
+
+  // Bloqueio de passado somente para o cliente (admin permite retroativo)
+  if (!isAdmin) {
+    const now = new Date();
+    if (date.getTime() < now.getTime() - (60 * 1000)) return 'Não é possível agendar no passado.';
+  }
+
+  return null;
+}
   function pad2(n) { return String(n).padStart(2, '0'); }
   function buildRangeForDate(dateStr) {
     if (!dateStr) return null;
@@ -721,8 +827,10 @@ function normalizeHHMM(t) {
 
     // carregamentos sob demanda (mantém comportamento atual)
     if (tabId === 'tab-servicos') loadServices().catch(console.error);
+    if (tabId === 'tab-pacotes') loadPackages().catch(console.error);
     if (tabId === 'tab-racas') loadBreeds().catch(console.error);
     if (tabId === 'tab-horarios') loadOpeningHours().catch(console.error);
+    if (tabId === 'tab-automacao') loadAutomation().catch(console.error);
     if (tabId === 'tab-dashboard') {
       loadDashboard().finally(() => {
         setTimeout(() => {
@@ -762,10 +870,59 @@ function normalizeHHMM(t) {
   const estadoVazioCards = document.getElementById('estadoVazioCards');
   const btnViewList = document.getElementById('btnViewList');
   const btnViewCards = document.getElementById('btnViewCards');
+  const btnViewCalendar = document.getElementById('btnViewCalendar');
+  const agendaCalendarWrapper = document.getElementById('agendaCalendarWrapper');
+  const agendaCalendar = document.getElementById('agendaCalendar');
+  const agendaCalendarWeek = document.getElementById('agendaCalendarWeek');
+  const agendaCalendarDayList = document.getElementById('agendaCalendarDayList');
+  const estadoVazioCalendarDay = document.getElementById('estadoVazioCalendarDay');
+  const calPrev = document.getElementById('calPrev');
+  const calNext = document.getElementById('calNext');
+  const calToday = document.getElementById('calToday');
+  const calLabel = document.getElementById('calLabel');
+  const calDayTitle = document.getElementById('calDayTitle');
+
+  // Clique no nome do Cliente/Pet (tabela e cards) -> abre modal de informações
+  function __handleAgendaNameClick(e) {
+    const el = e.target && e.target.closest ? e.target.closest('[data-open][data-id]') : null;
+    if (!el) return;
+    const kind = el.getAttribute('data-open');
+    const id = Number(el.getAttribute('data-id'));
+    if (!id) return;
+
+    // Evita disparar cliques de outras ações do card/tabela
+    try { e.preventDefault(); } catch (_) {}
+    try { e.stopPropagation(); } catch (_) {}
+
+    if (kind === 'customer') return openCustomerInfoModal(id);
+    if (kind === 'pet') return openPetInfoModal(id);
+  }
+  if (tbodyAgenda) tbodyAgenda.addEventListener('click', __handleAgendaNameClick);
+  if (agendaCards) agendaCards.addEventListener('click', __handleAgendaNameClick);
+
+
   const statTotal = document.getElementById('statTotal');
   const statAvulsos = document.getElementById('statAvulsos');
   const statPacotes = document.getElementById('statPacotes');
   const formPanel = document.getElementById('formPanel');
+  // Modal (Agendamentos)
+  const bookingModal = document.getElementById('bookingModal');
+  const bookingModalBackdrop = document.getElementById('bookingModalBackdrop');
+  const bookingModalClose = document.getElementById('bookingModalClose');
+  const bookingModalTitle = document.getElementById('bookingModalTitle');
+  const bookingModalFormHost = document.getElementById('bookingModalFormHost');
+  const bookingModalSuccess = document.getElementById('bookingModalSuccess');
+  const bookingModalSuccessClose = document.getElementById('bookingModalSuccessClose');
+  // Força desativação do modal de sucesso antigo (evita abrir 2 modais).
+  // Mantemos apenas o hint/toast padronizado com timer (pfHint/showHint).
+  try {
+    if (bookingModalSuccess) {
+      bookingModalSuccess.classList.add('hidden');
+      bookingModalSuccess.style.display = 'none';
+      bookingModalSuccess.setAttribute('aria-hidden', 'true');
+    }
+  } catch (_) {}
+
   const bookingId = document.getElementById('bookingId');
   const bookingOriginalStatus = document.getElementById('bookingOriginalStatus');
   
@@ -899,7 +1056,7 @@ attachCepMaskIfPresent();
     formPetSelect.addEventListener('change', () => {
       const pid = String(formPetSelect.value || '');
       const pet = bookingPetsCache.find(x => String(x.id) === pid);
-      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
+      currentPetSize = (pet && (pet.size || pet.porte)) ? String(pet.size || pet.porte) : '';
       refreshServiceOptionsInAgenda();
     });
   }
@@ -937,6 +1094,11 @@ const formStatus = document.getElementById('formStatus');
   const dashServicesEmpty = document.getElementById('dashServicesEmpty');
   const dashRevenue = document.getElementById('dashRevenue');
   const dashAvgTicket = document.getElementById('dashAvgTicket');
+  const dashPackagesCount = document.getElementById('dashPackagesCount');
+  const dashPackagesRevenue = document.getElementById('dashPackagesRevenue');
+  const dashPackagesDiscountAvg = document.getElementById('dashPackagesDiscountAvg');
+  const tbodyDashPackages = document.getElementById('tbodyDashPackages');
+  const dashPackagesEmpty = document.getElementById('dashPackagesEmpty');
   let ultimaLista = [];
   let clientesCache = [];
   let clienteSelecionadoId = null;
@@ -965,8 +1127,9 @@ function formatBRLInput(value) {
 }
 
 function getServicesFilters() {
-  const t = document.getElementById('filtroServicosTitle');
-  const c = document.getElementById('filtroServicosTipo');
+  // Compatibilidade: HTML atual usa ids antigos (filtroServicos / filtroCategoriaServicos)
+  const t = document.getElementById('filtroServicosTitle') || document.getElementById('filtroServicos');
+  const c = document.getElementById('filtroServicosTipo') || document.getElementById('filtroCategoriaServicos');
   const p = document.getElementById('filtroPorteServicos');
   return {
     title: t ? normStr(t.value) : '',
@@ -987,8 +1150,26 @@ function applyServicesFilters(list) {
 
 function showServicePanel(show) {
   const panel = document.getElementById('serviceFormPanel');
+  const overlay = document.getElementById('serviceModal');
+
+  // controla o overlay (modal) se existir
+  if (overlay) {
+    overlay.classList.toggle('hidden', !show);
+    overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
+  }
+
   if (!panel) return;
+
+  // garante que o painel do formulário esteja dentro do host do modal
+  if (show) {
+    const host = document.getElementById('serviceModalHost');
+    if (host && panel.parentElement !== host) {
+      try { host.appendChild(panel); } catch (_) {}
+    }
+  }
+
   panel.classList.toggle('hidden', !show);
+
   if (show) {
     // foco amigável
     const first = document.getElementById('serviceCategory') || document.getElementById('serviceTitle');
@@ -1043,43 +1224,10 @@ function fillServiceForm(service) {
 }
 
 function renderServicesTable() {
-  const tbody = document.getElementById('tbodyServices');
-  const empty = document.getElementById('servicesEmpty');
-  if (!tbody) return;
-
-  const filtered = applyServicesFilters(servicesCache);
-
-  tbody.innerHTML = '';
-  if (!filtered.length) {
-    if (empty) empty.style.display = 'block';
-    return;
-  }
-  if (empty) empty.style.display = 'none';
-
-  for (const s of filtered) {
-    const tr = document.createElement('tr');
-
-    const created = s.created_at || s.createdAt || '';
-    const updated = s.updated_at || s.updatedAt || '';
-
-    tr.innerHTML = `
-      <td>${escapeHtml(s.date ?? '')}</td>
-      <td>${escapeHtml(s.category ?? '')}</td>
-      <td>${escapeHtml(s.title ?? '')}</td>
-      <td>${escapeHtml(s.porte ?? '')}</td>
-      <td>${escapeHtml(String(s.duration_min ?? ''))}</td>
-      <td>${escapeHtml(formatBRLFromCents(s.value_cents ?? 0))}</td>
-      <td>${escapeHtml(String(created))}</td>
-      <td>${escapeHtml(String(updated))}</td>
-      <td class="actions-cell">
-        <button type="button" class="btn btn-light btn-sm" data-action="edit" data-id="${escapeHtml(s.id)}">Editar</button>
-        <button type="button" class="btn btn-light btn-sm" data-action="del" data-id="${escapeHtml(s.id)}">Excluir</button>
-      </td>
-    `;
-
-    tbody.appendChild(tr);
-  }
+  // Fonte de verdade: usa a mesma renderização do módulo legado (agora com filtro por porte)
+  try { return renderServices(); } catch(_) {}
 }
+
 
 function populateServiceSelects() {
   // Select do agendamento (multi-service)
@@ -1140,6 +1288,8 @@ async function saveServiceFromForm() {
   const tempoEl = document.getElementById('serviceTempo');
 
   const id = idEl && idEl.value ? Number(idEl.value) : null;
+  const isEdit = !!id;
+
   const category = catEl ? String(catEl.value || '') : '';
   const title = titleEl ? String(titleEl.value || '') : '';
   const porte = porteEl ? String(porteEl.value || '') : '';
@@ -1157,19 +1307,45 @@ async function saveServiceFromForm() {
   const payload = { category, title: title.trim(), porte, value_cents, duration_min };
 
   try {
-    if (id) {
+    if (isEdit) {
       await apiPut(`/api/services/${id}`, payload);
     } else {
       await apiPost('/api/services', payload);
     }
-    clearServiceForm();
-    showServicePanel(false);
+
+    // limpa o formulário para o próximo uso
+    try { clearServiceForm(); } catch(_) {}
+
+    // fecha o modal do formulário (sem esconder o painel, para evitar reabrir vazio)
+    const overlay = document.getElementById('serviceModal');
+    const panel = document.getElementById('serviceFormPanel');
+    if (overlay) {
+      overlay.classList.add('hidden');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+    if (panel) {
+      panel.classList.remove('hidden');
+    }
+
     await loadServices();
+
+    const msg = isEdit ? 'Serviço alterado com sucesso!' : 'Serviço criado com sucesso!';
+    if (typeof openInfoModal === 'function') {
+      const html = `
+        <div style="font-weight:800; font-size:16px; color:#014C5F; margin-bottom:6px;">${escapeHtml(msg)}</div>
+        <div class="pf-info-muted">Clique em “Fechar” para voltar.</div>
+      `;
+      showHint(msg, 'success', 'Serviços');
+    } else {
+      showHint(msg, 'success', 'Serviços');
+    }
   } catch (e) {
     console.error('Erro ao salvar serviço:', e);
     setServiceError((e && e.message) ? e.message : 'Erro ao salvar serviço.');
   }
 }
+
+
 
 async function deleteServiceById(id) {
   if (!id) return;
@@ -1177,7 +1353,9 @@ async function deleteServiceById(id) {
   if (!ok) return;
   try {
     await apiDelete(`/api/services/${id}`);
-    await loadServices();
+    
+    showHint('Serviço excluido com sucesso!', 'success', 'Serviços');
+await loadServices();
   } catch (e) {
     console.error('Erro ao excluir serviço:', e);
     alert((e && e.message) ? e.message : 'Erro ao excluir serviço.');
@@ -1190,6 +1368,29 @@ function bindServicesEventsOnce() {
   const btnSave = document.getElementById('btnServiceSave');
   const tbody = document.getElementById('tbodyServices');
   const btnLimpar = document.getElementById('btnLimparServicos');
+
+  // Modal (Serviços) — mesmo padrão de Clientes & Pets
+  const serviceModal = document.getElementById('serviceModal');
+  const serviceModalClose = document.getElementById('serviceModalClose');
+
+  if (serviceModal && !serviceModal.dataset.boundClose) {
+    serviceModal.dataset.boundClose = '1';
+    serviceModal.addEventListener('click', (e) => {
+      if (e.target === serviceModal) {
+        clearServiceForm();
+        showServicePanel(false);
+      }
+    });
+  }
+
+  if (serviceModalClose && !serviceModalClose.dataset.bound) {
+    serviceModalClose.dataset.bound = '1';
+    serviceModalClose.addEventListener('click', () => {
+      clearServiceForm();
+      showServicePanel(false);
+    });
+  }
+
 
   const t = document.getElementById('filtroServicosTitle');
   const c = document.getElementById('filtroServicosTipo');
@@ -1320,14 +1521,157 @@ try { bindServicesEventsOnce(); } catch (_) {}
     const used = occupiedTimesMap.get(t) || 0;
     return used >= cap;
   }
-  function mostrarFormAgenda() { formPanel.classList.remove('hidden'); }
-  function esconderFormAgenda() { formPanel.classList.add('hidden'); }
-  async function fetchBookings() {
+
+  // ===== Modal: Agendamentos (Admin) =====
+  const __formPanelOriginalParent = formPanel ? formPanel.parentNode : null;
+  const __formPanelOriginalNext = formPanel ? formPanel.nextSibling : null;
+
+  function __moveFormPanelToModal() {
+    if (!formPanel || !bookingModalFormHost) return;
+    if (formPanel.parentNode !== bookingModalFormHost) {
+      bookingModalFormHost.appendChild(formPanel);
+    }
+  }
+  function __restoreFormPanelFromModal() {
+    if (!formPanel || !__formPanelOriginalParent) return;
+    if (formPanel.parentNode === __formPanelOriginalParent) return;
+    if (__formPanelOriginalNext) __formPanelOriginalParent.insertBefore(formPanel, __formPanelOriginalNext);
+    else __formPanelOriginalParent.appendChild(formPanel);
+  }
+  function __showBookingModal(titleText) {
+    if (!bookingModal) return;
+    if (bookingModalTitle && titleText) bookingModalTitle.textContent = titleText;
+    bookingModal.classList.remove('hidden');
+    bookingModal.setAttribute('aria-hidden', 'false');
+    // move form inside modal and show it
+    __moveFormPanelToModal();
+    if (formPanel) formPanel.classList.remove('hidden');
+    // garante estado visual do modal
+    if (bookingModalSuccess) bookingModalSuccess.classList.add('hidden');
+  }
+  function __hideBookingModal() {
+    if (!bookingModal) return;
+    bookingModal.classList.add('hidden');
+    bookingModal.setAttribute('aria-hidden', 'true');
+    if (bookingModalSuccess) bookingModalSuccess.classList.add('hidden');
+    // esconde o form e devolve ao local original
+    if (formPanel) formPanel.classList.add('hidden');
+    __restoreFormPanelFromModal();
+  }
+  function __showBookingSuccess(message) {
+    // Sucesso padronizado: FECHA primeiro o modal do agendamento e depois exibe o aviso com timer.
+    // Evita "2 modais" (bookingModalSuccess + pfHint) e garante que só apareça a mensagem padronizada.
+    try { if (bookingModalSuccess) { bookingModalSuccess.classList.add('hidden'); bookingModalSuccess.style.display = 'none'; bookingModalSuccess.setAttribute('aria-hidden', 'true'); } } catch (_) {}
+
+    // Fecha imediatamente o modal de cadastro/edição
+    try { __hideBookingModal(); } catch (_) {}
+
+    // Em seguida, exibe o hint padronizado
+    try {
+      setTimeout(() => {
+        try {
+          showHint(message || 'Salvo com sucesso!', 'success', 'Agendamentos', { time: 2200 });
+        } catch (_) {}
+      }, 50);
+    } catch (_) {}
+}
+
+  // API compatível: funções antigas agora controlam o modal
+  function mostrarFormAgenda() {
+    __showBookingModal((bookingId && bookingId.value) ? 'Editar Agendamento' : 'Cadastrar Agendamento');
+  }
+  function esconderFormAgenda() { __hideBookingModal(); }
+  async function fetchBookings(extraParams = null) {
     const params = {};
-    if (filtroData.value) params.date = filtroData.value;
-    if (filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
+    if (filtroData && filtroData.value) params.date = filtroData.value;
+    if (filtroBusca && filtroBusca.value.trim()) params.search = filtroBusca.value.trim();
+    if (extraParams && typeof extraParams === 'object') {
+      Object.assign(params, extraParams);
+    }
     const data = await apiGet('/api/bookings', params);
-    return data.bookings || [];
+    return data;
+  }
+
+  // ===== Paginação (Agenda): evita carregar/renderizar tudo de uma vez =====
+  const btnCarregarMaisAgenda = document.getElementById('btnCarregarMaisAgenda');
+  const agendaLoadMoreInfo = document.getElementById('agendaLoadMoreInfo');
+  const agendaLoadMoreBar = document.getElementById('agendaLoadMoreBar');
+
+  const AGENDA_PAGE_LIMIT = 50;
+  let agendaPagingOffset = 0;
+  let agendaPagingHasMore = false;
+  let agendaPagingLoading = false;
+  let agendaPagingEnabled = true;
+
+  function __setAgendaLoadMoreVisible(isVisible) {
+    if (!agendaLoadMoreBar) return;
+    agendaLoadMoreBar.style.display = isVisible ? '' : 'none';
+  }
+  function __setAgendaLoadMoreButtonState() {
+    if (!btnCarregarMaisAgenda) return;
+    btnCarregarMaisAgenda.style.display = (agendaPagingHasMore && !agendaPagingLoading) ? '' : (agendaPagingLoading ? '' : 'none');
+    btnCarregarMaisAgenda.disabled = !!agendaPagingLoading;
+    if (agendaPagingLoading) btnCarregarMaisAgenda.textContent = 'Carregando...';
+    else btnCarregarMaisAgenda.textContent = 'Carregar mais';
+  }
+  function __setAgendaLoadMoreInfoText() {
+    if (!agendaLoadMoreInfo) return;
+    const n = Array.isArray(ultimaLista) ? ultimaLista.length : 0;
+    agendaLoadMoreInfo.textContent = `Mostrando ${n} agendamento(s)`;
+  }
+  function resetAgendaPaging() {
+    agendaPagingOffset = 0;
+    agendaPagingHasMore = false;
+    agendaPagingLoading = false;
+    __setAgendaLoadMoreInfoText();
+    __setAgendaLoadMoreButtonState();
+  }
+  async function loadAgendaPage({ append = false } = {}) {
+    if (!agendaPagingEnabled) {
+      const data = await fetchBookings();
+      const lista = data.bookings || [];
+      ultimaLista = lista;
+      agendaPagingHasMore = false;
+      __setAgendaLoadMoreInfoText();
+      __setAgendaLoadMoreButtonState();
+      return lista;
+    }
+
+    if (agendaPagingLoading) return Array.isArray(ultimaLista) ? ultimaLista : [];
+    agendaPagingLoading = true;
+    __setAgendaLoadMoreButtonState();
+
+    const effectiveOffset = append ? agendaPagingOffset : 0;
+    const data = await fetchBookings({ limit: AGENDA_PAGE_LIMIT, offset: effectiveOffset });
+    const page = data.bookings || [];
+    const hasMore = !!data.has_more;
+
+    if (append) {
+      ultimaLista = (Array.isArray(ultimaLista) ? ultimaLista : []).concat(page);
+      agendaPagingOffset = effectiveOffset + page.length;
+    } else {
+      ultimaLista = page;
+      agendaPagingOffset = page.length;
+    }
+    agendaPagingHasMore = hasMore;
+    agendaPagingLoading = false;
+    __setAgendaLoadMoreInfoText();
+    __setAgendaLoadMoreButtonState();
+    return ultimaLista;
+  }
+
+  if (btnCarregarMaisAgenda) {
+    btnCarregarMaisAgenda.addEventListener('click', async () => {
+      try {
+        await loadAgendaPage({ append: true });
+        renderAgendaByView(ultimaLista);
+        atualizaEstatisticas(ultimaLista);
+      } catch (e) {
+        agendaPagingLoading = false;
+        __setAgendaLoadMoreButtonState();
+        showHint('Erro ao carregar mais agendamentos: ' + (e?.message || e), 'error');
+      }
+    });
   }
   function atualizaEstatisticas(lista) {
     const total = Array.isArray(lista) ? lista.length : 0;
@@ -1418,7 +1762,7 @@ try { bindServicesEventsOnce(); } catch (_) {}
     const currentPetId = formPetSelect ? String(formPetSelect.value || '') : '';
     if (currentPetId) {
       const pet = bookingPetsCache.find(x => String(x.id) === currentPetId);
-      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
+      currentPetSize = (pet && (pet.size || pet.porte)) ? String(pet.size || pet.porte) : '';
     } else {
       currentPetSize = '';
     }
@@ -1449,7 +1793,7 @@ try { bindServicesEventsOnce(); } catch (_) {}
       if (booking && booking.pet_id) formPetSelect.value = String(booking.pet_id);
       const pid = String(formPetSelect.value || '');
       const pet = bookingPetsCache.find(x => String(x.id) === pid);
-      currentPetSize = (pet && pet.size) ? String(pet.size) : '';
+      currentPetSize = (pet && (pet.size || pet.porte)) ? String(pet.size || pet.porte) : '';
       refreshServiceOptionsInAgenda();
       // Se for edição de pacote, após carregar o pet (porte), carrega e seleciona o pacote do registro.
       if (isPkg && typeof refreshPackageSelectForBooking === 'function') {
@@ -1564,7 +1908,131 @@ try { bindServicesEventsOnce(); } catch (_) {}
   let filtroServicosTxt = '';
   let filtroCategoriaServicosVal = '';
 
+/* ===== PATCH: Garantir formulário de Serviços visível no modal (Novo/Editar) =====
+   Problema reportado: modal abre, mas o formulário não aparece; editar não responde.
+   Estratégia: handlers em CAPTURE com stopImmediatePropagation para evitar conflitos
+   com listeners legados duplicados, sem alterar layout/HTML.
+*/
+(function bindServiceModalHardFix(){
+  // Hardfix: em alguns fluxos o painel do formulário pode "sumir" após fechar/abrir.
+  // Para evitar modal vazio, sempre resolve overlay/panel/host pelo DOM no momento da ação.
+  function getEls(){
+    return {
+      overlay: document.getElementById('serviceModal'),
+      panel: document.getElementById('serviceFormPanel'),
+      host: document.getElementById('serviceModalHost'),
+      closeBtn: document.getElementById('serviceModalClose'),
+      btnNovo: document.getElementById('btnNovoServico'),
+      tbody: document.getElementById('tbodyServices')
+    };
+  }
+
+  function ensurePanelInHost(panel, host){
+    if (!panel) return;
+    if (host && panel.parentElement !== host) {
+      try { host.appendChild(panel); } catch(_) {}
+    }
+  }
+
+  function openModalEnsureForm(){
+    const { overlay, panel, host } = getEls();
+    if (!overlay || !panel) return;
+
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+
+    ensurePanelInHost(panel, host);
+    panel.classList.remove('hidden');
+
+    const first = document.getElementById('serviceCategory') || document.getElementById('serviceTitle');
+    if (first) { try { first.focus(); } catch(_){} }
+  }
+
+  function closeModalEnsure(){
+    // não assume referências antigas — pode ter sido recriado no DOM
+    const { overlay, panel } = getEls();
+    try { if (typeof clearServiceForm === 'function') clearServiceForm(); } catch(_) {}
+    if (overlay) {
+      overlay.classList.add('hidden');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+    if (panel) panel.classList.add('hidden');
+  }
+
+  const els0 = getEls();
+  const btnNovo = els0.btnNovo;
+  const tbody = els0.tbody;
+
+  if (btnNovo && !btnNovo.dataset.hardfix) {
+    btnNovo.dataset.hardfix = '1';
+    btnNovo.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      try { if (typeof clearServiceForm === 'function') clearServiceForm(); } catch(_) {}
+      openModalEnsureForm();
+    }, true);
+  }
+
+  if (tbody && !tbody.dataset.hardfix) {
+    tbody.dataset.hardfix = '1';
+    tbody.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('button') : null;
+      if (!btn) return;
+
+      const action = btn.getAttribute('data-action');
+      const idAttr = btn.getAttribute('data-id');
+      const isEditByText = !action && /editar/i.test(btn.textContent || '');
+      const isEdit = action === 'edit' || isEditByText;
+      if (!isEdit) return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      // resolve id pelo atributo ou pela primeira coluna (fallback)
+      let id = Number(idAttr || 0);
+      if (!id) {
+        const tr = btn.closest('tr');
+        const td0 = tr ? tr.querySelector('td') : null;
+        const maybe = td0 ? Number(String(td0.textContent || '').trim()) : 0;
+        if (maybe) id = maybe;
+      }
+
+      const svc = (Array.isArray(servicesCache) ? servicesCache : []).find(s => Number(s.id) === Number(id));
+      if (svc) {
+        try { if (typeof fillServiceForm === 'function') fillServiceForm(svc); } catch(_) {}
+      }
+      openModalEnsureForm();
+    }, true);
+  }
+
+  const els1 = getEls();
+  const closeBtn = els1.closeBtn;
+  const overlay = els1.overlay;
+
+  if (closeBtn && !closeBtn.dataset.hardfix) {
+    closeBtn.dataset.hardfix = '1';
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeModalEnsure();
+    }, true);
+  }
+
+  if (overlay && !overlay.dataset.hardfixBackdrop) {
+    overlay.dataset.hardfixBackdrop = '1';
+    overlay.addEventListener('click', (e) => {
+      if (e.target !== overlay) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeModalEnsure();
+    }, true);
+  }
+})();
+
+
   let packagesCache = [];
+  let packagesAllCache = [];
+
 
 function getServiceById(id){
   return servicesCache.find(s => String(s.id) === String(id));
@@ -1605,8 +2073,14 @@ function clearSelectedServices(){
   refreshSelectedServicesUI();
 }
  // [{id,title,value_cents,...}]
-  function showServiceForm() { serviceFormPanel.classList.remove('hidden'); }
-  function hideServiceForm() { serviceFormPanel.classList.add('hidden'); }
+  function showServiceForm() { 
+    // Mantém compatibilidade: abre o modal + mostra o painel do formulário
+    try { showServicePanel(true); } catch(_) { try { serviceFormPanel.classList.remove('hidden'); } catch(__){} }
+  }
+  function hideServiceForm() { 
+    // Mantém compatibilidade: fecha o modal + esconde o painel do formulário
+    try { showServicePanel(false); } catch(_) { try { serviceFormPanel.classList.add('hidden'); } catch(__){} }
+  }
   function clearServiceForm() {
     serviceId.value = '';
     serviceDate.value = toISODateOnly(new Date());
@@ -1643,6 +2117,12 @@ function clearSelectedServices(){
       if (filtroCategoriaServicosVal) {
         if (String(s.category || '') !== String(filtroCategoriaServicosVal)) return false;
       }
+      // filtro por porte
+      const filtroPorteEl = document.getElementById('filtroPorteServicos');
+      const filtroPorteVal = filtroPorteEl ? String(filtroPorteEl.value || '').trim() : '';
+      if (filtroPorteVal) {
+        if (String(s.porte || '') !== String(filtroPorteVal)) return false;
+      }
       return true;
     });
     servicesEmpty.style.display = list.length ? 'none' : 'block';
@@ -1658,30 +2138,94 @@ function clearSelectedServices(){
       const tdCreated = document.createElement('td'); tdCreated.textContent = svc.created_at ? formatDateTimeBr(svc.created_at) : '-';
       const tdUpdated = document.createElement('td'); tdUpdated.textContent = svc.updated_at ? formatDateTimeBr(svc.updated_at) : '-';
       const tdAcoes = document.createElement('td');
-      const divActions = document.createElement('div'); divActions.className = 'actions';
+      // Ações: menu de 3 pontinhos (kebab) no mesmo estilo de Clientes/Pets
+      const divActions = document.createElement('div');
+      divActions.className = 'actions actions-kebab';
+
+      const kebabBtn = document.createElement('button');
+      kebabBtn.type = 'button';
+      kebabBtn.className = 'kebab-btn';
+      kebabBtn.setAttribute('aria-label', 'Ações');
+      kebabBtn.textContent = '⋮';
+
+      const kebabMenu = document.createElement('div');
+      kebabMenu.className = 'kebab-menu hidden';
+
+      const closeMenu = () => {
+        kebabMenu.classList.add('hidden');
+        kebabMenu.classList.remove('open');
+        kebabMenu.style.display = 'none';
+      };
+
+      kebabBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        document.querySelectorAll('.kebab-menu').forEach(m => {
+          if (m !== kebabMenu) {
+            m.classList.add('hidden');
+            m.classList.remove('open');
+            m.style.display = 'none';
+          }
+        });
+
+        const willOpen = kebabMenu.classList.contains('hidden');
+        if (willOpen) {
+          kebabMenu.classList.remove('hidden');
+          kebabMenu.classList.add('open');
+          kebabMenu.style.display = 'block';
+        } else {
+          closeMenu();
+        }
+
+        if (willOpen) {
+          // portal no body p/ não cortar por overflow do wrapper da tabela
+          try {
+            if (!kebabMenu.dataset.portalAttached) {
+              document.body.appendChild(kebabMenu);
+              kebabMenu.dataset.portalAttached = '1';
+              kebabMenu.classList.add('kebab-menu-portal');
+            }
+            const rect = kebabBtn.getBoundingClientRect();
+            const menuW = 180;
+            kebabMenu.style.position = 'fixed';
+            kebabMenu.style.minWidth = menuW + 'px';
+            kebabMenu.style.zIndex = '999999';
+            kebabMenu.style.top = Math.round(rect.bottom + 6) + 'px';
+            kebabMenu.style.left = Math.round(Math.max(8, rect.right - menuW)) + 'px';
+          } catch (_) {}
+        }
+      });
+
+      document.addEventListener('click', closeMenu);
+
       const btnEdit = document.createElement('button');
       btnEdit.textContent = 'Editar';
-      btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.className = 'kebab-item';
       btnEdit.type = 'button';
       btnEdit.addEventListener('click', () => {
         fillServiceForm(svc);
         showServiceForm();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        closeMenu();
+        try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {}
       });
+
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
-      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.className = 'kebab-item kebab-item-danger';
       btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
+        closeMenu();
         if (!confirm('Deseja realmente excluir este serviço?')) return;
         try {
           await apiDelete('/api/services/' + svc.id);
           await loadServices();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) { showHint((e && e.message) ? e.message : 'Erro ao excluir pet.', 'error', 'Pets', { time: 3200 }); }
       });
-      divActions.appendChild(btnEdit);
-      divActions.appendChild(btnDel);
+
+      kebabMenu.appendChild(btnEdit);
+      kebabMenu.appendChild(btnDel);
+      divActions.appendChild(kebabBtn);
+      divActions.appendChild(kebabMenu);
       tdAcoes.appendChild(divActions);
       tr.appendChild(tdId);
       tr.appendChild(tdDate);
@@ -1700,13 +2244,14 @@ function clearSelectedServices(){
   const current = formService.value || '';
   formService.innerHTML = '<option value="">Selecione...</option>';
 
-  const sizeFilter = (typeof currentPetSize === 'string') ? currentPetSize.trim().toLowerCase() : '';
+  const sizeFilter = (typeof currentPetSize === 'string') ? normStr(currentPetSize) : '';
 
   // 1️⃣ Filtra serviços por porte (regra atual)
+  // - usa normalização para não falhar com acentos/variações (ex: 'médio' vs 'medio')
   const filtered = (servicesCache || []).filter(svc => {
     if (!sizeFilter) return true;
-    if (!svc.porte) return true;
-    return String(svc.porte).toLowerCase() === sizeFilter;
+    if (!svc?.porte) return true;
+    return normStr(svc.porte) === sizeFilter;
   });
 
   // 2️⃣ Agrupa por categoria
@@ -1855,12 +2400,22 @@ if (selectedServicesList) {
       renderServices();
     });
   }
+  // Filtro por porte (mantém consistência com os demais filtros)
+  const filtroPorteServicos = document.getElementById('filtroPorteServicos');
+  if (filtroPorteServicos) {
+    filtroPorteServicos.addEventListener('change', () => {
+      renderServices();
+    });
+  }
+
   if (btnLimparServicos) {
     btnLimparServicos.addEventListener('click', () => {
       if (filtroServicos) filtroServicos.value = '';
       filtroServicosTxt = '';
       if (filtroCategoriaServicos) filtroCategoriaServicos.value = '';
       filtroCategoriaServicosVal = '';
+      const filtroPorteServicos = document.getElementById('filtroPorteServicos');
+      if (filtroPorteServicos) filtroPorteServicos.value = '';
       renderServices();
     });
   }
@@ -1935,11 +2490,12 @@ if (selectedServicesList) {
       tdHist.title = full;
       const tdCreated = document.createElement('td'); tdCreated.textContent = b.created_at ? formatDateTimeBr(b.created_at) : '-';
       const tdUpdated = document.createElement('td'); tdUpdated.textContent = b.updated_at ? formatDateTimeBr(b.updated_at) : '-';
-      const tdAcoes = document.createElement('td');
+      const tdAcoes = document.createElement('td');tdAcoes.className = 'td-actions';
+
       const divActions = document.createElement('div'); divActions.className = 'actions';
       const btnEdit = document.createElement('button');
       btnEdit.textContent = 'Editar';
-      btnEdit.className = 'btn btn-small btn-secondary';
+      btnEdit.className = 'btn btn-secondary';
       btnEdit.type = 'button';
       btnEdit.addEventListener('click', () => {
         fillBreedForm(b);
@@ -1948,14 +2504,14 @@ if (selectedServicesList) {
       });
       const btnDel = document.createElement('button');
       btnDel.textContent = 'Excluir';
-      btnDel.className = 'btn btn-small btn-danger';
+      btnDel.className = 'btn btn-danger';
       btnDel.type = 'button';
       btnDel.addEventListener('click', async () => {
         if (!confirm('Deseja realmente excluir esta raça?')) return;
         try {
           await apiDelete('/api/breeds/' + b.id);
           await loadBreeds();
-        } catch (e) { alert(e.message); }
+        } catch (e) { showHint((e && e.message) ? e.message : 'Erro ao excluir pet.', 'error', 'Pets', { time: 3200 }); }
       });
       divActions.appendChild(btnEdit);
       divActions.appendChild(btnDel);
@@ -2039,14 +2595,15 @@ if (selectedServicesList) {
   function initAgendaViewToggle() {
     try {
       const saved = localStorage.getItem(AGENDA_VIEW_KEY);
-      if (saved === 'cards' || saved === 'list') agendaView = saved;
+      if (saved === 'cards' || saved === 'list' || saved === 'calendar') agendaView = saved;
     } catch (_) {}
     applyAgendaViewUI(agendaView);
     if (btnViewList) btnViewList.addEventListener('click', () => setAgendaView('list'));
     if (btnViewCards) btnViewCards.addEventListener('click', () => setAgendaView('cards'));
+    if (btnViewCalendar) btnViewCalendar.addEventListener('click', () => setAgendaView('calendar'));
   }
   function setAgendaView(view) {
-    agendaView = (view === 'cards') ? 'cards' : 'list';
+    agendaView = (view === 'cards') ? 'cards' : (view === 'calendar' ? 'calendar' : 'list');
     try { localStorage.setItem(AGENDA_VIEW_KEY, agendaView); } catch (_) {}
     applyAgendaViewUI(agendaView);
     renderAgendaByView(ultimaLista || []);
@@ -2054,12 +2611,252 @@ if (selectedServicesList) {
   function applyAgendaViewUI(view) {
     if (!agendaListWrapper || !agendaCardsWrapper) return;
     const isCards = (view === 'cards');
-    agendaListWrapper.classList.toggle('hidden', isCards);
+    const isCal = (view === 'calendar');
+
+    agendaListWrapper.classList.toggle('hidden', isCards || isCal);
     agendaCardsWrapper.classList.toggle('hidden', !isCards);
-    if (btnViewList) btnViewList.classList.toggle('active', !isCards);
+    if (agendaCalendarWrapper) agendaCalendarWrapper.classList.toggle('hidden', !isCal);
+
+    if (btnViewList) btnViewList.classList.toggle('active', !isCards && !isCal);
     if (btnViewCards) btnViewCards.classList.toggle('active', isCards);
+    if (btnViewCalendar) btnViewCalendar.classList.toggle('active', isCal);
   }
-  function getServicesInfoFromBooking(a) {
+  
+
+  /* ===== NOVO: Agenda - Visualização Calendário ===== */
+  let calCursor = null; // {y: 2026, m: 0..11}
+  let calSelectedDate = null; // 'YYYY-MM-DD'
+
+  function __isoFromParts(y, m, d) {
+    const mm = String(m + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
+  }
+  function __safeDate(iso) {
+    if (!iso) return null;
+    // garante parse estável (evita timezone)
+    const s = String(iso).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const [y, m, d] = s.split('-').map(n => parseInt(n, 10));
+    return new Date(y, (m - 1), d);
+  }
+  function __monthLabel(y, m) {
+    try {
+      const dt = new Date(y, m, 1);
+      return dt.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    } catch (_) {
+      return 'Mês/Ano';
+    }
+  }
+  function initAgendaCalendarControls() {
+    if (!calPrev || !calNext || !calToday) return;
+
+
+    // 🔒 evita múltiplos binds (corrige setas pulando e lentidão)
+    if (calPrev.__pfBound) return;
+    calPrev.__pfBound = true;
+    const setCursorTo = (dt) => {
+      const now = dt || new Date();
+      calCursor = { y: now.getFullYear(), m: now.getMonth() };
+    };
+
+    // cursor inicial
+    if (!calCursor) {
+      const fromFilter = __safeDate(filtroData && filtroData.value);
+      setCursorTo(fromFilter || new Date());
+    }
+
+    calPrev.addEventListener('click', () => {
+      if (!calCursor) setCursorTo(new Date());
+      calCursor.m -= 1;
+      if (calCursor.m < 0) { calCursor.m = 11; calCursor.y -= 1; }
+      renderAgendaByView(ultimaLista || []);
+    });
+    calNext.addEventListener('click', () => {
+      if (!calCursor) setCursorTo(new Date());
+      calCursor.m += 1;
+      if (calCursor.m > 11) { calCursor.m = 0; calCursor.y += 1; }
+      renderAgendaByView(ultimaLista || []);
+    });
+    calToday.addEventListener('click', () => {
+      setCursorTo(new Date());
+      calSelectedDate = __isoFromParts(calCursor.y, calCursor.m, new Date().getDate());
+      try { if (filtroData) filtroData.value = calSelectedDate; } catch (_) {}
+      renderAgendaByView(ultimaLista || []);
+    });
+
+    // week header
+    if (agendaCalendarWeek && !agendaCalendarWeek.__filled) {
+      const names = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+      agendaCalendarWeek.innerHTML = '';
+      names.forEach(n => {
+        const d = document.createElement('div');
+        d.textContent = n;
+        agendaCalendarWeek.appendChild(d);
+      });
+      agendaCalendarWeek.__filled = true;
+    }
+  }
+
+  function renderAgendaCalendar(lista) {
+    if (!agendaCalendar) return;
+    initAgendaCalendarControls();
+
+    // garante cursor
+    if (!calCursor) {
+      const dt = __safeDate(filtroData && filtroData.value) || new Date();
+      calCursor = { y: dt.getFullYear(), m: dt.getMonth() };
+    }
+
+    // label
+    if (calLabel) {
+      const txt = __monthLabel(calCursor.y, calCursor.m);
+      calLabel.textContent = txt.charAt(0).toUpperCase() + txt.slice(1);
+    }
+    // agrupa por data
+    // ⚡ performance: processa apenas o mês exibido
+    const byDate = new Map();
+    const mm = String(calCursor.m + 1).padStart(2, '0');
+    const prefix = `${calCursor.y}-${mm}`; // YYYY-MM
+
+    (lista || []).forEach(a => {
+      const iso = (a && a.date) ? String(a.date).trim() : '';
+      if (!iso) return;
+      if (!iso.startsWith(prefix)) return;
+      if (!byDate.has(iso)) byDate.set(iso, []);
+      byDate.get(iso).push(a);
+    });
+    const first = new Date(calCursor.y, calCursor.m, 1);
+    const last = new Date(calCursor.y, calCursor.m + 1, 0);
+
+    // offset segunda-feira=0
+    const jsDow = first.getDay(); // 0=Dom
+    const offset = (jsDow + 6) % 7; // 0=Seg
+
+    const totalCells = 42; // 6 semanas
+    const startDate = new Date(calCursor.y, calCursor.m, 1 - offset);
+
+    agendaCalendar.innerHTML = '';
+
+    for (let i = 0; i < totalCells; i++) {
+      const cellDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
+      const isCurrentMonth = cellDate.getMonth() === calCursor.m;
+      const iso = __isoFromParts(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
+      const items = byDate.get(iso) || [];
+
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell' + (isCurrentMonth ? '' : ' cal-out') + (calSelectedDate === iso ? ' cal-selected' : '');
+      cell.setAttribute('data-iso', iso);
+
+      const top = document.createElement('div');
+      top.className = 'cal-top';
+      const day = document.createElement('div');
+      day.className = 'cal-day';
+      day.textContent = String(cellDate.getDate());
+      top.appendChild(day);
+
+      if (items.length) {
+        const badge = document.createElement('div');
+        badge.className = 'cal-badge';
+        badge.textContent = String(items.length);
+        top.appendChild(badge);
+      }
+
+      const sub = document.createElement('div');
+      sub.className = 'cal-sub';
+      if (items.length) {
+        const firstItem = items.slice().sort((a,b) => String(a.time||'').localeCompare(String(b.time||'')))[0];
+        const nm = (firstItem && (firstItem.pet_name || firstItem.customer_name)) ? (firstItem.pet_name || firstItem.customer_name) : '';
+        sub.textContent = nm ? `Ex.: ${nm}` : '';
+      } else {
+        sub.textContent = '';
+      }
+
+      cell.appendChild(top);
+      cell.appendChild(sub);
+
+      cell.addEventListener('click', () => {
+        calSelectedDate = iso;
+        try { if (filtroData) filtroData.value = iso; } catch (_) {}
+        renderAgendaCalendarDayList(byDate.get(iso) || [], iso);
+        // re-render para atualizar destaque
+        renderAgendaCalendar(lista || []);
+      });
+
+      agendaCalendar.appendChild(cell);
+    }
+
+    // lista do dia selecionado
+    if (!calSelectedDate) {
+      const today = new Date();
+      const todayIso = __isoFromParts(today.getFullYear(), today.getMonth(), today.getDate());
+      calSelectedDate = todayIso;
+    }
+    renderAgendaCalendarDayList(byDate.get(calSelectedDate) || [], calSelectedDate);
+  }
+
+  function renderAgendaCalendarDayList(items, iso) {
+    if (!agendaCalendarDayList) return;
+    agendaCalendarDayList.innerHTML = '';
+
+    if (calDayTitle) {
+      const dow = getWeekdayPt(iso);
+      calDayTitle.textContent = `Agendamentos de ${formatDataBr(iso)}${dow ? ' (' + dow + ')' : ''}`;
+    }
+
+    const list = (items || []).slice().sort((a,b) => String(a.time||'').localeCompare(String(b.time||'')));
+    const isEmpty = !list.length;
+    if (estadoVazioCalendarDay) estadoVazioCalendarDay.classList.toggle('hidden', !isEmpty);
+
+    list.forEach(a => {
+      const wrap = document.createElement('div');
+      wrap.className = 'calendar-mini-item';
+
+      const left = document.createElement('div');
+      left.className = 'calendar-mini-left';
+
+      const t = document.createElement('div');
+      t.className = 'calendar-mini-time';
+      t.textContent = `⏰ ${a.time || '-'}`;
+
+      const main = document.createElement('div');
+      main.className = 'calendar-mini-main';
+      const cust = (a.customer_name || '').trim();
+      const pet = (a.pet_name || '').trim();
+      main.textContent = `${cust || '—'}${pet ? ' • ' + pet : ''}`;
+
+      const svcInfo = getServicesInfoFromBooking(a);
+      const muted = document.createElement('div');
+      muted.className = 'calendar-mini-muted';
+      muted.textContent = `${(svcInfo.labels || '-')} • ${svcInfo.values || ''} • ${svcInfo.times || ''}`.trim();
+
+      left.appendChild(t);
+      left.appendChild(main);
+      left.appendChild(muted);
+
+      const right = document.createElement('div');
+      const st = document.createElement('span');
+      const labelStatus = (a.status || 'agendado');
+      st.textContent = labelStatus;
+      st.className = 'td-status ' + classStatus(labelStatus);
+      right.appendChild(st);
+
+      wrap.appendChild(left);
+      wrap.appendChild(right);
+
+      // clique -> editar (mantém comportamento)
+      wrap.addEventListener('click', async () => {
+        try { await loadOpeningHours(); } catch (e) {}
+        try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
+        try { __showBookingModal('Editar Agendamento'); } catch (_) { mostrarFormAgenda(); }
+        setEditMode(true);
+        preencherFormEdicao(a);
+      });
+
+      agendaCalendarDayList.appendChild(wrap);
+    });
+  }
+function getServicesInfoFromBooking(a) {
     // Prefer lista vinda do backend (bookings.services_json -> alias services)
     let list = Array.isArray(a && a.services) ? a.services : [];
     // Se vier como string JSON do backend, tenta parsear
@@ -2152,8 +2949,14 @@ if (selectedServicesList) {
     return getServicesInfoFromBooking(a).labels;
   }
   function renderAgendaByView(lista) {
-    // vazio: atualiza ambos estados para evitar inconsistências
+    // vazio: atualiza todos estados para evitar inconsistências
     const isEmpty = !lista || !lista.length;
+    if (agendaView === 'calendar') {
+      renderAgendaCalendar(lista || []);
+      if (estadoVazio) estadoVazio.style.display = 'none';
+      if (estadoVazioCards) estadoVazioCards.classList.add('hidden');
+      return;
+    }
     if (agendaView === 'cards') {
       renderAgendaCards(lista || []);
       if (estadoVazio) estadoVazio.style.display = 'none';
@@ -2164,20 +2967,47 @@ if (selectedServicesList) {
       if (estadoVazio) estadoVazio.style.display = isEmpty ? 'block' : 'none';
     }
   }
-  
-function renderAgendaList(lista) {
+
+  function renderAgendaList(lista) {
     tbodyAgenda.innerHTML = '';
     estadoVazio.style.display = lista.length ? 'none' : 'block';
     lista.forEach(a => {
       const tr = document.createElement('tr');
       setRowTimeHighlight(tr, a.date, a.time);
+      const labelStatus = (a.status || 'agendado');
+      // labelStatus definido acima
+      // Status (para faixa de cor na primeira coluna)
+      // labelStatus definido acima
+
+      // Coluna fina: faixa de cor por status
+      const tdStrip = document.createElement('td');
+      tdStrip.className = 'status-strip ' + classStatus(labelStatus);
+      tdStrip.setAttribute('aria-label', 'Status');
 
       const tdData = document.createElement('td');
+      tdData.classList.add('agenda-bold-date');
       tdData.innerHTML = `<div>${formatDataBr(a.date)}</div><div class="td-sub">${getWeekdayPt(a.date)}</div>`;
 
       const tdHora = document.createElement('td'); tdHora.textContent = a.time || '-';
-      const tdTutor = document.createElement('td'); tdTutor.textContent = a.customer_name || '-';
-      const tdPet = document.createElement('td'); tdPet.textContent = a.pet_name || '-';
+      tdHora.classList.add('agenda-bold');
+
+      // Cliente (clicável -> modal)
+      const tdTutor = document.createElement('td');
+      tdTutor.classList.add('agenda-bold');
+      if (a.customer_id) {
+        tdTutor.innerHTML = `<span class="pf-linklike" data-open="customer" data-id="${a.customer_id}">${escapeHtml(a.customer_name || '-')}</span>`;
+      } else {
+        tdTutor.textContent = a.customer_name || '-';
+      }
+
+      // Pet (clicável -> modal)
+      const tdPet = document.createElement('td');
+      tdPet.classList.add('agenda-bold');
+      if (a.pet_id) {
+        tdPet.innerHTML = `<span class="pf-linklike" data-open="pet" data-id="${a.pet_id}">${escapeHtml(a.pet_name || '-')}</span>`;
+      } else {
+        tdPet.textContent = a.pet_name || '-';
+      }
 
       const tdTel = document.createElement('td');
       const waUrl = buildWhatsUrl(a.phone);
@@ -2215,7 +3045,7 @@ function renderAgendaList(lista) {
 
       const tdStatus = document.createElement('td');
       const spanStatus = document.createElement('span');
-      const labelStatus = (a.status || 'agendado');
+      try { tr.classList.add('agenda-row', classStatus(labelStatus)); } catch (_) {}
       spanStatus.textContent = labelStatus;
       spanStatus.className = 'td-status ' + classStatus(labelStatus);
       tdStatus.appendChild(spanStatus);
@@ -2288,7 +3118,7 @@ function renderAgendaList(lista) {
       btnEditar.addEventListener('click', async () => {
         try { await loadOpeningHours(); } catch (e) {}
         try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
-        mostrarFormAgenda();
+        try { __showBookingModal('Editar Agendamento'); } catch (_) { mostrarFormAgenda(); }
         setEditMode(true);
         preencherFormEdicao(a);
         closeMenu();
@@ -2325,9 +3155,10 @@ function renderAgendaList(lista) {
         if (!confirm('Deseja realmente excluir este agendamento?')) return;
         try {
           await apiDelete('/api/bookings/' + a.id);
+          showHint('Agendamento excluido com sucesso!', 'success', 'Agendamentos');
           await renderTabela();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) { showHint((e && e.message) ? e.message : 'Erro ao excluir pet.', 'error', 'Pets', { time: 3200 }); }
         closeMenu();
       });
 
@@ -2338,6 +3169,7 @@ function renderAgendaList(lista) {
       divActions.appendChild(kebabMenu);
       tdAcoes.appendChild(divActions);
 
+      tr.appendChild(tdStrip);
       tr.appendChild(tdData);
       tr.appendChild(tdHora);
       tr.appendChild(tdTutor);
@@ -2371,27 +3203,124 @@ function renderAgendaList(lista) {
       const dateWrap = document.createElement('div');
       dateWrap.className = 'agenda-card-date';
       const _dow = getWeekdayPt(a.date);
-      dateWrap.innerHTML = `📅 ${formatDataBr(a.date)}${_dow ? `<div style="font-size:12px;opacity:.8;margin-top:2px;">${_dow}</div>` : ''}`;
+      dateWrap.innerHTML = `📅 ${formatDataBr(a.date)}${_dow ? `<div style="font-size:14px;opacity:.8;margin-top:2px;">${_dow}</div>` : ''}`;
       left.appendChild(timeWrap);
       left.appendChild(dateWrap);
       const statusWrap = document.createElement('div');
       const spanStatus = document.createElement('span');
       const labelStatus = (a.status || 'agendado');
+      try { tr.classList.add('agenda-row', classStatus(labelStatus)); } catch (_) {}
       spanStatus.textContent = labelStatus;
       spanStatus.className = 'td-status ' + classStatus(labelStatus);
       statusWrap.appendChild(spanStatus);
+
+      // ===== NOVO: Menu (3 pontinhos) no card =====
+      const right = document.createElement('div');
+      right.className = 'agenda-card-top-right';
+
+      const divActions = document.createElement('div');
+      divActions.className = 'kebab';
+
+      const kebabBtn = document.createElement('button');
+      kebabBtn.className = 'kebab-btn';
+      kebabBtn.type = 'button';
+      kebabBtn.setAttribute('aria-label', 'Mais ações');
+      kebabBtn.textContent = '⋮';
+
+      const kebabMenu = document.createElement('div');
+      kebabMenu.className = 'kebab-menu';
+      kebabMenu.setAttribute('role', 'menu');
+
+      const closeMenu = () => { kebabMenu.classList.remove('open'); };
+      const toggleMenu = (ev) => {
+        ev.stopPropagation();
+        kebabMenu.classList.toggle('open');
+      };
+      kebabBtn.addEventListener('click', toggleMenu);
+      // fecha ao clicar fora
+      document.addEventListener('click', closeMenu);
+
+      // WhatsApp
+      const btnWhatsMenu = document.createElement('button');
+      btnWhatsMenu.textContent = 'Enviar WhatsApp';
+      btnWhatsMenu.className = 'kebab-item';
+      btnWhatsMenu.type = 'button';
+      btnWhatsMenu.addEventListener('click', () => {
+        const nome = (a.customer_name || '').trim() || 'tudo bem?';
+        const pet = (a.pet_name || '').trim() || 'seu pet';
+        const data = a.date ? formatDataBr(a.date) : '';
+        const hora = (a.time || '').trim();
+        const svc = (getServicesInfoFromBooking(a).labels || '').trim();
+        const msg = `Olá, ${nome}! Aqui é do *PetFunny – Banho & Tosa*.
+
+Seu agendamento do(a) *${pet}* está registrado para *${data}${hora ? ' às ' + hora : ''}*.
+Serviço(s): ${svc || '-'}
+
+Qualquer dúvida, estou à disposição.`;
+        const url = buildWhatsUrl(a.phone, msg);
+        if (url) window.open(url, '_blank');
+        else alert('Telefone inválido para WhatsApp.');
+        closeMenu();
+      });
+
+      const btnEditarMenu = document.createElement('button');
+      btnEditarMenu.textContent = 'Editar';
+      btnEditarMenu.className = 'kebab-item';
+      btnEditarMenu.type = 'button';
+      btnEditarMenu.addEventListener('click', async () => {
+        try { await loadOpeningHours(); } catch (e) {}
+        try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
+        try { __showBookingModal('Editar Agendamento'); } catch (_) { mostrarFormAgenda(); }
+        setEditMode(true);
+        preencherFormEdicao(a);
+        closeMenu();
+      });
+
+      const btnExcluirMenu = document.createElement('button');
+      btnExcluirMenu.textContent = 'Excluir';
+      btnExcluirMenu.className = 'kebab-item kebab-item-danger';
+      btnExcluirMenu.type = 'button';
+      btnExcluirMenu.addEventListener('click', async () => {
+        if (!confirm('Deseja realmente excluir este agendamento?')) return;
+        try {
+          await apiDelete('/api/bookings/' + a.id);
+          showHint('Agendamento excluido com sucesso!', 'success', 'Agendamentos');
+          await renderTabela();
+          await loadDashboard();
+        } catch (e) { showHint((e && e.message) ? e.message : 'Erro ao excluir pet.', 'error', 'Pets', { time: 3200 }); }
+        closeMenu();
+      });
+
+      kebabMenu.appendChild(btnWhatsMenu);
+      kebabMenu.appendChild(btnEditarMenu);
+      kebabMenu.appendChild(btnExcluirMenu);
+
+      divActions.appendChild(kebabBtn);
+      divActions.appendChild(kebabMenu);
+
       top.appendChild(left);
-      top.appendChild(statusWrap);
+
+      right.appendChild(statusWrap);
+      right.appendChild(divActions);
+      top.appendChild(right);
       const main = document.createElement('div');
       main.className = 'agenda-card-main';
       const svcInfo = getServicesInfoFromBooking(a);
       const serviceLabel = svcInfo.labels;
       const l1 = document.createElement('div');
       l1.className = 'agenda-line';
-      l1.innerHTML = `<span class="agenda-key">Tutor:</span> <span class="agenda-val">${(a.customer_name || '-')}</span>`;
+      l1.innerHTML = `<span class="agenda-key">Tutor:</span> ${
+        a.customer_id
+          ? `<span class="agenda-val"><span class="pf-linklike" data-open="customer" data-id="${a.customer_id}">${escapeHtml(a.customer_name || '-')}</span></span>`
+          : `<span class="agenda-val">${escapeHtml(a.customer_name || '-')}</span>`
+      }`;
       const l2 = document.createElement('div');
       l2.className = 'agenda-line';
-      l2.innerHTML = `<span class="agenda-key">Pet:</span> <span class="agenda-muted">${(a.pet_name || '-')}</span>`;
+      l2.innerHTML = `<span class="agenda-key">Pet:</span> ${
+        a.pet_id
+          ? `<span class="agenda-muted"><span class="pf-linklike" data-open="pet" data-id="${a.pet_id}">${escapeHtml(a.pet_name || '-')}</span></span>`
+          : `<span class="agenda-muted">${escapeHtml(a.pet_name || '-')}</span>`
+      }`;
       const l3 = document.createElement('div');
       l3.className = 'agenda-line';
       const waUrl = buildWhatsUrl(a.phone);
@@ -2443,13 +3372,13 @@ function renderAgendaList(lista) {
       actions.className = 'actions';
       const btnEditar = document.createElement('button');
       btnEditar.textContent = 'Editar';
-      btnEditar.className = 'btn btn-small btn-secondary';
+      btnEditar.className = 'btn btn-secondary';
       btnEditar.type = 'button';
       btnEditar.addEventListener('click', async () => {
         // Em edição, garantir caches carregados antes de preencher (evita precisar clicar em 'Novo Agendamento')
         try { await loadOpeningHours(); } catch (e) {}
         try { if (window.PF_MIMOS && window.PF_MIMOS.ensureLoaded) await window.PF_MIMOS.ensureLoaded(); } catch (e) {}
-        mostrarFormAgenda();
+        try { __showBookingModal('Editar Agendamento'); } catch (_) { mostrarFormAgenda(); }
         setEditMode(true);
         preencherFormEdicao(a);
       });
@@ -2461,9 +3390,10 @@ function renderAgendaList(lista) {
         if (!confirm('Deseja realmente excluir este agendamento?')) return;
         try {
           await apiDelete('/api/bookings/' + a.id);
+          showHint('Agendamento excluido com sucesso!', 'success', 'Agendamentos');
           await renderTabela();
           await loadDashboard();
-        } catch (e) { alert(e.message); }
+        } catch (e) { showHint((e && e.message) ? e.message : 'Erro ao excluir pet.', 'error', 'Pets', { time: 3200 }); }
       });
       actions.appendChild(btnEditar);
       actions.appendChild(btnExcluir);
@@ -2476,18 +3406,42 @@ function renderAgendaList(lista) {
     });
   }
   /* ===== Agenda: render e salvar ===== */
-  async function renderTabela() {
+  async function fetchBookingsForCalendar() {
+  // Calendário precisa de dados do mês inteiro: ignora filtroData, mas mantém busca.
+  const prev = filtroData ? filtroData.value : '';
+  try {
+    if (filtroData) filtroData.value = '';
+    const data = await fetchBookings();
+    const lista = (data && data.bookings) ? data.bookings : [];
+    return Array.isArray(lista) ? lista : [];
+  } finally {
+    try { if (filtroData) filtroData.value = prev; } catch (_) {}
+  }
+}
+
+async function renderTabela() {
     try {
-      const lista = await fetchBookings();
-      ultimaLista = lista;
-      // renderiza conforme view selecionada
-      renderAgendaByView(lista);
-      atualizaEstatisticas(lista);
+      if (agendaView === 'calendar') {
+        agendaPagingEnabled = false;
+        __setAgendaLoadMoreVisible(false);
+        const lista = await fetchBookingsForCalendar();
+        ultimaLista = lista;
+        renderAgendaByView(lista);
+        atualizaEstatisticas(lista);
+      } else {
+        agendaPagingEnabled = true;
+        __setAgendaLoadMoreVisible(true);
+        resetAgendaPaging();
+        await loadAgendaPage({ append: false });
+        renderAgendaByView(ultimaLista);
+        atualizaEstatisticas(ultimaLista);
+      }
     } catch (e) {
       // zera listagem e cards
       ultimaLista = [];
       tbodyAgenda.innerHTML = '';
       if (agendaCards) agendaCards.innerHTML = '';
+      __setAgendaLoadMoreVisible(false);
       if (estadoVazio) {
         estadoVazio.style.display = 'block';
         estadoVazio.textContent = 'Erro ao carregar agendamentos: ' + e.message;
@@ -2513,7 +3467,7 @@ function renderAgendaList(lista) {
   // Tipo (avulso/pacote)
   const bk = document.getElementById('formBookingKind');
   const pkgSel = document.getElementById('formPackageId');
-  if (bk) bk.value = '';
+  if (bk) { bk.value = ''; bk.disabled = false; }
   if (pkgSel) { pkgSel.value = ''; pkgSel.disabled = true; pkgSel.innerHTML = '<option value="">Selecione um pacote...</option>'; }
   if (typeof updateBookingKindUI === 'function') updateBookingKindUI('');
   // Multi-serviços
@@ -2755,10 +3709,12 @@ const bookingKind = bookingKindEl ? String(bookingKindEl.value || 'avulso') : 'a
       if (!id) await apiPost('/api/bookings', body);
       else await apiPut('/api/bookings/' + id, body);
       if (precisaWhats && urlWhats) window.open(urlWhats, '_blank');
+      // Atualiza lista e mostra confirmação no próprio modal
+      const successMsg = id ? 'Agendamento alterado com sucesso!' : 'Agendamento cadastrado com sucesso!';
       limparForm();
-      esconderFormAgenda();
       await renderTabela();
       await loadDashboard();
+      try { __showBookingSuccess(successMsg); } catch (_) {}
     } catch (e) {
       formError.textContent = e.message;
       formError.style.display = 'block';
@@ -2826,6 +3782,21 @@ const bookingKind = bookingKindEl ? String(bookingKindEl.value || 'avulso') : 'a
   btnExportarCSV.addEventListener('click', exportarCSV);
   btnSalvar.addEventListener('click', salvarAgendamento);
   btnCancelarEdicao.addEventListener('click', () => { limparForm(); esconderFormAgenda(); });
+
+  // Fechar modal (X, backdrop, botão de sucesso)
+  const __closeBookingModalAndReset = () => {
+    try { limparForm(); } catch (_) {}
+    try { setEditMode(false); } catch (_) {}
+    try { esconderFormAgenda(); } catch (_) {}
+  };
+  if (bookingModalClose) bookingModalClose.addEventListener('click', __closeBookingModalAndReset);
+  if (bookingModalBackdrop) bookingModalBackdrop.addEventListener('click', __closeBookingModalAndReset);
+  if (bookingModalSuccessClose) bookingModalSuccessClose.addEventListener('click', __closeBookingModalAndReset);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && bookingModal && !bookingModal.classList.contains('hidden')) {
+      __closeBookingModalAndReset();
+    }
+  });
   if (dashPeriod) {
     dashPeriod.addEventListener('change', () => {
       const val = dashPeriod.value;
@@ -2900,12 +3871,27 @@ const bookingKind = bookingKindEl ? String(bookingKindEl.value || 'avulso') : 'a
           formError.textContent = '';
         }
       } else {
-        // Cliente não existe: avisa e orienta cadastro
-        formNome.value = '';
-        formPetSelect.disabled = true;
-        formPetSelect.innerHTML = '<option value="">(Cadastre o cliente e os pets primeiro)</option>';
-        formError.textContent = 'Cliente não cadastrado. Vá na aba "Clientes & Pets" para cadastrar o tutor e os pets antes de criar o agendamento.';
-        formError.style.display = 'block';
+        // Cliente não existe: fecha o modal de agendamento e abre aviso com CTA para cadastro
+        try { formNome.value = ''; } catch (_) {}
+        try {
+          if (typeof closeForm === 'function') closeForm();
+          else {
+            const fm = document.getElementById('formModal');
+            if (fm) fm.classList.add('hidden');
+          }
+        } catch (_) {}
+
+        if (typeof openCustomerNotFoundModal === 'function') {
+          openCustomerNotFoundModal(phoneDigits);
+        } else if (typeof openInfoModal === 'function') {
+          const html = `
+            <div style="padding:6px 2px 2px;">
+              <div style="font-weight:700; font-size:16px; margin-bottom:6px;">Cliente não cadastrado!</div>
+              <div class="pf-info-muted" style="margin-top:6px;">Telefone: ${escapeHtml(formatTelefone(phoneDigits))}</div>
+            </div>
+          `;
+          openInfoModal({ title: 'Cliente', sub: 'Aviso', html });
+        }
       }
     } catch (e) {
       // Em caso de erro na API, mantém o fluxo mas informa
@@ -3050,6 +4036,358 @@ const cliState = document.getElementById('cliState') || document.getElementById(
   const tbodyPets = document.getElementById('tbodyPets');
   const badgeClienteSelecionado = document.getElementById('badgeClienteSelecionado');
   const petsCard = document.getElementById('petsCard');
+  const petFormBlock = document.getElementById('petFormBlock');
+
+  /* ===== MODAIS: Clientes e Pets ===== */
+  const customerModal = document.getElementById('customerModal');
+  const customerModalHost = document.getElementById('customerModalHost');
+  const customerModalTitle = document.getElementById('customerModalTitle');
+  const customerModalSub = document.getElementById('customerModalSub');
+  const customerModalClose = document.getElementById('customerModalClose');
+  const customerModalSuccess = document.getElementById('customerModalSuccess');
+  const customerModalSuccessMsg = document.getElementById('customerModalSuccessMsg');
+  const customerModalBtnFechar = document.getElementById('customerModalBtnFechar');
+
+  const petsModal = document.getElementById('petsModal');
+  const petsModalHost = document.getElementById('petsModalHost');
+  const petsModalTitle = document.getElementById('petsModalTitle');
+  const petsModalSub = document.getElementById('petsModalSub');
+  const petsModalClose = document.getElementById('petsModalClose');
+
+  /* ===== MODAL: Informações (Cliente/Pet) ===== */
+  const infoModal = document.getElementById('infoModal');
+  const infoModalTitle = document.getElementById('infoModalTitle');
+  const infoModalSub = document.getElementById('infoModalSub');
+  const infoModalBody = document.getElementById('infoModalBody');
+  const infoModalClose = document.getElementById('infoModalClose');
+  const infoModalBtnFechar = document.getElementById('infoModalBtnFechar');
+
+  function openInfoModal(opts) {
+    const o = opts || {};
+    if (!infoModal) return;
+    try { if (typeof resetInfoModalExtraActions === 'function') resetInfoModalExtraActions(); } catch (_) {}
+    if (infoModalTitle) infoModalTitle.textContent = String(o.title || 'Informações');
+    if (infoModalSub) infoModalSub.textContent = String(o.sub || '');
+    try { if (typeof infoModalIcon !== 'undefined' && infoModalIcon) infoModalIcon.textContent = String(o.icon || 'ℹ️'); } catch (_) {}
+    if (infoModalBody) infoModalBody.innerHTML = String(o.html || '');
+    infoModal.classList.remove('hidden');
+    infoModal.setAttribute('aria-hidden', 'false');
+  }
+  function closeInfoModal() {
+    if (!infoModal) return;
+    infoModal.classList.add('hidden');
+    infoModal.setAttribute('aria-hidden', 'true');
+    if (infoModalBody) infoModalBody.innerHTML = '';
+  }
+
+  // Avisa "Cliente não cadastrado!" (a partir do modal de Agendamento) e oferece CTA
+  function resetInfoModalExtraActions() {
+    try {
+      if (!infoModal) return;
+      const actions = infoModal.querySelector('.pf-modal-actions');
+      if (!actions) return;
+      actions.querySelectorAll('[data-info-extra="1"]').forEach(el => el.remove());
+    } catch (_) {}
+  }
+
+  function openCustomerNotFoundModal(phoneDigits) {
+    if (typeof openInfoModal !== 'function') return;
+
+    const digits = sanitizePhone(String(phoneDigits || '').trim());
+    const html = `
+      <div style="padding:6px 2px 2px;">
+        <div style="font-weight:700; font-size:16px; margin-bottom:6px;">Cliente não cadastrado!</div>
+        <div class="pf-info-muted" style="margin-top:6px;">Telefone: ${escapeHtml(formatTelefone(digits || phoneDigits || ''))}</div>
+      </div>
+    `;
+
+    resetInfoModalExtraActions();
+    openInfoModal({ title: 'Cliente', sub: 'Aviso', html });
+
+    // injeta CTA sem alterar o HTML base do modal (mantém layout)
+    try {
+      if (!infoModal) return;
+      const actions = infoModal.querySelector('.pf-modal-actions');
+      if (!actions) return;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn';
+      btn.textContent = 'Cadastrar novo cliente';
+      btn.setAttribute('data-info-extra', '1');
+      btn.addEventListener('click', () => {
+        try { closeInfoModal(); } catch (_) {}
+        try {
+          if (typeof showTab === 'function') {
+            showTab('tab-clientes');
+          } else {
+            const tb = document.querySelector('.tab-btn[data-tab="tab-clientes"]');
+            if (tb) tb.click();
+          }
+        } catch (_) {}
+      });
+      actions.appendChild(btn);
+    } catch (_) {}
+  }
+
+
+  // Fecha no X / botão e ao clicar no overlay (fora do dialog)
+  if (infoModalClose) infoModalClose.addEventListener('click', closeInfoModal);
+  if (infoModalBtnFechar) infoModalBtnFechar.addEventListener('click', closeInfoModal);
+  if (infoModal) {
+    infoModal.addEventListener('click', (e) => {
+      if (e.target === infoModal) closeInfoModal();
+    });
+  }
+
+  async function openCustomerInfoModal(customerId) {
+    try {
+      const data = await apiGet(`/api/customers/${Number(customerId)}`);
+      const c = data && data.customer ? data.customer : null;
+      if (!c) {
+        if (window.pfHint) pfHint({ type: 'error', title: 'Cliente', message: 'Cliente não encontrado.' });
+        return;
+      }
+
+      const endereco = [
+        c.street, c.number, c.complement, c.neighborhood,
+        c.city, c.state, c.cep ? ('CEP ' + c.cep) : null
+      ].filter(Boolean).join(', ');
+
+      const html = `
+        <div class="pf-info-grid">
+          <div class="k">Nome</div><div class="v">${escapeHtml(c.name || '-')}</div>
+          <div class="k">Telefone</div><div class="v">${escapeHtml(formatTelefone(c.phone || '-'))}</div>
+          <div class="k">Endereço</div><div class="v">${escapeHtml(endereco || '-')}</div>
+          <div class="k">Pets</div><div class="v">${escapeHtml(String(c.pets_count ?? '-'))}</div>
+          <div class="k">Agendamentos</div><div class="v">${escapeHtml(String(c.bookings_count ?? '-'))}</div>
+        </div>
+        <div class="pf-info-muted">Clique em “Fechar” para voltar.</div>
+      `;
+      openInfoModal({ title: 'Cliente', sub: c.name || 'Informações do cliente', html });
+    } catch (err) {
+      console.error('Falha ao abrir modal de cliente:', err);
+      if (window.pfHint) pfHint({ type: 'error', title: 'Cliente', message: 'Erro ao buscar informações do cliente.' });
+    }
+  }
+
+  async function openPetInfoModal(petId) {
+    try {
+      const data = await apiGet(`/api/pets/${Number(petId)}`);
+      const p = data && data.pet ? data.pet : null;
+      if (!p) {
+        if (window.pfHint) pfHint({ type: 'error', title: 'Pet', message: 'Pet não encontrado.' });
+        return;
+      }
+
+      const html = `
+        <div class="pf-info-grid">
+          <div class="k">Nome</div><div class="v">${escapeHtml(p.name || '-')}</div>
+          <div class="k">Tutor</div><div class="v">${escapeHtml(p.customer_name || '-')}</div>
+          <div class="k">Telefone</div><div class="v">${escapeHtml(formatTelefone(p.customer_phone || '-'))}</div>
+          <div class="k">Espécie</div><div class="v">${escapeHtml(p.species || '-')}</div>
+          <div class="k">Raça</div><div class="v">${escapeHtml(p.breed || '-')}</div>
+          <div class="k">Porte</div><div class="v">${escapeHtml(p.size || '-')}</div>
+          <div class="k">Pelagem</div><div class="v">${escapeHtml(p.coat || '-')}</div>
+          <div class="k">Obs.</div><div class="v">${escapeHtml((p.info || p.notes || '') || '-')}</div>
+        </div>
+        <div class="pf-info-muted">Clique em “Fechar” para voltar.</div>
+      `;
+      openInfoModal({ title: 'Pet', sub: p.name || 'Informações do pet', html });
+    } catch (err) {
+      console.error('Falha ao abrir modal de pet:', err);
+      if (window.pfHint) pfHint({ type: 'error', title: 'Pet', message: 'Erro ao buscar informações do pet.' });
+    }
+  }
+
+
+
+  let __customerModalOpen = false;
+  let __customerModalIsNew = false;
+  let __petsModalOpen = false;
+
+  // guardamos onde estavam os blocos originalmente
+  let __clienteFormOriginalParent = null;
+  let __clienteFormOriginalNext = null;
+  let __petsCardOriginalParent = null;
+  let __petsCardOriginalNext = null;
+
+  function __showModal(modalEl) {
+    if (!modalEl) return;
+    modalEl.classList.remove('hidden');
+    modalEl.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  function __hideModal(modalEl) {
+    if (!modalEl) return;
+    modalEl.classList.add('hidden');
+    modalEl.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  function openCustomerModal({ mode, customer } = {}) {
+    // Rebusca defensiva: em algumas navegações o DOM pode ser re-renderizado.
+    const _customerModal = customerModal || document.getElementById('customerModal');
+    const _customerModalHost = customerModalHost || document.getElementById('customerModalHost');
+    const _clienteFormBlock = clienteFormBlock || document.getElementById('clienteFormBlock');
+    const _customerModalTitle = customerModalTitle || document.getElementById('customerModalTitle');
+    const _customerModalSub = customerModalSub || document.getElementById('customerModalSub');
+    const _customerModalSuccess = customerModalSuccess || document.getElementById('customerModalSuccess');
+    const _customerModalSuccessMsg = customerModalSuccessMsg || document.getElementById('customerModalSuccessMsg');
+
+    if (!_customerModal || !_customerModalHost || !_clienteFormBlock) return;
+
+    __customerModalIsNew = mode === 'new';
+    __customerModalOpen = true;
+
+    // título
+    if (_customerModalTitle) _customerModalTitle.textContent = __customerModalIsNew ? 'Novo Cliente' : 'Editar cliente';
+    if (_customerModalSub) _customerModalSub.textContent = __customerModalIsNew ? 'Preencha os dados para salvar.' : 'Altere os dados e clique em salvar.';
+
+    // move o form para dentro do modal
+    if (!__clienteFormOriginalParent) {
+      __clienteFormOriginalParent = _clienteFormBlock.parentNode;
+      __clienteFormOriginalNext = _clienteFormBlock.nextSibling;
+    }
+    _customerModalHost.appendChild(_clienteFormBlock);
+
+    // estado visual
+    if (_customerModalSuccess) _customerModalSuccess.classList.add('hidden');
+    _clienteFormBlock.classList.remove('hidden');
+    if (btnCliLimpar) btnCliLimpar.textContent = 'Cancelar';
+    if (btnCliSalvar) btnCliSalvar.textContent = __customerModalIsNew ? 'Salvar' : 'Salvar / Atualizar';
+
+    // prepara dados
+    if (__customerModalIsNew) {
+      limparClienteForm();
+      clienteSelecionadoId = null;
+      try { if (badgeClienteSelecionado) badgeClienteSelecionado.classList.add('hidden'); } catch(_) {}
+      // limparClienteForm() esconde o bloco na tela principal; no modal precisamos manter visível
+      try { _clienteFormBlock.classList.remove('hidden'); } catch(_) {}
+    } else if (customer) {
+      clienteSelecionadoId = customer.id;
+      cliPhone.value = formatTelefone(customer.phone);
+      cliName.value = customer.name || '';
+      if (typeof cliCep !== 'undefined' && cliCep) cliCep.value = customer.cep || '';
+      if (typeof cliStreet !== 'undefined' && cliStreet) cliStreet.value = customer.street || '';
+      if (typeof cliNumber !== 'undefined' && cliNumber) cliNumber.value = customer.number || '';
+      if (typeof cliComplement !== 'undefined' && cliComplement) cliComplement.value = customer.complement || '';
+      if (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) cliNeighborhood.value = customer.neighborhood || '';
+      if (typeof cliCity !== 'undefined' && cliCity) cliCity.value = customer.city || '';
+      if (typeof cliState !== 'undefined' && cliState) cliState.value = customer.state || '';
+    }
+
+    __showModal(_customerModal);
+  }
+
+  function closeCustomerModal() {
+    const _customerModal = customerModal || document.getElementById('customerModal');
+    const _clienteFormBlock = clienteFormBlock || document.getElementById('clienteFormBlock');
+    const _customerModalSuccess = customerModalSuccess || document.getElementById('customerModalSuccess');
+    if (!_customerModal || !_clienteFormBlock) return;
+    __customerModalOpen = false;
+
+    // devolve o form para o local original
+    try {
+      if (__clienteFormOriginalParent) {
+        if (__clienteFormOriginalNext && __clienteFormOriginalNext.parentNode === __clienteFormOriginalParent) {
+          __clienteFormOriginalParent.insertBefore(_clienteFormBlock, __clienteFormOriginalNext);
+        } else {
+          __clienteFormOriginalParent.appendChild(_clienteFormBlock);
+        }
+      }
+    } catch(_) {}
+
+    // volta ao estado original (form escondido na tela)
+    try { if (_clienteFormBlock) _clienteFormBlock.classList.add('hidden'); } catch(_) {}
+    if (_customerModalSuccess) _customerModalSuccess.classList.add('hidden');
+    if (btnCliLimpar) btnCliLimpar.textContent = 'Limpar';
+    if (btnCliSalvar) btnCliSalvar.textContent = 'Salvar / Atualizar';
+
+    __hideModal(_customerModal);
+  }
+
+  function openPetsModal(customer) {
+    const _petsModal = petsModal || document.getElementById('petsModal');
+    const _petsModalHost = petsModalHost || document.getElementById('petsModalHost');
+    const _petsModalTitle = petsModalTitle || document.getElementById('petsModalTitle');
+    const _petsModalSub = petsModalSub || document.getElementById('petsModalSub');
+    const _petsCard = petsCard || document.getElementById('petsCard');
+    const _petFormBlock = petFormBlock || document.getElementById('petFormBlock');
+
+    if (!_petsModal || !_petsModalHost || !_petsCard) return;
+    __petsModalOpen = true;
+
+    if (_petsModalTitle) _petsModalTitle.textContent = 'Pets';
+    if (_petsModalSub) _petsModalSub.textContent = `${customer?.name || 'Cliente'} • ${formatTelefone(customer?.phone)}`;
+
+    // move petsCard para dentro do modal
+    if (!__petsCardOriginalParent) {
+      __petsCardOriginalParent = _petsCard.parentNode;
+      __petsCardOriginalNext = _petsCard.nextSibling;
+    }
+    _petsModalHost.appendChild(_petsCard);
+
+    // garante visibilidade e estado inicial (lista visível, formulário fechado)
+    _petsCard.classList.remove('hidden');
+    if (_petFormBlock) _petFormBlock.classList.add('hidden');
+
+    // seleciona cliente e carrega pets
+    clienteSelecionadoId = customer?.id || null;
+    limparPetsForm();
+    try { if (tbodyPets) tbodyPets.innerHTML = ''; } catch(_) {}
+    if (clienteSelecionadoId) loadPetsForClienteTab(clienteSelecionadoId);
+
+    __showModal(_petsModal);
+  }
+
+  function closePetsModal() {
+    const _petsModal = petsModal || document.getElementById('petsModal');
+    const _petsCard = petsCard || document.getElementById('petsCard');
+    const _petFormBlock = petFormBlock || document.getElementById('petFormBlock');
+    if (!_petsModal || !_petsCard) return;
+    __petsModalOpen = false;
+
+    try {
+      if (__petsCardOriginalParent) {
+        if (__petsCardOriginalNext && __petsCardOriginalNext.parentNode === __petsCardOriginalParent) {
+          __petsCardOriginalParent.insertBefore(_petsCard, __petsCardOriginalNext);
+        } else {
+          __petsCardOriginalParent.appendChild(_petsCard);
+        }
+      }
+    } catch(_) {}
+
+    _petsCard.classList.add('hidden');
+    if (_petFormBlock) _petFormBlock.classList.add('hidden');
+    __hideModal(_petsModal);
+  }
+
+  // Eventos globais de fechar (X, backdrop, ESC)
+  if (customerModalClose) customerModalClose.addEventListener('click', closeCustomerModal);
+  if (customerModalBtnFechar) customerModalBtnFechar.addEventListener('click', closeCustomerModal);
+  if (petsModalClose) petsModalClose.addEventListener('click', closePetsModal);
+
+  if (customerModal) {
+    customerModal.addEventListener('click', (ev) => {
+      const t = ev.target;
+      if (t && t.dataset && t.dataset.close === 'customerModal') closeCustomerModal();
+    });
+  }
+  if (petsModal) {
+    petsModal.addEventListener('click', (ev) => {
+      const t = ev.target;
+      if (t && t.dataset && t.dataset.close === 'petsModal') closePetsModal();
+    });
+  }
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape') return;
+    if (__petsModalOpen) return closePetsModal();
+    if (__customerModalOpen) return closeCustomerModal();
+  });
+
+
   const racas = [
     'SRD (Sem Raça Definida)','Poodle','Shih Tzu','Lhasa Apso','Labrador Retriever','Golden Retriever',
     'Yorkshire Terrier','Bulldog Francês','Bulldog Inglês','Spitz Alemão (Lulu da Pomerânia)','Beagle',
@@ -3057,6 +4395,60 @@ const cliState = document.getElementById('cliState') || document.getElementById(
     'Pitbull','Pug','Cocker Spaniel','Schnauzer','Husky Siberiano','Akita','Chihuahua','Outro (informar nas observações)'
   ];
   cliPhone.addEventListener('input', () => applyPhoneMask(cliPhone));
+
+  /* ===== DUPLICIDADE: telefone já cadastrado (no modal + Novo Cliente) =====
+     Requisito: ao preencher o telefone WhatsApp no modal de "+ Novo cliente",
+     verificar se o número já existe e, se existir:
+     1) FECHAR o modal de cadastro/novo cliente
+     2) Exibir a mensagem padronizada (pfHint) com timer
+     (evitando dois modais empilhados).
+  */
+  let __cliPhoneLookupTimer = null;
+  async function __checkExistingCustomerByPhoneInCustomerModal() {
+    try {
+      // só no modal de novo cliente
+      if (!__customerModalOpen || !__customerModalIsNew) return;
+      if (!cliPhone) return;
+
+      const digits = sanitizePhone(String(cliPhone.value || '').trim());
+      if (!digits || digits.length < 10) return;
+
+      const data = await apiPost('/api/customers/lookup', { phone: digits });
+      const customer = data && data.customer ? data.customer : null;
+
+      if (customer && customer.id) {
+        // Evita dois modais empilhados:
+        // FECHA primeiro o modal de cadastro/novo cliente e, em seguida, exibe a mensagem padronizada (com timer).
+        try { closeCustomerModal(); } catch (_) {}
+
+        const msg = [
+          'Cliente já cadastrado!',
+          'Telefone: ' + formatTelefone(customer.phone || digits),
+          customer.name ? ('Nome: ' + customer.name) : null
+        ].filter(Boolean).join('\n');
+
+        // leve delay para garantir que o overlay anterior já saiu da tela
+        setTimeout(() => {
+          try { showHint(msg, 'warn', 'Clientes e Pets', { time: 2800 }); } catch (_) {}
+        }, 50);
+
+        return;
+      }
+    } catch (e) {
+      console.warn('[PetFunny] Falha ao verificar cliente por telefone (modal cliente):', e);
+    }
+  }
+
+
+  if (cliPhone && !cliPhone.dataset.boundLookupDup) {
+    cliPhone.dataset.boundLookupDup = '1';
+    const schedule = (delay) => {
+      try { clearTimeout(__cliPhoneLookupTimer); } catch (_) {}
+      __cliPhoneLookupTimer = setTimeout(__checkExistingCustomerByPhoneInCustomerModal, delay);
+    };
+    cliPhone.addEventListener('blur', () => schedule(160));
+    cliPhone.addEventListener('input', () => schedule(320));
+  }
   if (filtroClientes) {
     filtroClientes.addEventListener('input', () => {
       filtroClientesTxt = normStr(filtroClientes.value);
@@ -3132,6 +4524,7 @@ const cliState = document.getElementById('cliState') || document.getElementById(
         tdTime.textContent = b.time || '-';
 
         const tdPet = document.createElement('td');
+      tdPet.classList.add('agenda-bold');
         tdPet.style.padding = '10px';
         tdPet.style.borderBottom = '1px solid rgba(255,255,255,.06)';
         tdPet.textContent = b.pet_name || '-';
@@ -3262,32 +4655,25 @@ const cliState = document.getElementById('cliState') || document.getElementById(
       document.addEventListener('click', closeMenu);
 
       const btnSel = document.createElement('button');
-      btnSel.textContent = 'Selecionar';
+      btnSel.textContent = 'Editar';
       btnSel.className = 'kebab-item';
       btnSel.type = 'button';
-      btnSel.addEventListener('click', async () => {
-        clienteSelecionadoId = c.id;
-initCepAutofillToCrudIfPresent();
-        badgeClienteSelecionado.classList.remove('hidden');
-        clienteFormBlock.classList.remove('hidden');
-        petsCard.classList.remove('hidden');
-        cliPhone.value = formatTelefone(c.phone);
-        cliName.value = c.name || '';
-
-        // Endereço: se não existir no cadastro, deve vir vazio (não "undefined"/"null")
-   if (cliCep) cliCep.value = c.cep || '';
-if (cliStreet) cliStreet.value = c.street || '';
-if (cliNumber) cliNumber.value = c.number || '';
-if (cliComplement) cliComplement.value = c.complement || '';
-if (cliNeighborhood) cliNeighborhood.value = c.neighborhood || '';
-if (cliCity) cliCity.value = c.city || '';
-if (cliState) cliState.value = c.state || '';
-limparPetsForm();
-        await loadPetsForClienteTab(c.id);
+      btnSel.addEventListener('click', () => {
+        openCustomerModal({ mode: 'edit', customer: c });
         closeMenu();
       });
 
-      const btnHist = document.createElement('button');
+      
+      const btnPets = document.createElement('button');
+      btnPets.textContent = 'Pets';
+      btnPets.className = 'kebab-item';
+      btnPets.type = 'button';
+      btnPets.addEventListener('click', async () => {
+        await openPetsModal(c);
+        closeMenu();
+      });
+
+const btnHist = document.createElement('button');
       btnHist.textContent = 'Histórico';
       btnHist.className = 'kebab-item';
       btnHist.type = 'button';
@@ -3306,8 +4692,8 @@ limparPetsForm();
           await apiDelete('/api/customers/' + c.id);
           if (clienteSelecionadoId === c.id) {
             clienteSelecionadoId = null;
-            badgeClienteSelecionado.classList.add('hidden');
-            petsCard.classList.add('hidden');
+            try { if (badgeClienteSelecionado) badgeClienteSelecionado.classList.add('hidden'); } catch(_) {}
+            try { if (petsCard) petsCard.classList.add('hidden'); } catch(_) {}
             limparClienteForm();
             limparPetsForm();
             tbodyPets.innerHTML = '';
@@ -3315,11 +4701,12 @@ limparPetsForm();
           await loadClientes();
           await loadDashboard();
           await renderTabela();
-        } catch (e) { alert(e.message); }
+        } catch (e) { showHint((e && e.message) ? e.message : 'Erro ao excluir pet.', 'error', 'Pets', { time: 3200 }); }
         closeMenu();
       });
 
       kebabMenu.appendChild(btnSel);
+      kebabMenu.appendChild(btnPets);
       kebabMenu.appendChild(btnHist);
       kebabMenu.appendChild(btnDel);
 
@@ -3336,22 +4723,29 @@ limparPetsForm();
     });
   }
   function limparClienteForm() {
-    cliPhone.value = '';
-    cliName.value = '';
-    if (typeof cliCep !== 'undefined' && cliCep) cliCep.value = '';
-    if (typeof cliStreet !== 'undefined' && cliStreet) cliStreet.value = '';
-    if (typeof cliNumber !== 'undefined' && cliNumber) cliNumber.value = '';
-    if (typeof cliComplement !== 'undefined' && cliComplement) cliComplement.value = '';
-    if (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) cliNeighborhood.value = '';
-    if (typeof cliCity !== 'undefined' && cliCity) cliCity.value = '';
-    if (typeof cliState !== 'undefined' && cliState) cliState.value = '';
-    cliError.style.display = 'none';
+    // limpa campos (defensivo para evitar quebra caso algum elemento não exista)
+    try { if (cliPhone) cliPhone.value = ''; } catch (_) {}
+    try { if (cliName) cliName.value = ''; } catch (_) {}
+
+    try { if (typeof cliCep !== 'undefined' && cliCep) cliCep.value = ''; } catch (_) {}
+    try { if (typeof cliStreet !== 'undefined' && cliStreet) cliStreet.value = ''; } catch (_) {}
+    try { if (typeof cliNumber !== 'undefined' && cliNumber) cliNumber.value = ''; } catch (_) {}
+    try { if (typeof cliComplement !== 'undefined' && cliComplement) cliComplement.value = ''; } catch (_) {}
+    try { if (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) cliNeighborhood.value = ''; } catch (_) {}
+    try { if (typeof cliCity !== 'undefined' && cliCity) cliCity.value = ''; } catch (_) {}
+    try { if (typeof cliState !== 'undefined' && cliState) cliState.value = ''; } catch (_) {}
+
+    try { if (cliError) cliError.style.display = 'none'; } catch (_) {}
+
     clienteSelecionadoId = null;
-    badgeClienteSelecionado.classList.add('hidden');
-    clienteFormBlock.classList.add('hidden');
-    petsCard.classList.add('hidden');
-    tbodyPets.innerHTML = '';
-    limparPetsForm();
+
+    // elementos opcionais (em alguns renders do admin podem não existir)
+    try { if (badgeClienteSelecionado) badgeClienteSelecionado.classList.add('hidden'); } catch (_) {}
+    try { if (clienteFormBlock) clienteFormBlock.classList.add('hidden'); } catch (_) {}
+    try { if (petsCard) petsCard.classList.add('hidden'); } catch (_) {}
+    try { if (tbodyPets) tbodyPets.innerHTML = ''; } catch (_) {}
+
+    try { limparPetsForm(); } catch (_) {}
   }
     async function salvarCliente() {
     cliError.style.display = 'none';
@@ -3396,13 +4790,17 @@ limparPetsForm();
       // Backend pode responder como {customer:{...}} ou {...}
       const customer = data?.customer || data;
       if (customer?.id) clienteSelecionadoId = customer.id;
-      badgeClienteSelecionado.classList.remove('hidden');
-      petsCard.classList.remove('hidden');
       await loadClientes();
-      if (clienteSelecionadoId) await loadPetsForClienteTab(clienteSelecionadoId);
-      // feedback visual (modal se existir)
-      if (typeof window.pfHint === 'function') {
-        window.pfHint({ type: 'success', title: 'Cliente salvo', msg: 'Cadastro atualizado com sucesso.', time: 2200 });
+      if (__customerModalOpen) {
+        // Sucesso no modal: fecha o modal de cliente e abre o modal de mensagens (PF Hint) com timer.
+        const msgOk = __customerModalIsNew ? 'Cliente cadastrado com sucesso!' : 'Cliente alterado com sucesso!';
+        if (customerModalSuccessMsg) customerModalSuccessMsg.textContent = msgOk;
+        try { closeCustomerModal(); } catch (_) {}
+        try { showHint(msgOk, 'success', 'Clientes', { time: 2400 }); } catch (_) {}
+      } else {
+        try { if (badgeClienteSelecionado) badgeClienteSelecionado.classList.remove('hidden'); } catch(_) {}
+        try { if (petsCard) petsCard.classList.remove('hidden'); } catch(_) {}
+        if (clienteSelecionadoId) await loadPetsForClienteTab(clienteSelecionadoId);
       }
       await loadDashboard();
       await renderTabela();
@@ -3410,9 +4808,7 @@ limparPetsForm();
       const msg = (e && e.message) ? e.message : 'Erro ao salvar cliente.';
       cliError.textContent = msg;
       cliError.style.display = 'block';
-      if (typeof window.pfHint === 'function') {
-        window.pfHint({ type: 'error', title: 'Erro ao salvar', msg, time: 3200 });
-      }
+      showHint(msg, 'error', 'Clientes', { time: 3200 });
     }
   }
   async function loadPetsForClienteTab(customerId) {
@@ -3500,6 +4896,13 @@ limparPetsForm();
         if (petSize) petSize.value = p.size || '';
         if (petCoat) petCoat.value = p.coat || '';
         petInfo.value = (p.notes || p.info) || '';
+        // Ao editar, garante que o formulário esteja aberto
+        try {
+          if (petFormBlock) {
+            petFormBlock.classList.remove('hidden');
+          }
+          try { petName.focus(); } catch (_) {}
+        } catch (_) {}
         closeMenu();
       });
 
@@ -3511,11 +4914,12 @@ limparPetsForm();
         if (!confirm('Excluir este pet?')) return;
         try {
           await apiDelete('/api/pets/' + p.id);
+          showHint('Pet excluido com sucesso!', 'success', 'Pets');
           await loadPetsForClienteTab(clienteSelecionadoId);
           await loadClientes();
           await loadDashboard();
           await renderTabela();
-        } catch (e) { alert(e.message); }
+        } catch (e) { showHint((e && e.message) ? e.message : 'Erro ao excluir pet.', 'error', 'Pets', { time: 3200 }); }
         closeMenu();
       });
 
@@ -3564,66 +4968,101 @@ if (!name || !breed) {
     try {
       if (!petEditIdLocal) {
         await apiPost('/api/pets', { customer_id: clienteSelecionadoId, name, breed, size, coat, notes });
+        showHint('Pet cadastrado com sucesso!', 'success', 'Pets');
       } else {
         await apiPut('/api/pets/' + petEditIdLocal, { name, breed, size, coat, notes });
+        showHint('Pet alterado com sucesso!', 'success', 'Pets');
       }
       limparPetsForm();
+      // Após salvar, fecha o formulário e mantém a listagem atualizada
+      try {
+        if (typeof petFormBlock !== 'undefined' && petFormBlock) petFormBlock.classList.add('hidden');
+      } catch (_) {}
       await loadPetsForClienteTab(clienteSelecionadoId);
       await loadClientes();
       await loadBreeds();
       await loadDashboard();
       await renderTabela();
     } catch (e) {
-      petError.textContent = e.message;
+      const msg = (e && e.message) ? e.message : 'Erro ao salvar pet.';
+      petError.textContent = msg;
       petError.style.display = 'block';
+      showHint(msg, 'error', 'Pets', { time: 3200 });
     }
   }
-  btnCliLimpar.addEventListener('click', limparClienteForm);
-  btnCliSalvar.addEventListener('click', salvarCliente);
-  btnPetLimpar.addEventListener('click', limparPetsForm);
-  btnPetSalvar.addEventListener('click', salvarPet);
-  btnNovoPet.addEventListener('click', () => {
-    // Toggle: clica para abrir, clica de novo para fechar
+  // IMPORTANTE: esses elementos podem não existir no DOM no momento em que scripts.js roda
+  // (dependendo da navegação do admin). Então, colocamos listeners defensivos + delegação.
+  if (btnCliLimpar) {
+    btnCliLimpar.addEventListener('click', () => {
+      if (__customerModalOpen) return closeCustomerModal();
+      limparClienteForm();
+    });
+  }
+  if (btnCliSalvar) btnCliSalvar.addEventListener('click', salvarCliente);
+  if (btnPetLimpar) btnPetLimpar.addEventListener('click', limparPetsForm);
+  if (btnPetSalvar) btnPetSalvar.addEventListener('click', salvarPet);
+
+  function __toggleNovoPetForm() {
+    // Toggle: abre/fecha SOMENTE o formulário (mantém a listagem sempre visível no modal)
+    // IMPORTANTE: como o bloco de Pets pode ser movido para dentro de um modal,
+    // os elementos podem não existir no DOM quando scripts.js carregou.
+    // Portanto, sempre re-obtemos as referências aqui.
+    const _petFormBlock = (typeof petFormBlock !== 'undefined' && petFormBlock)
+      ? petFormBlock
+      : document.getElementById('petFormBlock');
+    const _petName = (typeof petName !== 'undefined' && petName)
+      ? petName
+      : document.getElementById('petName');
+    const _petsCard = (typeof petsCard !== 'undefined' && petsCard)
+      ? petsCard
+      : document.getElementById('petsCard');
+
     try {
-      if (petsCard && !petsCard.classList.contains('hidden')) {
+      if (_petFormBlock && !_petFormBlock.classList.contains('hidden')) {
         limparPetsForm();
-        petsCard.classList.add('hidden');
+        _petFormBlock.classList.add('hidden');
         return;
       }
-    } catch(e) {}
-    // garante que o painel de pets está visível e prepara formulário para novo cadastro
-    petsCard.classList.remove('hidden');
+    } catch (_) {}
+
+    // abre o form para novo cadastro
+    try { if (_petFormBlock) _petFormBlock.classList.remove('hidden'); } catch (_) {}
     limparPetsForm();
-    try { petName.focus(); } catch(e) {}
-    try { petsCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
-  });
-  btnNovoCliente.addEventListener('click', () => {
-    // Toggle: clica para abrir, clica de novo para fechar
-    try {
-      if (clienteFormBlock && !clienteFormBlock.classList.contains('hidden')) {
-        clienteSelecionadoId = null;
-        badgeClienteSelecionado.classList.add('hidden');
-        cliError.style.display = 'none';
-        clienteFormBlock.classList.add('hidden');
-        petsCard.classList.add('hidden');
-        tbodyPets.innerHTML = '';
-        limparPetsForm();
-        return;
-      }
-    } catch(e) {}
-    initCepAutofillToCrudIfPresent();modoNovoCliente = true;
-modoNovoClienteCRUD = true;
-attachCepMaskIfPresent();
-attachCepMaskToCrudIfPresent();
-    clienteSelecionadoId = null;
-    badgeClienteSelecionado.classList.add('hidden');
-    cliPhone.value = '';
-    cliName.value = '';
-    cliError.style.display = 'none';
-    clienteFormBlock.classList.remove('hidden');
-    petsCard.classList.add('hidden');
-    tbodyPets.innerHTML = '';
-    limparPetsForm();
+    try { if (_petName) _petName.focus(); } catch (_) {}
+    try { if (_petsCard) _petsCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+  }
+
+  // IMPORTANTE: também existe delegação de clique no document para suportar re-renderizações.
+  // Para evitar execução duplicada (listener direto + delegação), interrompemos a propagação aqui.
+  if (btnNovoPet) {
+    btnNovoPet.addEventListener('click', (ev) => {
+      try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {}
+      return __toggleNovoPetForm();
+    });
+  }
+  if (btnNovoCliente) {
+    btnNovoCliente.addEventListener('click', (ev) => {
+      try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {}
+      return openCustomerModal({ mode: 'new' });
+    });
+  }
+
+  // Delegação: garante que, mesmo que a UI seja re-renderizada, os botões continuem funcionando.
+  document.addEventListener('click', (ev) => {
+    const t = ev.target;
+    if (!t) return;
+
+    const novoClienteBtn = t.closest && t.closest('#btnNovoCliente');
+    if (novoClienteBtn) {
+      ev.preventDefault();
+      return openCustomerModal({ mode: 'new' });
+    }
+
+    const novoPetBtn = t.closest && t.closest('#btnNovoPet');
+    if (novoPetBtn) {
+      ev.preventDefault();
+      return __toggleNovoPetForm();
+    }
   });
   if (dashPeriod && dashPeriod.value === 'custom') dashCustomRange.classList.remove('hidden');
   /* ===== DASHBOARD: inclui financeiro por serviço ===== */
@@ -3694,47 +5133,162 @@ attachCepMaskToCrudIfPresent();
     dashPrizeHidratacao.textContent = prizeCounts['Hidratação'];
     dashPrizeFotoVideo.textContent = prizeCounts['Foto e Vídeo Profissional'];
     dashPrizePatinhas.textContent = prizeCounts['Patinhas impecáveis'];
-    // financeiro por serviço
-    const usage = new Map(); // serviceId -> {title, qty, value_cents}
-    let revenueCents = 0;
-    bookings.forEach(b => {
-      // determinar serviceId
-      let sid = b.service_id ?? b.serviceId ?? null;
-      if (sid == null) {
-        const txt = b.service || b.service_title || '';
-        const match = servicesCache.find(s => normStr(s.title) === normStr(txt));
-        sid = match ? match.id : null;
-      }
-      if (sid == null) return;
-      const svc = servicesCache.find(s => String(s.id) === String(sid));
-      if (!svc) return;
-      const key = String(svc.id);
-      if (!usage.has(key)) usage.set(key, { title: svc.title, qty: 0, value_cents: Number(svc.value_cents || 0) });
-      const row = usage.get(key);
-      row.qty += 1;
-      const add = row.value_cents;
-      revenueCents += add;
+// financeiro por serviço (agregação robusta: considera avulsos + pacotes via b.services)
+const usage = new Map(); // serviceId -> {title, qty, catalog_cents, total_cents}
+let revenueCents = 0;
+
+function __findSvc(item, fallbackTitle) {
+  const sid = item && item.id != null ? item.id : null;
+  const title = (item && item.title != null) ? String(item.title) : (fallbackTitle || '');
+  if (sid != null) return servicesCache.find(s => String(s.id) === String(sid)) || null;
+  if (title) return servicesCache.find(s => normStr(s.title) === normStr(title)) || null;
+  return null;
+}
+
+bookings.forEach(b => {
+  // lista de serviços do booking
+  let list = b.services ?? b.services_json ?? b.servicesJson ?? null;
+  if (typeof list === 'string') { try { list = JSON.parse(list); } catch (_) { list = null; } }
+
+  if (!Array.isArray(list) || !list.length) {
+    // compat: serviço único
+    list = [{
+      id: b.service_id ?? b.serviceId ?? null,
+      title: b.service_title ?? b.service ?? null,
+      value_cents: b.service_value_cents ?? null
+    }];
+  }
+
+  list.forEach(item => {
+    const svc = __findSvc(item, b.service_title ?? b.service ?? '');
+    if (!svc) return;
+
+    const key = String(svc.id);
+    if (!usage.has(key)) usage.set(key, { title: svc.title, qty: 0, catalog_cents: Number(svc.value_cents || 0), total_cents: 0 });
+    const row = usage.get(key);
+    row.qty += 1;
+
+    // valor efetivo cobrado no booking (pacotes já vêm com desconto aplicado; inclusos podem vir 0)
+    const eff = (item && Number.isFinite(Number(item.value_cents))) ? Number(item.value_cents) : row.catalog_cents;
+    row.total_cents += eff;
+    revenueCents += eff;
+  });
+});
+
+dashRevenue.textContent = formatCentsToBRL(revenueCents);
+const avg = bookings.length ? Math.round(revenueCents / bookings.length) : 0;
+dashAvgTicket.textContent = formatCentsToBRL(avg);
+
+tbodyDashServices.innerHTML = '';
+const rows = Array.from(usage.values())
+  .map(r => ({ title: r.title, qty: r.qty, value_cents: r.catalog_cents, total_cents: r.total_cents }))
+  .sort((a,b) => b.total_cents - a.total_cents);
+
+dashServicesEmpty.style.display = rows.length ? 'none' : 'block';
+rows.forEach(r => {
+  const tr = document.createElement('tr');
+  const tdTitle = document.createElement('td'); tdTitle.textContent = r.title;
+  const tdQty = document.createElement('td'); tdQty.textContent = String(r.qty);
+  const tdPrice = document.createElement('td'); tdPrice.textContent = formatCentsToBRL(r.value_cents);
+  const tdTotal = document.createElement('td'); tdTotal.textContent = formatCentsToBRL(r.total_cents);
+  tr.appendChild(tdTitle);
+  tr.appendChild(tdQty);
+  tr.appendChild(tdPrice);
+  tr.appendChild(tdTotal);
+  tbodyDashServices.appendChild(tr);
+});
+
+// pacotes no período (quantidade + valor cobrado + % desconto estimado)
+if (tbodyDashPackages && dashPackagesEmpty && dashPackagesCount && dashPackagesRevenue && dashPackagesDiscountAvg) {
+  let pkgDefs = packagesCache || [];
+  if (!Array.isArray(pkgDefs) || !pkgDefs.length) {
+    try {
+      const pr = await apiGet('/api/packages');
+      pkgDefs = (pr && pr.packages) ? pr.packages : [];
+    } catch (_) {
+      pkgDefs = [];
+    }
+  }
+  const pkgById = new Map((pkgDefs || []).map(p => [String(p.id), p]));
+
+  const saleMap = new Map(); // saleId -> { package_id, title, charged_cents, catalog_cents }
+
+  bookings.forEach(b => {
+    const saleId = (b.package_sale_id != null) ? b.package_sale_id : (b.packageSaleId != null ? b.packageSaleId : null);
+    if (saleId == null) return;
+
+    const pkgId = (b.package_id != null) ? b.package_id : (b.packageId != null ? b.packageId : null);
+    const pkgDef = (pkgId != null) ? (pkgById.get(String(pkgId)) || null) : null;
+    const title = pkgDef ? String(pkgDef.title || ('Pacote #' + pkgId)) : (pkgId != null ? ('Pacote #' + pkgId) : ('Venda #' + saleId));
+
+    if (!saleMap.has(String(saleId))) saleMap.set(String(saleId), { package_id: pkgId, title, charged_cents: 0, catalog_cents: 0 });
+    const rec = saleMap.get(String(saleId));
+
+    // valor cobrado por booking: usa services_total_cents quando existir; senão soma itens efetivos
+    let charged = (Number.isFinite(Number(b.services_total_cents))) ? Number(b.services_total_cents) : null;
+
+    let list = b.services ?? b.services_json ?? b.servicesJson ?? null;
+    if (typeof list === 'string') { try { list = JSON.parse(list); } catch (_) { list = null; } }
+    if (!Array.isArray(list) || !list.length) {
+      list = [{ id: b.service_id ?? b.serviceId ?? null, title: b.service_title ?? b.service ?? null, value_cents: b.service_value_cents ?? null }];
+    }
+
+    if (charged == null) {
+      charged = list.reduce((acc, it) => acc + (Number.isFinite(Number(it.value_cents)) ? Number(it.value_cents) : 0), 0);
+    }
+    rec.charged_cents += charged;
+
+    // valor de tabela do booking: soma do catálogo (inclui inclusos)
+    let catalogSum = 0;
+    list.forEach(it => {
+      const svc = __findSvc(it, '');
+      if (svc) catalogSum += Number(svc.value_cents || 0);
+      else if (Number.isFinite(Number(it.value_cents))) catalogSum += Number(it.value_cents);
     });
-    dashRevenue.textContent = formatCentsToBRL(revenueCents);
-    const avg = bookings.length ? Math.round(revenueCents / bookings.length) : 0;
-    dashAvgTicket.textContent = formatCentsToBRL(avg);
-    tbodyDashServices.innerHTML = '';
-    const rows = Array.from(usage.values())
-      .map(r => ({...r, total_cents: r.qty * r.value_cents}))
-      .sort((a,b) => b.total_cents - a.total_cents);
-    dashServicesEmpty.style.display = rows.length ? 'none' : 'block';
-    rows.forEach(r => {
-      const tr = document.createElement('tr');
-      const tdTitle = document.createElement('td'); tdTitle.textContent = r.title;
-      const tdQty = document.createElement('td'); tdQty.textContent = String(r.qty);
-      const tdPrice = document.createElement('td'); tdPrice.textContent = formatCentsToBRL(r.value_cents);
-      const tdTotal = document.createElement('td'); tdTotal.textContent = formatCentsToBRL(r.total_cents);
-      tr.appendChild(tdTitle);
-      tr.appendChild(tdQty);
-      tr.appendChild(tdPrice);
-      tr.appendChild(tdTotal);
-      tbodyDashServices.appendChild(tr);
-    });
+    rec.catalog_cents += catalogSum;
+  });
+
+  // agrega por package_id (tipo de pacote), contando vendas
+  const byPkg = new Map(); // pkgId -> { title, sales_count, charged_cents, catalog_cents }
+  for (const rec of saleMap.values()) {
+    const pid = (rec.package_id != null) ? String(rec.package_id) : 'unknown';
+    if (!byPkg.has(pid)) byPkg.set(pid, { title: rec.title, sales_count: 0, charged_cents: 0, catalog_cents: 0 });
+    const r = byPkg.get(pid);
+    r.sales_count += 1;
+    r.charged_cents += rec.charged_cents;
+    r.catalog_cents += rec.catalog_cents;
+  }
+
+  const pkgRows = Array.from(byPkg.values())
+    .map(r => {
+      const disc = (r.catalog_cents > 0) ? (1 - (r.charged_cents / r.catalog_cents)) : 0;
+      return { ...r, discount_pct: Math.max(0, Math.min(1, disc)) };
+    })
+    .sort((a,b) => b.charged_cents - a.charged_cents);
+
+  const totalSales = pkgRows.reduce((acc, r) => acc + r.sales_count, 0);
+  const totalCharged = pkgRows.reduce((acc, r) => acc + r.charged_cents, 0);
+  const totalCatalog = pkgRows.reduce((acc, r) => acc + r.catalog_cents, 0);
+  const avgDisc = (totalCatalog > 0) ? (1 - (totalCharged / totalCatalog)) : 0;
+
+  dashPackagesCount.textContent = String(totalSales);
+  dashPackagesRevenue.textContent = formatCentsToBRL(totalCharged);
+  dashPackagesDiscountAvg.textContent = (Math.max(0, Math.min(1, avgDisc)) * 100).toFixed(1) + '%';
+
+  tbodyDashPackages.innerHTML = '';
+  dashPackagesEmpty.style.display = pkgRows.length ? 'none' : 'block';
+
+  pkgRows.forEach(r => {
+    const tr = document.createElement('tr');
+    const tdT = document.createElement('td'); tdT.textContent = r.title;
+    const tdQ = document.createElement('td'); tdQ.textContent = String(r.sales_count);
+    const tdCat = document.createElement('td'); tdCat.textContent = formatCentsToBRL(r.catalog_cents);
+    const tdCh = document.createElement('td'); tdCh.textContent = formatCentsToBRL(r.charged_cents);
+    const tdD = document.createElement('td'); tdD.textContent = (r.discount_pct * 100).toFixed(1) + '%';
+    tr.appendChild(tdT); tr.appendChild(tdQ); tr.appendChild(tdCat); tr.appendChild(tdCh); tr.appendChild(tdD);
+    tbodyDashPackages.appendChild(tr);
+  });
+}
     renderCharts(bookings);
   }
   
@@ -4029,13 +5583,41 @@ async function loadPackages(){
   // carrega e renderiza tabela de pacotes
   try {
     const resp = await apiGet('/api/packages');
-    packagesCache = (resp && resp.packages) ? resp.packages : [];
+    packagesAllCache = (resp && resp.packages) ? resp.packages : [];
   } catch (_) {
-    packagesCache = [];
+    packagesAllCache = [];
   }
-  renderPackagesTable();
+
+  applyPackagesFiltersAndRender();
+
   // se estiver no modo pacote, atualiza select
   try { await refreshPackageSelectForBooking(); } catch (_) {}
+}
+
+function getPackagesFilters(){
+  const q = String(document.getElementById('filtroPacotesTitle')?.value || '').trim().toLowerCase();
+  const tipo = String(document.getElementById('filtroPacotesTipo')?.value || '').trim().toLowerCase();
+  const porte = String(document.getElementById('filtroPacotesPorte')?.value || '').trim().toLowerCase();
+  return { q, tipo, porte };
+}
+
+function applyPackagesFilters(list){
+  const arr = Array.isArray(list) ? list.slice() : [];
+  const { q, tipo, porte } = getPackagesFilters();
+  return arr.filter(p => {
+    const title = String(p.title || '').toLowerCase();
+    const t = String(p.type || '').toLowerCase();
+    const po = String(p.porte || '').toLowerCase();
+    if (q && !title.includes(q)) return false;
+    if (tipo && t !== tipo) return false;
+    if (porte && po !== porte) return false;
+    return true;
+  });
+}
+
+function applyPackagesFiltersAndRender(){
+  packagesCache = applyPackagesFilters(packagesAllCache);
+  renderPackagesTable();
 }
 
 function renderPackagesTable(){
@@ -4054,9 +5636,9 @@ function renderPackagesTable(){
   for (const p of rows) {
     const pr = p.preview || {};
     const tr = document.createElement('tr');
-
     const statusTxt = (String(p.is_active) === 'true' || p.is_active === true) ? 'Ativo' : 'Inativo';
 
+    // Colunas
     tr.innerHTML = `
       <td>${escapeHtml(p.title || '')}</td>
       <td>${escapeHtml(p.type || '')}</td>
@@ -4068,30 +5650,150 @@ function renderPackagesTable(){
       <td>${formatBRLFromCents(pr.total_avulso_cents || 0)}</td>
       <td><strong>${formatBRLFromCents(pr.economia_cents || 0)}</strong></td>
       <td>${statusTxt}</td>
-      <td style="white-space:nowrap;">
-        <button class="btn btn-secondary btn-sm" data-act="edit" data-id="${p.id}">Editar</button>
-        <button class="btn btn-danger btn-sm" data-act="del" data-id="${p.id}">Excluir</button>
-      </td>
     `;
+
+    
+    // Ações (3 pontinhos) - mesmo padrão do menu Serviços
+    const tdActions = document.createElement('td');
+    tdActions.className = 'td-actions';
+    tdActions.style.whiteSpace = 'nowrap';
+
+    const divActions = document.createElement('div');
+    divActions.className = 'actions actions-kebab';
+
+    const kebabBtn = document.createElement('button');
+    kebabBtn.type = 'button';
+    kebabBtn.className = 'kebab-btn';
+    kebabBtn.setAttribute('aria-label', 'Ações');
+    kebabBtn.textContent = '⋮';
+
+    const kebabMenu = document.createElement('div');
+    kebabMenu.className = 'kebab-menu hidden';
+
+    const closeMenu = () => {
+      kebabMenu.classList.add('hidden');
+      kebabMenu.classList.remove('open');
+      kebabMenu.style.display = 'none';
+    };
+
+    kebabBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      document.querySelectorAll('.kebab-menu').forEach(m => {
+        if (m !== kebabMenu) {
+          m.classList.add('hidden');
+          m.classList.remove('open');
+          m.style.display = 'none';
+        }
+      });
+
+      const willOpen = kebabMenu.classList.contains('hidden');
+      if (willOpen) {
+        kebabMenu.classList.remove('hidden');
+        kebabMenu.classList.add('open');
+        kebabMenu.style.display = 'block';
+      } else {
+        closeMenu();
+      }
+
+      if (willOpen) {
+        // portal no body p/ não cortar por overflow do wrapper da tabela
+        try {
+          if (!kebabMenu.dataset.portalAttached) {
+            document.body.appendChild(kebabMenu);
+            kebabMenu.dataset.portalAttached = '1';
+            kebabMenu.classList.add('kebab-menu-portal');
+          }
+          const rect = kebabBtn.getBoundingClientRect();
+          const menuW = 200;
+          kebabMenu.style.position = 'fixed';
+          kebabMenu.style.minWidth = menuW + 'px';
+          kebabMenu.style.zIndex = '999999';
+          kebabMenu.style.top = Math.round(rect.bottom + 6) + 'px';
+          kebabMenu.style.left = Math.round(Math.max(8, rect.right - menuW)) + 'px';
+        } catch (_) {}
+      }
+    });
+
+    document.addEventListener('click', closeMenu);
+
+    const btnEdit = document.createElement('button');
+    btnEdit.textContent = 'Editar';
+    btnEdit.className = 'kebab-item';
+    btnEdit.type = 'button';
+    btnEdit.addEventListener('click', () => {
+      openPackageForm(Number(p.id));
+      closeMenu();
+    });
+
+    const btnDel = document.createElement('button');
+    btnDel.textContent = 'Excluir';
+    btnDel.className = 'kebab-item kebab-item-danger';
+    btnDel.type = 'button';
+    btnDel.addEventListener('click', () => {
+      closeMenu();
+      deletePackage(Number(p.id));
+    });
+
+    kebabMenu.appendChild(btnEdit);
+    kebabMenu.appendChild(btnDel);
+
+    divActions.appendChild(kebabBtn);
+    divActions.appendChild(kebabMenu);
+    tdActions.appendChild(divActions);
+    tr.appendChild(tdActions);
+
+
     tbody.appendChild(tr);
   }
+}
 
-  tbody.querySelectorAll('button[data-act]').forEach(btn => {
-    btn.addEventListener('click', async (ev) => {
-      const id = Number(ev.currentTarget.getAttribute('data-id'));
-      const act = ev.currentTarget.getAttribute('data-act');
-      if (act === 'edit') openPackageForm(id);
-      if (act === 'del') deletePackage(id);
-    });
-  });
+let _pkgFormHomeParent = null;
+let _pkgFormHomeNext = null;
+
+function showPackageModal(isOpen){
+  const modal = document.getElementById('packageModal');
+  const host = document.getElementById('packageModalHost');
+  const card = document.getElementById('packageFormCard');
+  if (!modal || !host || !card) return;
+
+  // guarda posição original para restaurar
+  if (!_pkgFormHomeParent) {
+    _pkgFormHomeParent = card.parentElement;
+    _pkgFormHomeNext = card.nextSibling;
+  }
+
+  if (isOpen) {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    // move o formulário para dentro do modal
+    host.appendChild(card);
+    card.style.display = 'block';
+  } else {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    card.style.display = 'none';
+
+    // restaura o formulário para o local original no DOM (mantém layout)
+    if (_pkgFormHomeParent) {
+      if (_pkgFormHomeNext && _pkgFormHomeNext.parentNode === _pkgFormHomeParent) {
+        _pkgFormHomeParent.insertBefore(card, _pkgFormHomeNext);
+      } else {
+        _pkgFormHomeParent.appendChild(card);
+      }
+    }
+  }
 }
 
 function openPackageForm(id=null){
-  const card = document.getElementById('packageFormCard');
-  if (!card) return;
-  card.style.display = 'block';
+  showPackageModal(true);
 
-  const pkg = id ? (packagesCache||[]).find(p => Number(p.id) === Number(id)) : null;
+  const pkg = id ? (packagesAllCache||[]).find(p => Number(p.id) === Number(id)) : null;
+
+  // título do modal
+  const ttl = document.getElementById('packageModalTitle');
+  const sub = document.getElementById('packageModalSub');
+  if (ttl) ttl.textContent = pkg ? 'Editar Pacote' : 'Cadastrar / Editar Pacote';
+  if (sub) sub.textContent = 'Preencha os dados para salvar.';
 
   document.getElementById('pkgId').value = pkg ? pkg.id : '';
   document.getElementById('pkgTitle').value = pkg ? (pkg.title || '') : '';
@@ -4121,14 +5823,16 @@ function openPackageForm(id=null){
     document.querySelectorAll('#pkgIncludedList input[type="checkbox"]').forEach(chk => {
       chk.checked = incIds.includes(Number(chk.value));
     });
+  } else {
+    // novo pacote: limpa seleção inclusos
+    document.querySelectorAll('#pkgIncludedList input[type="checkbox"]').forEach(chk => { chk.checked = false; });
   }
 
   recalcPackagePreview();
 }
 
 function closePackageForm(){
-  const card = document.getElementById('packageFormCard');
-  if (card) card.style.display = 'none';
+  showPackageModal(false);
 }
 
 function refreshPackageFormFilters(){
@@ -4178,7 +5882,7 @@ function refreshPackageFormFilters(){
         incWrap.appendChild(lbl);
       }
     } else {
-      incWrap.innerHTML = '<div style="opacity:.7; font-size:13px;">Selecione o porte para listar os serviços inclusos.</div>';
+      incWrap.innerHTML = '<div style="opacity:.7; font-size:14px;">Selecione o porte para listar os serviços inclusos.</div>';
     }
   }
 }
@@ -4243,7 +5947,7 @@ function recalcPackagePreview(){
       <span class="pill">Avulso real: ${formatBRLFromCents(totalAvulso)}</span>
       <span class="pill">Economia: ${formatBRLFromCents(econ)}</span>
     </div>
-    <div style="margin-top:8px; font-size:12px; opacity:.75;">
+    <div style="margin-top:8px; font-size:14px; opacity:.75;">
       Banho avulso: ${formatBRLFromCents(bathUnit)} | Banho no pacote: ${formatBRLFromCents(bathDiscounted)} | Banhos: ${bathQty}
     </div>
   `;
@@ -4260,24 +5964,30 @@ async function savePackage(){
   try {
     if (!id) {
       await apiPost('/api/packages', payload);
-      showHint('Pacote criado com sucesso!', 'success');
+      // fecha o modal imediatamente e exibe mensagem com timer (padrão do sistema)
+      try { closePackageForm(); } catch (_) {}
+      showHint('Pacote criado com sucesso!', 'success', 'Pacotes', { time: 2200 });
     } else {
       await apiPut(`/api/packages/${id}`, payload);
-      showHint('Pacote atualizado com sucesso!', 'success');
+      // fecha o modal imediatamente e exibe mensagem com timer (padrão do sistema)
+      try { closePackageForm(); } catch (_) {}
+      showHint('Pacote alterado com sucesso!', 'success', 'Pacotes', { time: 2200 });
     }
-    closePackageForm();
-    await loadPackages();
+
+    // recarrega a listagem sem interferir no hint (o hint fica em overlay)
+    setTimeout(() => { try { loadPackages(); } catch (_) {} }, 80);
   } catch (e) {
     showHint(e && e.message ? e.message : 'Erro ao salvar pacote.', 'error');
   }
 }
+
 
 async function deletePackage(id){
   if (!id) return;
   if (!confirm('Excluir este pacote?')) return;
   try {
     await apiDelete(`/api/packages/${id}`);
-    showHint('Pacote excluído.', 'success');
+    showHint('Pacote excluido com sucesso!', 'success');
     await loadPackages();
   } catch (e) {
     showHint(e && e.message ? e.message : 'Erro ao excluir pacote.', 'error');
@@ -4288,6 +5998,9 @@ async function deletePackage(id){
 function updateBookingKindUI(kind){
   // Gate (tudo abaixo de "Tipo")
   const gate = document.getElementById('bookingKindDependentFields') || document.getElementById('bookingKindGate');
+
+  // No modal: quando não seleciona o tipo, esconde os campos superiores (telefone/tutor/pet/mimo)
+  const topRow = document.querySelector('#formPanel .form-row');
 
   // Pacotes
   const grpPkg = document.getElementById('packagePickerGroup');
@@ -4302,13 +6015,10 @@ function updateBookingKindUI(kind){
 
   const k = String(kind || '');
 
-  // ADMIN: em Avulso, permitir selecionar datas passadas (retroativo). Em Pacote, mantém bloqueio no passado.
-  const _dateEl = document.getElementById('formDate');
-  if (_dateEl) _dateEl.min = (k === 'avulso') ? '' : todayISO;
-
   // Se não selecionou tipo, esconde tudo abaixo (gate) e reseta áreas específicas
   const showGate = (k === 'avulso' || k === 'pacote');
   if (gate) gate.style.display = showGate ? 'block' : 'none';
+  if (topRow) topRow.style.display = showGate ? '' : 'none';
 
   // Default: esconde blocos condicionais
   if (grpPkg) grpPkg.style.display = 'none';
@@ -4397,6 +6107,14 @@ async function refreshPackageSelectForBooking(){
 /* bindings */
 (function bindPackagesUI(){
   const btnNew = document.getElementById('btnNewPackage');
+  const btnClear = document.getElementById('btnLimparPacotes');
+  const filtroTitle = document.getElementById('filtroPacotesTitle');
+  const filtroTipo = document.getElementById('filtroPacotesTipo');
+  const filtroPorte = document.getElementById('filtroPacotesPorte');
+
+  const pkgModal = document.getElementById('packageModal');
+  const pkgModalClose = document.getElementById('packageModalClose');
+
   const btnCancel = document.getElementById('btnCancelPackage');
   const btnSave = document.getElementById('btnSavePackage');
   const porteSel = document.getElementById('pkgPorte');
@@ -4405,6 +6123,37 @@ async function refreshPackageSelectForBooking(){
   if (btnNew) btnNew.addEventListener('click', () => openPackageForm(null));
   if (btnCancel) btnCancel.addEventListener('click', closePackageForm);
   if (btnSave) btnSave.addEventListener('click', savePackage);
+
+  // filtros (mesmo comportamento do menu Serviços)
+  const onFilter = () => applyPackagesFiltersAndRender();
+  if (filtroTitle) filtroTitle.addEventListener('input', onFilter);
+  if (filtroTipo) filtroTipo.addEventListener('change', onFilter);
+  if (filtroPorte) filtroPorte.addEventListener('change', onFilter);
+  if (btnClear) btnClear.addEventListener('click', () => {
+    if (filtroTitle) filtroTitle.value = '';
+    if (filtroTipo) filtroTipo.value = '';
+    if (filtroPorte) filtroPorte.value = '';
+    applyPackagesFiltersAndRender();
+  });
+
+  // fechar modal (X, clique fora e ESC)
+  const closeNow = () => closePackageForm();
+  if (pkgModalClose) pkgModalClose.addEventListener('click', closeNow);
+  if (pkgModal && !pkgModal.dataset.bound) {
+    pkgModal.dataset.bound = '1';
+    pkgModal.addEventListener('click', (e) => {
+      if (e.target === pkgModal) closeNow();
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const m = document.getElementById('packageModal');
+      if (m && !m.classList.contains('hidden')) closeNow();
+    }
+  });
+
+
+  
 
   if (porteSel) porteSel.addEventListener('change', () => { refreshPackageFormFilters(); recalcPackagePreview(); });
 
@@ -4430,9 +6179,597 @@ async function refreshPackageSelectForBooking(){
     if (t && t.closest && t.closest('#pkgIncludedList')) recalcPackagePreview();
   });
 
+
+
+  /* =========================
+     AUTOMATION (Admin)
+  ========================= */
+  async function loadAutomation() {
+    const tbody = document.getElementById('tbodyAutomationRules');
+    const sel = document.getElementById('automationTemplateSelect');
+    const txt = document.getElementById('automationTemplateBody');
+    const btnReload = document.getElementById('btnReloadAutomation');
+    const btnSaveTpl = document.getElementById('btnSaveAutomationTemplate');
+
+    if (!tbody || !sel || !txt) return;
+
+    initAutomationQueueBindings();
+
+    // evita múltiplos binds
+    if (!btnReload?.dataset.bound) {
+      if (btnReload) {
+        btnReload.dataset.bound = '1';
+        btnReload.addEventListener('click', () => loadAutomation().catch(console.error));
+      }
+    }
+    if (!btnSaveTpl?.dataset.bound) {
+      if (btnSaveTpl) {
+        btnSaveTpl.dataset.bound = '1';
+        btnSaveTpl.addEventListener('click', async () => {
+          const id = Number(sel.value);
+          if (!id) return showHint('Selecione um template.', 'error');
+          const body = String(txt.value || '').trim();
+          if (!body) return showHint('Digite o texto do template.', 'error');
+
+          try {
+            const resp = await fetch(`/api/automation/templates/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ body })
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.error || 'Erro ao salvar template.');
+            showHint('Template salvo com sucesso!', 'success');
+          } catch (e) {
+            console.error(e);
+            showHint(String(e.message || e), 'error');
+          }
+        });
+      }
+    }
+
+    // carrega templates
+    let templates = [];
+    try {
+      const r = await fetch('/api/automation/templates');
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Erro ao buscar templates.');
+      templates = Array.isArray(d.templates) ? d.templates : [];
+    } catch (e) {
+      console.error(e);
+      tbody.innerHTML = `<tr><td colspan="8" class="muted">${escapeHtml(String(e.message || e))}</td></tr>`;
+      return;
+    }
+
+    // popula select
+    sel.innerHTML = '';
+    for (const t of templates) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.code} (#${t.id})`;
+      sel.appendChild(opt);
+    }
+    if (templates.length > 0) {
+      // mantém seleção
+      const current = Number(sel.dataset.current || 0);
+      if (current && templates.some(t => t.id === current)) sel.value = String(current);
+      else sel.value = String(templates[0].id);
+      sel.dataset.current = sel.value;
+      const curTpl = templates.find(t => String(t.id) === String(sel.value));
+      txt.value = curTpl?.body || '';
+    } else {
+      txt.value = '';
+    }
+
+    if (!sel.dataset.bound) {
+      sel.dataset.bound = '1';
+      sel.addEventListener('change', () => {
+        sel.dataset.current = sel.value;
+        const cur = templates.find(t => String(t.id) === String(sel.value));
+        txt.value = cur?.body || '';
+      });
+    }
+
+    // carrega regras
+    try {
+      const r = await fetch('/api/automation/rules');
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Erro ao buscar regras.');
+      const rules = Array.isArray(d.rules) ? d.rules : [];
+
+      if (rules.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="muted">Nenhuma regra cadastrada.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      for (const rule of rules) {
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td><input type="checkbox" ${rule.is_enabled ? 'checked' : ''} data-field="is_enabled" /></td>
+          <td>${escapeHtml(rule.code || '')}</td>
+          <td><input type="text" value="${escapeAttr(rule.name || '')}" data-field="name" style="min-width:220px" /></td>
+          <td><input type="text" value="${escapeAttr(rule.trigger || '')}" data-field="trigger" style="min-width:180px" /></td>
+          <td><input type="number" value="${Number(rule.delay_minutes||0)}" data-field="delay_minutes" style="width:110px" /></td>
+          <td><input type="number" value="${Number(rule.cooldown_days||0)}" data-field="cooldown_days" style="width:120px" /></td>
+          <td>
+            <select data-field="template_id" style="min-width:200px">
+              <option value="">(sem template)</option>
+              ${templates.map(t => `<option value="${t.id}" ${String(t.id)===String(rule.template_id||'')?'selected':''}>${escapeHtml(t.code)}</option>`).join('')}
+            </select>
+          </td>
+          <td><button class="btn btn-small" type="button" data-action="save">Salvar</button></td>
+        `;
+
+        const btn = tr.querySelector('[data-action="save"]');
+        btn.addEventListener('click', async () => {
+          try {
+            const payload = {};
+            tr.querySelectorAll('[data-field]').forEach(el => {
+              const field = el.getAttribute('data-field');
+              if (!field) return;
+              if (el.type === 'checkbox') payload[field] = el.checked;
+              else if (el.type === 'number') payload[field] = Number(el.value || 0);
+              else payload[field] = el.value;
+            });
+
+            const resp = await fetch(`/api/automation/rules/${rule.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.error || 'Erro ao salvar regra.');
+            showHint('Regra salva com sucesso!', 'success');
+          } catch (e) {
+            console.error(e);
+            showHint(String(e.message || e), 'error');
+          }
+        });
+
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      console.error(e);
+      tbody.innerHTML = `<tr><td colspan="8" class="muted">${escapeHtml(String(e.message || e))}</td></tr>`;
+    }
+
+    // carrega a fila (se a UI existir)
+    loadWhatsAppQueue().catch(console.error);
+  }
+
+
+  /* =========================
+     UI – Fila WhatsApp (MVP link/manual)
+  ========================= */
+  function initAutomationQueueBindings() {
+    const filter = document.getElementById('queueStatusFilter');
+    const btnReload = document.getElementById('btnQueueReload');
+    const btnCopyNext = document.getElementById('btnQueueCopyNext');
+    const btnOpenNext = document.getElementById('btnQueueOpenNext');
+
+    if (filter && !filter.dataset.bound) {
+      filter.dataset.bound = '1';
+      filter.addEventListener('change', () => loadWhatsAppQueue().catch(console.error));
+    }
+
+    if (btnReload && !btnReload.dataset.bound) {
+      btnReload.dataset.bound = '1';
+      btnReload.addEventListener('click', () => loadWhatsAppQueue().catch(console.error));
+    }
+
+    if (btnCopyNext && !btnCopyNext.dataset.bound) {
+      btnCopyNext.dataset.bound = '1';
+      btnCopyNext.addEventListener('click', () => copyNextQueuedLink().catch(console.error));
+    }
+
+    if (btnOpenNext && !btnOpenNext.dataset.bound) {
+      btnOpenNext.dataset.bound = '1';
+      btnOpenNext.addEventListener('click', () => openNextQueuedLink().catch(console.error));
+    }
+  }
+
+  async function loadWhatsAppQueue() {
+    const tbody = document.getElementById('tbodyQueue');
+    const filter = document.getElementById('queueStatusFilter');
+    const meta = document.getElementById('queueMeta');
+    if (!tbody) return;
+
+    const status = String(filter?.value ?? 'queued');
+    tbody.innerHTML = `<tr><td colspan="8" class="muted">Carregando…</td></tr>`;
+
+    try {
+      const url = status ? `/api/message-queue?status=${encodeURIComponent(status)}&limit=50` : `/api/message-queue?limit=50`;
+      const r = await fetch(url);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Erro ao buscar fila.');
+      const rows = Array.isArray(d.queue) ? d.queue : [];
+
+      if (meta) {
+        meta.textContent = `${rows.length} item(ns) exibidos` + (status ? ` • filtro: ${status}` : '');
+      }
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="muted">Nenhum item encontrado na fila.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      for (const q of rows) {
+        const tr = document.createElement('tr');
+        const toPhone = String(q.to_phone || '');
+        const customerName = String(q.customer_name || '').trim();
+        const ruleCode = String(q.rule_code || q.rule_id || '').trim();
+        const scheduledAt = formatDateTimeBR(q.scheduled_at);
+        const createdAt = formatDateTimeBR(q.created_at);
+        const waLink = String(q.wa_link || '');
+
+        tr.innerHTML = `
+          <td>#${Number(q.id || 0)}</td>
+          <td>${escapeHtml(String(q.status || ''))}</td>
+          <td>${escapeHtml(maskPhoneBR(toPhone) || toPhone)}</td>
+          <td>${escapeHtml(customerName || '-')}</td>
+          <td>${escapeHtml(ruleCode || '-')}</td>
+          <td>${escapeHtml(scheduledAt || '-')}</td>
+          <td>${escapeHtml(createdAt || '-')}</td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-small" type="button" data-act="copy">Copiar</button>
+            <button class="btn btn-small btn-light" type="button" data-act="open">Abrir</button>
+            <button class="btn btn-small btn-light" type="button" data-act="sent">Marcar enviado</button>
+            <button class="btn btn-small btn-danger" type="button" data-act="cancel">Cancelar</button>
+          </td>
+        `;
+
+        tr.querySelector('[data-act="copy"]').addEventListener('click', async () => {
+          if (!waLink) return showHint('Este item não tem link wa.me.', 'error');
+          const ok = await copyToClipboard(waLink);
+          showHint(ok ? 'Link do WhatsApp copiado!' : 'Não foi possível copiar automaticamente. Copie manualmente.', ok ? 'success' : 'error');
+        });
+
+        tr.querySelector('[data-act="open"]').addEventListener('click', () => {
+          if (!waLink) return showHint('Este item não tem link wa.me.', 'error');
+          window.open(waLink, '_blank', 'noopener');
+        });
+
+        tr.querySelector('[data-act="sent"]').addEventListener('click', async () => {
+          try {
+            const resp = await fetch(`/api/message-queue/${Number(q.id)}/mark-sent`, { method: 'POST' });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.error || 'Erro ao marcar como enviado.');
+            showHint('Marcado como enviado!', 'success');
+            loadWhatsAppQueue().catch(console.error);
+          } catch (e) {
+            console.error(e);
+            showHint(String(e.message || e), 'error');
+          }
+        });
+
+        tr.querySelector('[data-act="cancel"]').addEventListener('click', async () => {
+          try {
+            const resp = await fetch(`/api/message-queue/${Number(q.id)}/cancel`, { method: 'POST' });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) throw new Error(data.error || 'Erro ao cancelar.');
+            showHint('Item cancelado.', 'success');
+            loadWhatsAppQueue().catch(console.error);
+          } catch (e) {
+            console.error(e);
+            showHint(String(e.message || e), 'error');
+          }
+        });
+
+        tbody.appendChild(tr);
+      }
+    } catch (e) {
+      console.error(e);
+      tbody.innerHTML = `<tr><td colspan="8" class="muted">${escapeHtml(String(e.message || e))}</td></tr>`;
+    }
+  }
+
+  function formatDateTimeBR(value) {
+    if (!value) return '';
+    try {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+    } catch {
+      return String(value);
+    }
+  }
+
+  function maskPhoneBR(whatsPhone) {
+    const s = String(whatsPhone || '').replace(/\D/g, '');
+    const n = s.startsWith('55') ? s.slice(2) : s;
+    if (n.length < 10) return '';
+    const ddd = n.slice(0, 2);
+    const rest = n.slice(2);
+    if (rest.length === 9) {
+      return `(${ddd}) ${rest.slice(0, 1)} ${rest.slice(1, 5)}-${rest.slice(5)}`;
+    }
+    return `(${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+  }
+
+  async function copyToClipboard(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(String(text));
+        return true;
+      }
+    } catch (_) {}
+
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = String(text);
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function copyNextQueuedLink() {
+    try {
+      const r = await fetch('/api/message-queue?status=queued&limit=1');
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Erro ao buscar o próximo item.');
+      const q = Array.isArray(d.queue) ? d.queue[0] : null;
+      if (!q || !q.wa_link) return showHint('Nenhum envio pendente na fila (status: queued).', 'error');
+      const ok = await copyToClipboard(q.wa_link);
+      showHint(ok ? 'Link do WhatsApp copiado! (fila)' : 'Não foi possível copiar automaticamente.', ok ? 'success' : 'error');
+    } catch (e) {
+      console.error(e);
+      showHint(String(e.message || e), 'error');
+    }
+  }
+
+  async function openNextQueuedLink() {
+    try {
+      const r = await fetch('/api/message-queue?status=queued&limit=1');
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Erro ao buscar o próximo item.');
+      const q = Array.isArray(d.queue) ? d.queue[0] : null;
+      if (!q || !q.wa_link) return showHint('Nenhum envio pendente na fila (status: queued).', 'error');
+      window.open(String(q.wa_link), '_blank', 'noopener');
+    } catch (e) {
+      console.error(e);
+      showHint(String(e.message || e), 'error');
+    }
+  }
+  // expõe para o escopo global (aba Automação chama via showTab)
+  window.loadAutomation = loadAutomation;
+
+  // helpers de escape (reaproveita padrões simples)
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/\n/g, ' ');
+  }
+
   // booking kind
   const bookingKindEl = document.getElementById('formBookingKind');
   if (bookingKindEl) bookingKindEl.addEventListener('change', refreshPackageSelectForBooking);
     const formPetSelect = document.getElementById('formPetSelect');
   if (formPetSelect) formPetSelect.addEventListener('change', refreshPackageSelectForBooking);
 })();
+
+
+
+/* ===== PATCH (2026-01-04): Serviços — Cancelar apenas fecha modal e garante formulário visível ao reabrir =====
+   - Botão "Cancelar" fecha somente o overlay do modal (não limpa e não esconde o painel do formulário).
+   - Ao abrir pelo "+ Novo serviço", garante que o painel do formulário esteja visível.
+   Obs.: aplicado em capture para sobrepor listeners legados já existentes sem alterar layout/fluxos.
+*/
+(function patchServicesCancelOnlyClose(){
+  const overlay = document.getElementById('serviceModal');
+  const panel = document.getElementById('serviceFormPanel');
+  const btnNovo = document.getElementById('btnNovoServico');
+  const btnCancel = document.getElementById('btnServiceCancel');
+  if (!overlay || !panel) return;
+
+  function openEnsure(){
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+    // garante que o formulário esteja visível
+    panel.classList.remove('hidden');
+    // garante painel dentro do host
+    const host = document.getElementById('serviceModalHost');
+    if (host && panel.parentElement !== host) {
+      try { host.appendChild(panel); } catch(_) {}
+    }
+  }
+
+  function closeOnly(){
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+    // NÃO esconder o painel (evita reabrir vazio)
+    panel.classList.remove('hidden');
+  }
+
+  if (btnNovo && !btnNovo.dataset.cancelClosePatch) {
+    btnNovo.dataset.cancelClosePatch = '1';
+    btnNovo.addEventListener('click', (e) => {
+      // abre e garante form
+      try { e.preventDefault(); e.stopImmediatePropagation(); } catch(_) {}
+      // mantém comportamento de limpar no "novo" se existir
+      try { if (typeof clearServiceForm === 'function') clearServiceForm(); } catch(_) {}
+      openEnsure();
+    }, true);
+  }
+
+  if (btnCancel && !btnCancel.dataset.cancelClosePatch) {
+    btnCancel.dataset.cancelClosePatch = '1';
+    btnCancel.addEventListener('click', (e) => {
+      try { e.preventDefault(); e.stopImmediatePropagation(); } catch(_) {}
+      closeOnly();
+    }, true);
+  }
+})();
+
+
+
+
+/* ===== Patch (2026-01-06): Serviços — impedir duplicação de salvamento e garantir formulário no modal =====
+   Objetivos:
+   1) Evitar múltiplos POSTs mesmo que existam listeners duplicados (módulos carregados mais de uma vez).
+   2) Garantir que o formulário (#serviceFormPanel) esteja visível sempre que abrir "+ Novo serviço".
+   Estratégia:
+   - Listener em CAPTURE no botão Salvar e no botão Novo, com stopImmediatePropagation().
+   - Lock in-flight para bloquear cliques repetidos e handlers duplicados.
+*/
+(function patchServicesSaveAndOpenSingle(){
+  const overlay = document.getElementById('serviceModal');
+  const panel = document.getElementById('serviceFormPanel');
+  const host = document.getElementById('serviceModalHost');
+  const btnNovo = document.getElementById('btnNovoServico');
+  const btnSave = document.getElementById('btnServiceSave');
+
+  function ensurePanelVisible(){
+    if (overlay) {
+      overlay.classList.remove('hidden');
+      overlay.setAttribute('aria-hidden', 'false');
+    }
+    if (panel) {
+      // garante no host do modal (se existir)
+      if (host && panel.parentElement !== host) {
+        try { host.appendChild(panel); } catch(_) {}
+      }
+      panel.classList.remove('hidden');
+      panel.style.display = ''; // fallback caso algum fluxo tenha setado display:none
+    }
+  }
+
+  // Intercepta o "+ Novo serviço" para sempre abrir com o formulário visível.
+  if (btnNovo && !btnNovo.dataset.pfOpenSingle) {
+    btnNovo.dataset.pfOpenSingle = '1';
+    btnNovo.addEventListener('click', (e) => {
+      try { e.preventDefault(); e.stopImmediatePropagation(); } catch(_) {}
+      try { if (typeof clearServiceForm === 'function') clearServiceForm(); } catch(_) {}
+      ensurePanelVisible();
+    }, true);
+  }
+
+  // Intercepta o "Salvar" para disparar SOMENTE uma vez (mesmo com múltiplos listeners).
+  if (btnSave && !btnSave.dataset.pfSaveSingle) {
+    btnSave.dataset.pfSaveSingle = '1';
+    let inFlight = false;
+
+    btnSave.addEventListener('click', async (e) => {
+      try { e.preventDefault(); e.stopImmediatePropagation(); } catch(_) {}
+
+      if (inFlight) return;
+      inFlight = true;
+
+      const prevDisabled = btnSave.disabled;
+      btnSave.disabled = true;
+
+      try {
+        if (typeof saveServiceFromForm === 'function') {
+          await saveServiceFromForm();
+        }
+      } finally {
+        inFlight = false;
+        btnSave.disabled = prevDisabled;
+      }
+    }, true);
+  }
+})();
+
+
+/* ===== PATCH (2026-01-06): Footer dinâmico (ano vigente + horário do cadastro) =====
+   - Ano: atualiza automaticamente no footer do admin
+   - Horário: monta texto a partir de /api/opening-hours (menu "Horários de atendimento")
+   Obs.: não altera layout; apenas preenche textos existentes no rodapé.
+*/
+(function initAdminFooterDynamic(){
+  try {
+    const yearEl = document.getElementById('footerYear');
+    if (yearEl) yearEl.textContent = String(new Date().getFullYear());
+
+    const hoursEl = document.getElementById('footerHoursText');
+    if (!hoursEl) return;
+
+    function dayName(dow){
+      return ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][dow] || 'Dia';
+    }
+    function dayShort(dow){
+      return ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][dow] || 'Dia';
+    }
+    function rangeLabel(startDow, endDow){
+      if (startDow === endDow) return dayName(startDow);
+      return dayShort(startDow) + '–' + dayShort(endDow);
+    }
+
+    function buildHoursLabel(rows){
+      const clean = (Array.isArray(rows) ? rows : [])
+        .map(r => ({
+          dow: Number(r.dow),
+          is_closed: !!r.is_closed,
+          open_time: r.open_time ? String(r.open_time).slice(0,5) : null,
+          close_time: r.close_time ? String(r.close_time).slice(0,5) : null
+        }))
+        .filter(r => Number.isFinite(r.dow) && r.dow >= 0 && r.dow <= 6)
+        .sort((a,b) => a.dow - b.dow);
+
+      const openRows = clean.filter(r => !r.is_closed && r.open_time && r.close_time);
+      if (!openRows.length) return 'Fechado';
+
+      const groups = [];
+      let cur = null;
+      for (const r of openRows) {
+        if (!cur) {
+          cur = { start: r.dow, end: r.dow, open: r.open_time, close: r.close_time };
+          continue;
+        }
+        const sameTime = (r.open_time === cur.open && r.close_time === cur.close);
+        const consecutive = (r.dow === cur.end + 1);
+        if (sameTime && consecutive) {
+          cur.end = r.dow;
+        } else {
+          groups.push(cur);
+          cur = { start: r.dow, end: r.dow, open: r.open_time, close: r.close_time };
+        }
+      }
+      if (cur) groups.push(cur);
+
+      return groups.map(g => `${rangeLabel(g.start, g.end)}: ${g.open} às ${g.close}`).join(' • ');
+    }
+
+    async function loadAndRender(){
+      try {
+        let data = null;
+        if (typeof apiGet === 'function') {
+          data = await apiGet('/api/opening-hours');
+        } else {
+          const r = await fetch('/api/opening-hours');
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.error || 'Erro ao carregar horários.');
+          data = d;
+        }
+        const label = buildHoursLabel(data && data.opening_hours ? data.opening_hours : []);
+        hoursEl.textContent = label;
+      } catch (e) {
+        hoursEl.textContent = '—';
+        console.warn('Footer: não foi possível carregar horários:', e);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadAndRender);
+    } else {
+      loadAndRender();
+    }
+  } catch (_) {}
+})();
+

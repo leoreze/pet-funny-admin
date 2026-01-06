@@ -91,8 +91,10 @@
           <button class="tab-btn active" data-tab="tab-agenda" type="button"><span>📅</span> Agendamentos</button>
           <button class="tab-btn" data-tab="tab-clientes" type="button"><span>👤</span> Clientes &amp; 🐶 Pets</button>
           <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
+          <button class="tab-btn" data-tab="tab-pacotes" type="button"><span>📦</span> Pacotes</button>
       <button class="tab-btn" data-tab="tab-mimos" type="button"><span>🎁</span> Mimos</button>
           <button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
+          <button class="tab-btn" data-tab="tab-automacao" type="button"><span>⚙️</span> Automação</button>
           <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
       </div>
     </nav>
@@ -108,9 +110,10 @@
           <div class="view-toggle" aria-label="Alternar visualização">
             <button class="toggle-btn active" id="btnViewList" type="button">📋 Lista</button>
             <button class="toggle-btn" id="btnViewCards" type="button">🗂️ Cards</button>
+            <button class="toggle-btn" id="btnViewCalendar" type="button">🗓️ Calendário</button>
           </div>
 
-          <button class="btn btn-light" id="btnNovoAgendamento" type="button">+ Novo agendamento</button>
+          <button class="btn" id="btnNovoAgendamento" type="button">+ Novo agendamento</button>
         </div>
       </div>
 
@@ -127,7 +130,7 @@
     <button class="btn btn-light" id="btnLimparFiltro" type="button">Limpar</button>
 
     <div class="filters-group" style="flex:1; min-width:200px;">
-      <label style="font-size:12px;">Buscar</label>
+      <label style="font-size:14px;">Buscar</label>
       <input
         type="text"
         id="filtroBusca"
@@ -143,7 +146,7 @@
 
       
 
-  <div class="form-panel hidden" id="formPanel">
+  <div class="hidden" id="formPanel">
         <input type="hidden" id="bookingId" />
         <input type="hidden" id="bookingOriginalStatus" />
 
@@ -277,6 +280,37 @@
         </div>
   </div>
 
+  <!-- Modal: Cadastrar / Editar Agendamento (Admin) -->
+  <div id="bookingModal" class="pf-modal hidden" aria-hidden="true">
+    <div class="pf-modal__backdrop" id="bookingModalBackdrop"></div>
+    <div class="pf-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="bookingModalTitle">
+
+
+       <div class="pf-modal-head">
+      <div class="pf-modal-left">
+        <div class="pf-modal-ic" aria-hidden="true">📅</div>
+        <div>
+          <p class="pf-modal-title" id="customerModalTitle">Cadastrar / Editar Agendamento</p>
+          <p class="pf-modal-sub" id="customerModalSub">Preencha os dados para salvar.</p>
+        </div>
+      </div>
+      <button class="pf-modal-x" id="bookingModalClose" type="button" aria-label="Fechar">×</button>
+    </div>
+
+      <div class="pf-modal__body">
+        <!-- O formulário existente (#formPanel) é movido para cá via JS ao abrir o modal -->
+        <div id="bookingModalFormHost"></div>
+
+        <div id="bookingModalSuccess" class="pf-modal__success hidden">
+          <div class="pf-modal__successText" id="bookingModalSuccessText">Agendamento cadastrado com sucesso!</div>
+          <div class="pf-modal__successActions">
+            <button type="button" class="btn" id="bookingModalSuccessClose">Fechar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
    <div class="stats">
         <div class="stats-item"><span class="stats-label">Total de agendamentos:</span> <span class="stats-value" id="statTotal">0</span></div>
         <div class="stats-item"><span class="stats-label">Total de agendamentos Avulsos:</span> <span class="stats-value" id="statAvulsos">0</span></div>
@@ -288,6 +322,7 @@
         <table>
           <thead>
           <tr>
+            <th class="status-strip-col"></th>
             <th>Data</th>
             <th>Hora</th>
             <th>Tutor(a)</th>
@@ -300,7 +335,7 @@
             <th>Forma</th>
                         <th>Obs.</th>
             <th>Status</th>
-            <th>Ações</th>
+            <th style="align-items: end;">Ações</th>
           </tr>
           </thead>
           <tbody id="tbodyAgenda"></tbody>
@@ -316,31 +351,58 @@
         <div id="agendaCards" class="cards-grid"></div>
         <div id="estadoVazioCards" class="empty hidden">Nenhum agendamento encontrado para o filtro atual.</div>
       </div>
+
+      <!-- NOVO: Carregar mais (paginação da lista/cards) -->
+      <div id="agendaLoadMoreBar" class="footer" style="display:none; margin-top:10px; align-items:center; justify-content:space-between;">
+        <div id="agendaLoadMoreInfo">Mostrando 0 agendamento(s)</div>
+        <button class="btn btn-light" id="btnCarregarMaisAgenda" type="button" style="display:none;">Carregar mais</button>
+      </div>
+    
+
+      <!-- NOVO: Wrapper Calendário -->
+      <div id="agendaCalendarWrapper" class="calendar-wrapper hidden">
+        <div class="calendar-toolbar">
+          <button class="btn btn-light" id="calPrev" type="button">◀</button>
+          <div class="cal-label" id="calLabel">Mês/Ano</div>
+          <button class="btn btn-light" id="calNext" type="button">▶</button>
+          <button class="btn btn-light" id="calToday" type="button">Hoje</button>
+        </div>
+        <div class="calendar-week" id="agendaCalendarWeek"></div>
+        <div id="agendaCalendar" class="calendar-grid"></div>
+        <div class="calendar-daylist">
+          <div class="calendar-daylist-title" id="calDayTitle">Selecione um dia para ver os agendamentos.</div>
+          <div id="agendaCalendarDayList"></div>
+          <div id="estadoVazioCalendarDay" class="empty hidden">Nenhum agendamento neste dia.</div>
+        </div>
+      </div>
+
     </section>
 
     <!-- TAB: CLIENTES & PETS -->
     <section id="tab-clientes" class="tab-view">
 
-      
-      <div class="section-title" style="margin-bottom: 20px;"><span>👤</span> Clientes &amp; 🐶 Pets</div>
-    
-      <div class="two-cols">
-        <!-- CLIENTES -->
-        <div class="subcard">
-          <div class="subcard-title">
-            <span>Clientes</span>
-            <span id="badgeClienteSelecionado" class="badge-mini badge-selected hidden">Cliente selecionado</span>
 
-              <div class="tab-toolbar">
-        <div class="filters-group">
-          <span style="font-size:13px;">Buscar:</span>
+      <div class="section-title-row">
+         <div class="section-title"><span>👤</span> Clientes</div>
+
+           <div class="agenda-actions-right">
+    
+               <div class="filters-group">
+              
+
+
+          <label style="font-size:14px;">Buscar</label>
           <input type="text" id="filtroClientes" placeholder="Nome do tutor ou telefone" />
           <button class="btn btn-light" id="btnLimparClientes" type="button">Limpar</button>
         </div>
-      </div>
 
-            <button class="btn btn-light" id="btnNovoCliente" type="button">+ Novo cliente</button>
-          </div>
+           <button class="btn" id="btnNovoCliente" type="button">+ Novo cliente</button>
+        </div>
+      </div>
+    
+      <div class="two-cols">
+        <!-- CLIENTES -->
+  
 
           <div id="clienteFormBlock" class="hidden">
             <div class="form-group">
@@ -388,7 +450,12 @@
             </div>
           </div>
 
-          <div class="subtable-wrapper" style="margin-top:10px;">
+     
+      </div>
+
+
+
+      <div id="clientesListWrapper" class="subtable-wrapper" style="margin-top:10px;">
             <table>
               <thead>
               <tr>
@@ -397,20 +464,22 @@
                 <th>Telefone</th>
                 <th>Pets</th>
                 <th>Agendamentos</th>
-                <th>Ações</th>
+                <th style="display:inline-flex; align-items:flex-end; justify-content:right;">Ações</th>
               </tr>
               </thead>
               <tbody id="tbodyClientes"></tbody>
             </table>
-          </div>
+      </div>
+
+      <!-- PETS DO CLIENTE SELECIONADO -->
+      <div class="hidden" id="petsCard">
+        <div class="subcard-title">
+          <h3 style="margin:0;"></h3>
+          <button class="btn" id="btnNovoPet" type="button">+ Novo pet</button>
         </div>
 
-        <!-- PETS DO CLIENTE SELECIONADO -->
-        <div class="subcard hidden" id="petsCard">
-          <div class="subcard-title">
-            <span>Pets do cliente selecionado</span>
-            <button class="btn btn-secondary btn-small" id="btnNovoPet" type="button">+ Novo pet</button>
-          </div>
+        <!-- Formulário (abre ao clicar em "+ Novo pet" ou ao editar) -->
+        <div id="petFormBlock" class="hidden">
           <div class="form-group">
             <label for="petName">Nome do pet</label>
             <input type="text" id="petName" placeholder="Nome do pet" />
@@ -443,37 +512,42 @@
           </div>
           <div id="petError" class="error-msg" style="display:none;"></div>
           <div class="form-actions">
-            <button class="btn btn-secondary btn-small" id="btnPetLimpar" type="button">Limpar</button>
-            <button class="btn btn-small" id="btnPetSalvar" type="button">Salvar pet</button>
-          </div>
-
-          <div class="subtable-wrapper" style="margin-top:10px;">
-            <table>
-              <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nome</th>
-                <th>Raça</th>
-                <th>Porte</th>
-                <th>Pelagem</th>
-                <th>Observações</th>
-                <th>Ações</th>
-              </tr>
-              </thead>
-              <tbody id="tbodyPets"></tbody>
-            </table>
+            <button class="btn btn-secondary" id="btnPetLimpar" type="button">Limpar</button>
+            <button class="btn" id="btnPetSalvar" type="button">Salvar pet</button>
           </div>
         </div>
+
+
+        <!-- Listagem (sempre visível dentro do modal) -->
+        <div class="subtable-wrapper" style="margin-top:10px;">
+          <table>
+            <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nome</th>
+              <th>Raça</th>
+              <th>Porte</th>
+              <th>Pelagem</th>
+              <th>Observações</th>
+              <th>Ações</th>
+            </tr>
+            </thead>
+            <tbody id="tbodyPets"></tbody>
+          </table>
+        </div>
       </div>
+
+    
     </section>
 
-     <!-- TAB: SERVIÇOS -->
+  
+   <!-- TAB: SERVIÇOS -->
     <section id="tab-servicos" class="tab-view">
       <div class="section-title-row">
-        <div class="section-title">Serviços</div>
+        <div class="section-title"><span>🧼</span> Serviços</div>
         <div class="tab-toolbar-inline">
           <div class="filters-group">
-            <span style="font-size:13px;">Buscar:</span>
+            <label style="font-size:14px;">Buscar</label>
             <input type="text" id="filtroServicos" placeholder="Título do serviço" />
             
             <select id="filtroCategoriaServicos" class="select-small" aria-label="Filtrar por categoria">
@@ -492,57 +566,10 @@
 <button class="btn btn-light" id="btnLimparServicos" type="button">Limpar</button>
           </div>
         </div>
-        <button class="btn btn-light" id="btnNovoServico" type="button">+ Novo serviço</button>
+        <button class="btn" id="btnNovoServico" type="button">+ Novo serviço</button>
       </div>
 
-      <div class="form-panel hidden" id="serviceFormPanel">
-        <input type="hidden" id="serviceId" />
-        <input type="hidden" id="serviceDate" />
-        <div class="form-row-2">
-<div class="form-group">
-            <label for="serviceCategory">Categoria</label>
-            <select id="serviceCategory">
-              <option value="">Selecione...</option>
-              <option value="Banho">Banho</option>
-              <option value="Complemento">Complemento</option>
-              <option value="Tosa">Tosa</option>
-              <option value="Avulso">Avulso</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="serviceTitle">Título do serviço</label>
-            <input type="text" id="serviceTitle" placeholder="Ex: Banho (Porte M)" />
-          </div>
-
-          <div class="form-group">
-            <label for="servicePorte">Porte</label>
-            <select id="servicePorte">
-              <option value="">Selecione...</option>
-              <option value="Pequeno">Pequeno</option>
-              <option value="Médio">Médio</option>
-              <option value="Grande">Grande</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="servicePrice">Preço (R$)</label>
-            <input type="text" id="servicePrice" placeholder="R$ 0,00" inputmode="numeric" />
-          </div>
-
-          <div class="form-group">
-            <label for="serviceTempo">Tempo (min)</label>
-            <input type="number" name="duration_min" id="serviceTempo" class="input-tempo-min" min="0" step="5" placeholder="Ex: 60" inputmode="numeric" />
-          </div>
-        </div>
-
-        <div id="serviceError" class="error-msg" style="display:none;"></div>
-
-        <div class="form-actions">
-          <button class="btn btn-secondary" id="btnServiceCancel" type="button">Limpar / cancelar</button>
-          <button class="btn" id="btnServiceSave" type="button">Salvar</button>
-        </div>
-      </div>
+      
 
       <div class="table-wrapper">
         <table>
@@ -566,13 +593,18 @@
       </div>
 
    
+      </section>  
+    
+
+    <!-- TAB: PACOTES -->
+    <section id="tab-pacotes" class="tab-view">
       <!-- PACOTES DE SERVIÇOS (POR PORTE) -->
       <div class="section-divider"></div>
       <div class="section-title-row" style="margin-top:16px;">
-        <div class="section-title">Pacotes de Serviços</div>
+        <div class="section-title"><span>📦</span> Pacotes</div>
         <div class="tab-toolbar-inline">
           <div class="filters-group">
-            <span style="font-size:13px;">Buscar:</span>
+            <label style="font-size:14px;">Buscar</label>
             <input type="text" id="filtroPacotesTitle" placeholder="Título do pacote" />
             <select id="filtroPacotesTipo" class="select-small" aria-label="Filtrar por tipo">
               <option value="">Todos os tipos</option>
@@ -587,7 +619,7 @@
             </select>
             <button class="btn btn-light" id="btnLimparPacotes" type="button">Limpar</button>
           </div>
-          <button type="button" class="btn btn-light" id="btnNewPackage">Novo pacote</button>
+          <button type="button" class="btn" id="btnNewPackage">+ Novo pacote</button>
         </div>
       </div>
 
@@ -689,9 +721,6 @@
         </table>
         <div id="packagesEmpty" class="empty" style="display:none;">Nenhum pacote cadastrado ainda.</div>
       </div>
-
-    
-
     </section>
 
     <!-- TAB: MIMOS -->
@@ -700,7 +729,7 @@
         <div class="section-title">🎁 Mimos</div>
 
         <div class="section-actions" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-   <div style="display:flex; gap:8px; align-items:center;">
+   <div style="display:flex; gap:8px; align-items:center;"><label style="font-size:14px;">Buscar</label>
   <input id="mimosSearch" type="text" placeholder="Buscar..." class="input" style="min-width:260px;" />
 
   <button class="btn btn-secondary" id="btnMimosClearSearch" type="button">
@@ -709,7 +738,7 @@
 </div>
 
 
-          <button class="btn btn-secondary" id="btnNovoMimo" type="button">+ Novo Mimo</button>
+          <button class="btn" id="btnNovoMimo" type="button">+ Novo Mimo</button>
         </div>
       </div>
 
@@ -810,12 +839,12 @@
     <!-- TAB: HORÁRIO DE FUNCIONAMENTO -->
     <section id="tab-horarios" class="tab-view">
       <div class="section-title-row">
-        <div class="section-title">Horário de Funcionamento</div>
+        <div class="section-title"><span>⏱️</span> Horário de Funcionamento</div>
         <button class="btn btn-light" id="btnHoursReload" type="button">Recarregar</button>
       </div>
 
       <div class="form-panel" style="margin-top:6px;">
-        <div style="font-size:12px;color:#546e7a;line-height:1.35;">
+        <div style="font-size:14px;color:#546e7a;line-height:1.35;">
           Configure por dia: abertura, fechamento, dia fechado e a capacidade máxima de agendamentos por <strong>slot de 30 minutos</strong>.
         </div>
       </div>
@@ -846,9 +875,197 @@
     </section>
 
     <!-- TAB: DASHBOARD -->
+
+
+    <section id="tab-automacao" class="tab-view">
+      <div class="card">
+        <div class="card-header">
+          <h2><span>⚙️</span> Automação (WhatsApp)</h2>
+          <p class="muted">Ative/desative regras e edite os textos das mensagens. Não altera o layout do sistema; apenas configurações.</p>
+        </div>
+
+        <div class="card-body">
+          <h3 style="margin-top:0">Regras</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ativo</th>
+                  <th>Código</th>
+                  <th>Nome</th>
+                  <th>Trigger</th>
+                  <th>Delay (min)</th>
+                  <th>Cooldown (dias)</th>
+                  <th>Template</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyAutomationRules">
+                <tr><td colspan="8" class="muted">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <hr style="margin:18px 0" />
+
+          <h3>Templates</h3>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+            <select id="automationTemplateSelect" style="min-width:260px"></select>
+            <button id="btnReloadAutomation" class="btn" type="button">Recarregar</button>
+          </div>
+
+          <div style="margin-top:10px">
+            <textarea id="automationTemplateBody" rows="8" style="width:100%; resize:vertical" placeholder="Digite o texto do template…"></textarea>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:10px">
+            <button id="btnSaveAutomationTemplate" class="btn primary" type="button">Salvar template</button>
+          </div>
+
+          <p class="muted" style="margin-top:10px">Variáveis disponíveis: {{customer_name}}, {{pet_name}}, {{service_summary}}, {{date_br}}, {{time_br}}, {{days_since_last}}, {{ref_code}}</p>
+
+          <hr style="margin:18px 0" />
+
+          <h3>Fila (WhatsApp) – MVP link/manual</h3>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+            <select id="queueStatusFilter" style="min-width:220px">
+              <option value="queued" selected>Pendentes (queued)</option>
+              <option value="sending">Enviando (sending)</option>
+              <option value="sent">Enviados (sent)</option>
+              <option value="cancelled">Cancelados (cancelled)</option>
+              <option value="failed">Falhas (failed)</option>
+              <option value="">Todos</option>
+            </select>
+
+            <button id="btnQueueReload" class="btn" type="button">Recarregar fila</button>
+            <button id="btnQueueCopyNext" class="btn btn-light" type="button">Copiar link do próximo</button>
+            <button id="btnQueueOpenNext" class="btn btn-light" type="button">Abrir link do próximo</button>
+
+            <div class="muted" id="queueMeta" style="margin-left:auto;"></div>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Status</th>
+                  <th>Para</th>
+                  <th>Cliente</th>
+                  <th>Regra</th>
+                  <th>Agendado</th>
+                  <th>Criado</th>
+                  <th style="width:240px;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyQueue">
+                <tr><td colspan="8" class="muted">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="muted" style="margin-top:10px">
+            Como usar: o sistema gera o <strong>link wa.me</strong> na fila. No MVP, você copia/abre o link e envia manualmente. “PARAR” aplica opt-out real e cancela pendências.
+          </p>
+
+          <hr style="margin:18px 0" />
+
+          <h3>Fila (WhatsApp) – MVP link/manual</h3>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+            <select id="queueStatusFilter" style="min-width:220px">
+              <option value="queued" selected>Pendentes (queued)</option>
+              <option value="sending">Enviando (sending)</option>
+              <option value="sent">Enviados (sent)</option>
+              <option value="cancelled">Cancelados (cancelled)</option>
+              <option value="failed">Falhas (failed)</option>
+              <option value="">Todos</option>
+            </select>
+
+            <button id="btnQueueReload" class="btn" type="button">Recarregar fila</button>
+            <button id="btnQueueCopyNext" class="btn btn-light" type="button">Copiar link do próximo</button>
+            <button id="btnQueueOpenNext" class="btn btn-light" type="button">Abrir link do próximo</button>
+
+            <div class="muted" id="queueMeta" style="margin-left:auto;"></div>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Status</th>
+                  <th>Para</th>
+                  <th>Cliente</th>
+                  <th>Regra</th>
+                  <th>Agendado</th>
+                  <th>Criado</th>
+                  <th style="width:240px;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyQueue">
+                <tr><td colspan="8" class="muted">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="muted" style="margin-top:10px">
+            Como usar: o sistema gera o <strong>link wa.me</strong> na fila. No MVP, você copia/abre o link e envia manualmente. “PARAR” aplica opt-out real e cancela pendências.
+          </p>
+
+          <hr style="margin:18px 0" />
+
+          <h3>Fila (WhatsApp) – MVP link/manual</h3>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+            <select id="queueStatusFilter" style="min-width:220px">
+              <option value="queued" selected>Pendentes (queued)</option>
+              <option value="sending">Enviando (sending)</option>
+              <option value="sent">Enviados (sent)</option>
+              <option value="cancelled">Cancelados (cancelled)</option>
+              <option value="failed">Falhas (failed)</option>
+              <option value="">Todos</option>
+            </select>
+
+            <button id="btnQueueReload" class="btn" type="button">Recarregar fila</button>
+            <button id="btnQueueCopyNext" class="btn btn-light" type="button">Copiar link do próximo</button>
+            <button id="btnQueueOpenNext" class="btn btn-light" type="button">Abrir link do próximo</button>
+
+            <div class="muted" id="queueMeta" style="margin-left:auto;"></div>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Status</th>
+                  <th>Para</th>
+                  <th>Cliente</th>
+                  <th>Regra</th>
+                  <th>Agendado</th>
+                  <th>Criado</th>
+                  <th style="width:240px;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyQueue">
+                <tr><td colspan="8" class="muted">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="muted" style="margin-top:10px">
+            Como usar: o sistema gera o <strong>link wa.me</strong> na fila. No MVP, você copia/abre o link e envia manualmente. “PARAR” aplica opt-out real e cancela pendências.
+          </p>
+
+        </div>
+      </div>
+    </section>
+
     <section id="tab-dashboard" class="tab-view">
       <div class="section-title-row">
-        <div class="section-title">Dashboard de Indicadores</div>
+        <div class="section-title"><span>📊</span> Dashboard</div>
       </div>
 
       <div class="form-panel" id="dashboardFilters">
@@ -878,6 +1095,11 @@
         <div class="stats-item"><span class="stats-label">Agendamentos no período:</span> <span class="stats-value" id="dashTotalBookings">0</span></div>
         <div class="stats-item"><span class="stats-label">Clientes únicos no período:</span> <span class="stats-value" id="dashUniqueCustomers">0</span></div>
         <div class="stats-item"><span class="stats-label">Total de clientes cadastrados:</span> <span class="stats-value" id="dashTotalCustomers">0</span></div>
+        <div class="stats-item"><span class="stats-label">Pagos:</span> <span class="stats-value" id="dashPaidBookings">0</span></div>
+        <div class="stats-item"><span class="stats-label">Não Pagos:</span> <span class="stats-value" id="dashUnpaidBookings">0</span></div>
+        <div class="stats-item"><span class="stats-label">Cancelamento:</span> <span class="stats-value" id="dashCancelRate">0%</span></div>
+        <div class="stats-item"><span class="stats-label">Tempo médio:</span> <span class="stats-value" id="dashAvgDuration">0 min</span></div>
+
       </div>
 
       <div class="section-title" style="margin-top:12px;">Status dos agendamentos</div>
@@ -922,6 +1144,32 @@
         <div id="dashServicesEmpty" class="empty" style="display:none;">Sem dados suficientes para compor o financeiro por serviço.</div>
       </div>
 
+      
+
+<!-- NOVO: PACOTES NO PERÍODO -->
+<div class="section-title" style="margin-top:18px;">Pacotes no período (quantidade e faturamento estimado)</div>
+<div class="stats">
+  <div class="stats-item"><span class="stats-label">Pacotes vendidos:</span> <span class="stats-value" id="dashPackagesCount">0</span></div>
+  <div class="stats-item"><span class="stats-label">Faturamento de pacotes (cobrado):</span> <span class="stats-value" id="dashPackagesRevenue">R$ 0,00</span></div>
+  <div class="stats-item"><span class="stats-label">Desconto médio (estimado):</span> <span class="stats-value" id="dashPackagesDiscountAvg">0%</span></div>
+</div>
+
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Pacote</th>
+        <th>Qtd. vendas</th>
+        <th>Valor de tabela</th>
+        <th>Valor cobrado</th>
+        <th>% desconto</th>
+      </tr>
+    </thead>
+    <tbody id="tbodyDashPackages"></tbody>
+  </table>
+  <div id="dashPackagesEmpty" class="empty" style="display:none;">Sem dados suficientes para compor os pacotes no período.</div>
+</div>
+
       <div class="section-title" style="margin-top:20px;">Visão Gráfica</div>
       <div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center;margin-top:10px;">
         <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
@@ -930,6 +1178,16 @@
         <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
           <canvas id="chartPrizes" style="max-width:380px;"></canvas>
         </div>
+        <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
+          <canvas id="chartRevenue" style="max-width:520px;"></canvas>
+        </div>
+        <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
+          <canvas id="chartWeekday" style="max-width:520px;"></canvas>
+        </div>
+        <div style="background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
+          <canvas id="chartPayments" style="max-width:420px;"></canvas>
+        </div>
+
       </div>
     </section>
 
@@ -941,11 +1199,11 @@
   <div class="footer-inner">
     <div class="footer-top">
       <img src="/pet-funny-logo.svg" alt="Pet Funny" class="footer-logo" />
-      <div class="footer-bottom">© 2026 Pet Funny • Roleta de Mimos. Todos os direitos reservados.</div>
+      <div class="footer-bottom">© <span id="footerYear"></span> Pet Funny • Roleta de Mimos. Todos os direitos reservados.</div>
       <div class="footer-info">
         <strong>Pet Funny • Banho &amp; Tosa</strong>
         <span>Rua Virgílio de Carvalho Neves Neto, 794 – Ribeirão Preto / SP</span>
-        <span>Horário: Seg–Sex: 07:30 às 17:30 • Sábado: 07:30 às 13:00</span>
+        <span>Horário: <span id="footerHoursText">—</span></span>
         <span>WhatsApp: (16) 98153-5338</span>
       </div>
     </div>
@@ -955,6 +1213,172 @@
 
 
 <!-- <script src="/pf_healthcheck.js"></script> -->
+
+<!-- MODAL: Cadastrar / Editar Cliente -->
+<div id="customerModal" class="pf-modal-overlay hidden" aria-hidden="true" data-close="customerModal">
+  <div class="pf-modal" role="dialog" aria-modal="true" aria-label="Cliente">
+    <div class="pf-modal-head">
+      <div class="pf-modal-left">
+        <div class="pf-modal-ic" aria-hidden="true">👤</div>
+        <div>
+          <p class="pf-modal-title" id="customerModalTitle">Cadastrar novo cliente</p>
+          <p class="pf-modal-sub" id="customerModalSub">Preencha os dados para salvar.</p>
+        </div>
+      </div>
+      <button class="pf-modal-x" id="customerModalClose" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="pf-modal-body">
+      <!-- aqui o bloco #clienteFormBlock será movido dinamicamente -->
+      <div id="customerModalHost"></div>
+
+      <!-- sucesso -->
+      <div id="customerModalSuccess" class="pf-modal-success hidden">
+        <div class="pf-modal-success-msg" id="customerModalSuccessMsg">Cliente cadastrado com sucesso</div>
+        <div class="pf-modal-actions">
+          <button class="btn btn-light" id="customerModalBtnFechar" type="button">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Pets do Cliente -->
+<div id="petsModal" class="pf-modal-overlay hidden" aria-hidden="true" data-close="petsModal">
+  <div class="pf-modal" role="dialog" aria-modal="true" aria-label="Pets" style="width:min(980px, calc(100vw - 32px));">
+    <div class="pf-modal-head">
+      <div class="pf-modal-left">
+        <div class="pf-modal-ic" aria-hidden="true">🐶</div>
+        <div>
+          <p class="pf-modal-title" id="petsModalTitle">Pets</p>
+          <p class="pf-modal-sub" id="petsModalSub">Lista de pets do cliente.</p>
+        </div>
+      </div>
+      <button class="pf-modal-x" id="petsModalClose" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="pf-modal-body">
+      <!-- aqui o card #petsCard será movido dinamicamente -->
+      <div id="petsModalHost"></div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- MODAL: Cadastrar / Editar Serviço -->
+<div id="serviceModal" class="pf-modal-overlay hidden" aria-hidden="true" data-close="serviceModal">
+  <div class="pf-modal" role="dialog" aria-modal="true" aria-label="Serviço">
+    <div class="pf-modal-head">
+      <div class="pf-modal-left">
+        <div class="pf-modal-ic" aria-hidden="true">🧼</div>
+        <div>
+          <p class="pf-modal-title" id="serviceModalTitle">Cadastrar / Editar Serviço</p>
+          <p class="pf-modal-sub" id="serviceModalSub">Preencha os dados para salvar.</p>
+        </div>
+      </div>
+      <button class="pf-modal-x" id="serviceModalClose" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="pf-modal-body">
+      <div id="serviceModalHost">
+        <div id="serviceFormPanel">
+        <input type="hidden" id="serviceId" />
+        <input type="hidden" id="serviceDate" />
+        <div class="form-row-2">
+<div class="form-group">
+            <label for="serviceCategory">Categoria</label>
+            <select id="serviceCategory">
+              <option value="">Selecione...</option>
+              <option value="Banho">Banho</option>
+              <option value="Complemento">Complemento</option>
+              <option value="Tosa">Tosa</option>
+              <option value="Avulso">Avulso</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="serviceTitle">Título do serviço</label>
+            <input type="text" id="serviceTitle" placeholder="Ex: Banho (Porte M)" />
+          </div>
+
+          <div class="form-group">
+            <label for="servicePorte">Porte</label>
+            <select id="servicePorte">
+              <option value="">Selecione...</option>
+              <option value="Pequeno">Pequeno</option>
+              <option value="Médio">Médio</option>
+              <option value="Grande">Grande</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="servicePrice">Preço (R$)</label>
+            <input type="text" id="servicePrice" placeholder="R$ 0,00" inputmode="numeric" />
+          </div>
+
+          <div class="form-group">
+            <label for="serviceTempo">Tempo (min)</label>
+            <input type="number" name="duration_min" id="serviceTempo" class="input-tempo-min" min="0" step="5" placeholder="Ex: 60" inputmode="numeric" />
+          </div>
+        </div>
+
+        <div id="serviceError" class="error-msg" style="display:none;"></div>
+
+        <div class="form-actions">
+          <button class="btn btn-secondary" id="btnServiceCancel" type="button">Cancelar</button>
+          <button class="btn" id="btnServiceSave" type="button">Salvar</button>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Cadastrar / Editar Mimo -->
+<div id="mimoModal" class="pf-modal-overlay hidden" aria-hidden="true" data-close="mimoModal">
+  <div class="pf-modal" role="dialog" aria-modal="true" aria-label="Mimo" style="width:min(980px, calc(100vw - 32px));">
+    <div class="pf-modal-head">
+      <div class="pf-modal-left">
+        <div class="pf-modal-ic" aria-hidden="true">🎁</div>
+        <div>
+          <p class="pf-modal-title" id="mimoModalTitle">Cadastrar / Editar Mimo</p>
+          <p class="pf-modal-sub" id="mimoModalSub">Preencha os dados para salvar.</p>
+        </div>
+      </div>
+      <button class="pf-modal-x" id="mimoModalClose" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="pf-modal-body">
+      <!-- aqui o bloco #mimoFormWrap será movido dinamicamente -->
+      <div id="mimoModalHost"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Informações (Cliente / Pet) -->
+<div id="infoModal" class="pf-modal-overlay hidden" aria-hidden="true" data-close="infoModal">
+  <div class="pf-modal" role="dialog" aria-modal="true" aria-label="Informações" style="width:min(720px, calc(100vw - 32px));">
+    <div class="pf-modal-head">
+      <div class="pf-modal-left">
+        <div class="pf-modal-ic" aria-hidden="true" id="infoModalIcon">ℹ️</div>
+        <div>
+          <p class="pf-modal-title" id="infoModalTitle">Informações</p>
+          <p class="pf-modal-sub" id="infoModalSub">Detalhes</p>
+        </div>
+      </div>
+      <button class="pf-modal-x" id="infoModalClose" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="pf-modal-body">
+      <div id="infoModalBody"></div>
+      <div class="pf-modal-actions" style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+        <button class="btn btn-light" id="infoModalBtnFechar" type="button">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- PF HINT MODAL (auto-close + focus) -->
 <div id="pfHintOverlay" class="pf-hint-overlay" aria-hidden="true">
   <div class="pf-hint-modal" role="dialog" aria-modal="true" aria-label="Notificação">
@@ -988,7 +1412,7 @@
 
     <div style="margin-top:12px; max-height: 62vh; overflow:auto; border:1px solid rgba(255,255,255,.10); border-radius:12px; background: rgba(255,255,255,.04);">
       
-      <table style="width:100%; border-collapse: collapse; font-size:13px;">
+      <table style="width:100%; border-collapse: collapse; font-size:14px;">
         <thead>
           <tr style="background-color: #BBE1E9">
             <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,.10);">Data</th>
@@ -1012,7 +1436,7 @@
       <div style="width:18px; height:18px; border:3px solid #ddd; border-top-color:#01ADB7; border-radius:50%; animation: pfSpin 1s linear infinite;"></div>
       <div>
         <div style="font-weight:800; font-size:16px; line-height:1.2;">Encaminhando Detalhes do Pacote.....</div>
-        <div id="packageDispatchSub" style="margin-top:4px; font-size:13px; opacity:.85;">Abrindo o WhatsApp com a ficha completa do pacote.</div>
+        <div id="packageDispatchSub" style="margin-top:4px; font-size:14px; opacity:.85;">Abrindo o WhatsApp com a ficha completa do pacote.</div>
       </div>
     </div>
   </div>
@@ -1029,6 +1453,25 @@
 <script src="/pf_helpers.js"></script>
 <script src="/pf_api.js"></script>
 <script src="/admin/js/bootstrap.js"></script>
+
+<div id="packageModal" class="pf-modal-overlay hidden" aria-hidden="true" data-close="packageModal">
+  <div class="pf-modal" role="dialog" aria-modal="true" aria-label="Pacote">
+    <div class="pf-modal-head">
+      <div class="pf-modal-left">
+        <div class="pf-modal-ic" aria-hidden="true">📦</div>
+        <div>
+          <p class="pf-modal-title" id="packageModalTitle">Cadastrar / Editar Pacote</p>
+          <p class="pf-modal-sub" id="packageModalSub">Preencha os dados para salvar.</p>
+        </div>
+      </div>
+      <button class="pf-modal-x" id="packageModalClose" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="pf-modal-body">
+      <div id="packageModalHost"></div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
