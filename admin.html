@@ -1443,6 +1443,26 @@
 </div>
 <style>
   @keyframes pfSpin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+
+  /* PATCH (2026-01-06): Agenda table resilience
+     - Evita "quebra" da tabela quando algum campo vem muito longo.
+     - Mantém layout existente, apenas habilita scroll horizontal no wrapper.
+  */
+  #agendaListWrapper.table-wrapper{
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  #agendaListWrapper.table-wrapper table{
+    width: 100%;
+    min-width: 1400px; /* garante espaço para todas as colunas */
+  }
+  #agendaListWrapper.table-wrapper th,
+  #agendaListWrapper.table-wrapper td{
+    white-space: nowrap; /* evita colapsar/empurrar colunas */
+  }
+
 </style>
 
 
