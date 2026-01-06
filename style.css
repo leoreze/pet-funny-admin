@@ -1283,7 +1283,9 @@ input[name="duration_min"],
 /* Pagamento (badge) */
 .pay-badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 14px; font-weight: 700; line-height: 1; }
 .pay-paid { background: rgba(0, 200, 83, 0.18); color: #0b6b2f; }
-.pay-unpaid { background: rgba(244, 67, 54, 0.18); color: #b71c1c; }
+.pay-pending { background: rgba(255, 193, 7, 0.22); color: #6a4b00; }
+.pay-rejected { background: rgba(244, 67, 54, 0.18); color: #b71c1c; }
+.pay-unpaid { background: rgba(244, 67, 54, 0.12); color: #b71c1c; }
 .pay-unknown { background: rgba(120, 120, 120, 0.15); color: #555; }
 
 /* Forma de pagamento com ícone */

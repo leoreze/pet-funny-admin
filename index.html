@@ -705,6 +705,31 @@
               <textarea id="notesInput" placeholder="Ex: busca em casa, pet idoso, medicação, etc."></textarea>
             </div>
 
+            <div class="field-group">
+              <div class="field-label">Forma de pagamento</div>
+              <select id="paymentMethodSelect">
+                <option value="balcao" selected>Cartão no balcão (débito/crédito)</option>
+                <option value="pix">Pix (pagar agora)</option>
+              </select>
+              <div class="field-help">Se escolher Pix, você verá o QR Code para pagar e o sistema confirma automaticamente.</div>
+            </div>
+
+            <div id="pixPaymentBox" class="field-group hidden">
+              <div class="field-label">Pagamento via Pix</div>
+              <div class="field-help" id="pixStatusMsg">Gerando Pix...</div>
+              <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; margin-top:10px;">
+                <img id="pixQrImg" alt="QR Code Pix" style="width:220px; height:220px; border-radius:14px; background:#fff; padding:8px; box-shadow:0 10px 22px rgba(0,0,0,.08);"/>
+                <div style="flex:1; min-width:240px;">
+                  <div class="field-help" style="margin-bottom:8px;">Ou copie e cole no seu app do banco:</div>
+                  <textarea id="pixCopyPaste" readonly style="min-height:120px;"></textarea>
+                  <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button id="btnCopyPix" type="button" class="btn btn-inline" style="padding:10px 14px;">Copiar Pix</button>
+                    <button id="btnCancelPix" type="button" class="btn btn-inline" style="padding:10px 14px; opacity:.85;">Cancelar</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div id="step4Error" class="error-msg hidden"></div>
             <div id="step4Success" class="success-msg hidden"></div>
 
@@ -1121,9 +1146,83 @@
 
   const notesInput = document.getElementById('notesInput');
 
+  // Pagamento (Pix online / cartão no balcão)
+  const paymentMethodSelect = document.getElementById('paymentMethodSelect');
+  const pixPaymentBox = document.getElementById('pixPaymentBox');
+  const pixStatusMsg = document.getElementById('pixStatusMsg');
+  const pixQrImg = document.getElementById('pixQrImg');
+  const pixCopyPaste = document.getElementById('pixCopyPaste');
+  const btnCopyPix = document.getElementById('btnCopyPix');
+  const btnCancelPix = document.getElementById('btnCancelPix');
+
+  let pixPollTimer = null;
+  let currentPixBookingId = null;
+
+  function stopPixPolling() {
+    if (pixPollTimer) {
+      clearInterval(pixPollTimer);
+      pixPollTimer = null;
+    }
+  }
+
+  function resetPixUI() {
+    stopPixPolling();
+    currentPixBookingId = null;
+    if (pixCopyPaste) pixCopyPaste.value = '';
+    if (pixQrImg) pixQrImg.src = '';
+    if (pixStatusMsg) pixStatusMsg.textContent = '';
+    if (pixPaymentBox) pixPaymentBox.classList.add('hidden');
+  }
+
+
   const step4Error = document.getElementById('step4Error');
   const step4Success = document.getElementById('step4Success');
   const btnConfirmBooking = document.getElementById('btnConfirmBooking');
+
+  function updateConfirmButtonLabel() {
+    if (!btnConfirmBooking) return;
+    const v = paymentMethodSelect ? String(paymentMethodSelect.value || '') : '';
+    if (v === 'pix') {
+      btnConfirmBooking.textContent = 'Gerar Pix e confirmar pagamento';
+    } else {
+      btnConfirmBooking.textContent = 'Confirmar agendamento e falar no WhatsApp';
+    }
+  }
+
+  if (paymentMethodSelect) {
+    paymentMethodSelect.addEventListener('change', () => {
+      updateConfirmButtonLabel();
+      // Se o usuário trocar para balcão, esconda o box do Pix
+      if (paymentMethodSelect.value !== 'pix') resetPixUI();
+    });
+  }
+
+  if (btnCopyPix) {
+    btnCopyPix.addEventListener('click', async () => {
+      try {
+        if (!pixCopyPaste || !pixCopyPaste.value) return;
+        await navigator.clipboard.writeText(pixCopyPaste.value);
+        pfToast('Pix copiado!', 'success', 1600);
+      } catch (e) {
+        pfToast('Não foi possível copiar automaticamente. Selecione e copie manualmente.', 'info', 2500);
+      }
+    });
+  }
+
+  if (btnCancelPix) {
+    btnCancelPix.addEventListener('click', () => {
+      resetPixUI();
+      if (step4Error) {
+        step4Error.textContent = 'Pagamento Pix cancelado. Você pode escolher cartão no balcão e confirmar.';
+        step4Error.classList.remove('hidden');
+      }
+      updateConfirmButtonLabel();
+    });
+  }
+
+  // inicial
+  updateConfirmButtonLabel();
+
 
   const sortingScreen = document.getElementById('sortingScreen');
   const successScreen = document.getElementById('successScreen');
@@ -2223,11 +2322,11 @@
         return;
       }
     }
-
-
-
     try {
-      await apiPost('/api/bookings', {
+      const paymentChoice = paymentMethodSelect ? String(paymentMethodSelect.value || 'balcao') : 'balcao';
+      const isPix = paymentChoice === 'pix';
+
+      const created = await apiPost('/api/bookings', {
         customer_id: currentCustomer.id,
         pet_id: parseInt(petId, 10),
         date,
@@ -2237,41 +2336,130 @@
         services: servicesJson,
         prize: selectedPrize.key,
         notes,
-        status: 'agendado'
+        status: 'agendado',
+        payment_method: isPix ? 'pix' : 'balcao',
+        payment_status: isPix ? 'Aguardando pagamento' : 'Não Pago'
       });
+
+      const bookingId = created && created.booking && created.booking.id ? Number(created.booking.id) : null;
 
       const pet = currentPets.find(p => String(p.id) === String(petId));
       const petName = pet ? pet.name : 'seu pet';
 
-      const dataBr = (() => {
-        const parts = (date || '').split('-');
-        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-        return date;
-      })();
+      // Se o cliente escolheu Pix, gerar cobrança e aguardar confirmação automática
+      if (isPix) {
+        if (!bookingId) throw new Error('Não foi possível gerar o Pix (agendamento sem ID). Tente novamente.');
 
-      function normalizeText(str) {
-        return str.normalize('NFC');
+        step4Success.classList.add('hidden');
+        step4Error.classList.add('hidden');
+
+        btnConfirmBooking.disabled = true;
+        updateConfirmButtonLabel();
+
+        pixPaymentBox.classList.remove('hidden');
+        pixStatusMsg.textContent = 'Gerando Pix...';
+
+        const pix = await apiPost('/api/payments/mercadopago/pix', { booking_id: bookingId });
+
+        currentPixBookingId = bookingId;
+
+        // QR base64 -> imagem
+        if (pix && pix.qr_code_base64) {
+          pixQrImg.src = 'data:image/png;base64,' + pix.qr_code_base64;
+        } else if (pix && pix.qr_code_image_url) {
+          pixQrImg.src = pix.qr_code_image_url;
+        } else {
+          pixQrImg.src = '';
+        }
+
+        pixCopyPaste.value = (pix && pix.qr_code) ? pix.qr_code : '';
+
+        pixStatusMsg.textContent = 'Aguardando pagamento... Assim que confirmar, a tela avisa automaticamente.';
+
+        stopPixPolling();
+        pixPollTimer = setInterval(async () => {
+          try {
+            const resp = await apiGet(`/api/payments/mercadopago/bookings/${bookingId}/sync`);
+            const b = resp && resp.booking ? resp.booking : null;
+            const ps = String((b && b.payment_status) || '').toLowerCase();
+            const st = String((b && b.status) || '').toLowerCase();
+
+            if (ps === 'pago' || st === 'confirmado' || ps === 'approved') {
+              stopPixPolling();
+              pixStatusMsg.textContent = 'Pagamento confirmado! Finalizando...';
+              pfToast('Pagamento Pix confirmado!', 'success', 2000);
+
+              btnConfirmBooking.disabled = false;
+              resetPixUI();
+
+              // Continua o fluxo normal: WhatsApp + retorno ao início
+              const message = buildWhatsappMessage({
+                customerName: currentCustomer.name,
+                phone: currentCustomer.phone,
+                petName,
+                servicesText,
+                date,
+                time,
+                prizeKey: selectedPrize.key,
+                notes
+              }) + "\n\nPagamento: PIX CONFIRMADO ✅";
+
+              const url = buildWhatsappUrl(message);
+
+              sortingScreen.classList.remove('hidden');
+              setTimeout(() => {
+                sortingScreen.classList.add('hidden');
+                successScreen.classList.remove('hidden');
+              }, 850);
+
+              pfToast('Agendamento enviado com sucesso! Te chamamos no WhatsApp 🐾', 'success', 2200);
+
+              setTimeout(() => {
+                window.open(url, '_blank');
+              }, 650);
+
+              setTimeout(() => {
+                successScreen.classList.add('hidden');
+                try { localStorage.removeItem('petfunny_prize'); } catch {}
+                window.location.href = '/';
+              }, 1300);
+            }
+          } catch (e) {
+            // mantém aguardando
+          }
+        }, 2500);
+
+        // fallback: após 3 min, libera e orienta
+        setTimeout(() => {
+          if (currentPixBookingId === bookingId) {
+            stopPixPolling();
+            btnConfirmBooking.disabled = false;
+            pixStatusMsg.textContent = 'Ainda não identificamos o pagamento. Se já pagou, aguarde mais alguns instantes ou fale com a gente pelo WhatsApp.';
+          }
+        }, 180000);
+
+        return;
       }
 
-      const texto = normalizeText(`
-Oi, Pet Funny, meu nome é ${currentCustomer.name || ''}, realizei um novo agendamento vindo da Roleta de Mimos:
+      // Pagamento no balcão (cartão/débito/crédito)
+      const message = buildWhatsappMessage({
+        customerName: currentCustomer.name,
+        phone: currentCustomer.phone,
+        petName,
+        servicesText,
+        date,
+        time,
+        prizeKey: selectedPrize.key,
+        notes
+      }) + "\n\nPagamento: CARTÃO NO BALCÃO (DÉBITO/CRÉDITO)";
 
-• Tutor(a): ${currentCustomer.name || ''}
-• WhatsApp do tutor: ${phoneInput.value.trim() || ''}
-• Pet: ${petName}
-• Serviço(s): ${servicesText}
-• Valor total: ${serviceValueBRL}
-• Mimo da Roleta: ${selectedPrize.key}
-• Data: ${dataBr}
-• Horário: ${time}
-• Observações: ${notes || '—'}
+      const url = buildWhatsappUrl(message);
 
-Aguardo o retorno de confirmação do agendamento.`).trim();
-
-      const url = `https://api.whatsapp.com/send?phone=5516981535338&text=${encodeURIComponent(texto)}`;
-
-
-      successScreen.classList.remove('hidden');
+      sortingScreen.classList.remove('hidden');
+      setTimeout(() => {
+        sortingScreen.classList.add('hidden');
+        successScreen.classList.remove('hidden');
+      }, 850);
 
       // Toast visual + encaminhamento WhatsApp e retorno ao início
       pfToast('Agendamento enviado com sucesso! Te chamamos no WhatsApp 🐾', 'success', 2200);
@@ -2288,7 +2476,9 @@ Aguardo o retorno de confirmação do agendamento.`).trim();
       }, 1300);
 
     } catch (e) {
-      step4Error.textContent = e.message;
+      console.error('Erro ao confirmar agendamento:', e);
+      btnConfirmBooking.disabled = false;
+      step4Error.textContent = e.message || 'Erro ao confirmar agendamento.';
       step4Error.classList.remove('hidden');
     }
   });

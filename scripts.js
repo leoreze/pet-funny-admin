@@ -169,26 +169,46 @@ function setRowTimeHighlight(tr, dateISO, timeHHMM) {
     else if (diffH > 4 && diffH <= 10) tr.classList.add('row-soon-green');
   } catch (_) {}
 }
+function paymentLabel(ps) {
+  // Normaliza status vindo do Mercado Pago ou textos já existentes
+  const raw = String(ps || '').trim();
+  const s = normStr(raw);
+
+  if (!s) return '—';
+
+  // Mercado Pago (payment.status)
+  if (s === 'approved') return 'Pago';
+  if (s === 'pending' || s === 'in process' || s === 'in_process') return 'Aguardando';
+  if (s === 'rejected' || s === 'cancelled' || s === 'canceled' || s === 'charged back' || s === 'charged_back') return 'Recusado';
+
+  // Variações em PT
+  if (s.includes('aguard')) return 'Aguardando';
+  if (s.includes('recus') || s.includes('rejeit') || s.includes('cancel')) return 'Recusado';
+  if (s.includes('pago') || s.includes('paid') || s === 'sim') return 'Pago';
+  if (s.includes('nao pago') || s.includes('não pago') || s.includes('pendente') || s.includes('aberto') || s.includes('unpaid')) return 'Aguardando';
+
+  // Mantém texto original se não reconheceu, mas com capitalização simples
+  return raw;
+}
+
 function classPayment(ps) {
-  const s = normStr(ps || '');
+  const label = paymentLabel(ps);
+  const s = normStr(label || '');
+
   if (!s) return 'pay-unknown';
 
-  // IMPORTANTE: checar "não pago" antes de "pago" (porque "nao pago" contém "pago")
-  if (
-    s.includes('nao pago') || s.includes('não pago') ||
-    s.includes('nao') || s.includes('não') ||
-    s.includes('pendente') || s.includes('aberto') || s.includes('unpaid')
-  ) return 'pay-unpaid';
+  if (s.includes('recus') || s.includes('rejeit') || s.includes('cancel')) return 'pay-rejected';
+  if (s.includes('aguard') || s.includes('pend') || s.includes('process')) return 'pay-pending';
 
-  if (
-    s === 'pago' || s === 'paga' ||
-    s.includes(' pago') || s.includes('paid') || s === 'sim'
-  ) return 'pay-paid';
+  // IMPORTANTE: checar "não pago" antes de "pago" (porque "nao pago" contém "pago")
+  if (s.includes('nao pago') || s.includes('não pago') || s.includes('unpaid')) return 'pay-unpaid';
+
+  if (s === 'pago' || s === 'paga' || s.includes(' pago') || s.includes('paid') || s === 'sim') return 'pay-paid';
 
   return 'pay-unknown';
 }
 
-function iconForMethod(method) {
+function iconForMethod(method) {(method) {
   const m = normStr(method || '');
   if (!m) return '';
   if (m.includes('dinheiro')) return '💵';
@@ -3029,10 +3049,11 @@ function getServicesInfoFromBooking(a) {
       tdMimo.className = 'td-mimo';
 
       const tdPayStatus = document.createElement('td');
-      const psLabel = (a.payment_status || a.paymentStatus || a.pagamento || a.payment || '-');
-      const psClass = classPayment(psLabel);
-      const psIcon = (psClass === 'pay-paid') ? '✔' : (psClass === 'pay-unpaid' ? '✖' : '•');
-      tdPayStatus.innerHTML = `<span class="pay-badge ${psClass}">${psIcon} ${psLabel}</span>`;
+      const psRaw = (a.payment_status || a.paymentStatus || a.pagamento || a.payment || '');
+      const psLabel = paymentLabel(psRaw);
+      const psClass = classPayment(psRaw);
+      const psIcon = (psClass === 'pay-paid') ? '✔' : (psClass === 'pay-rejected' ? '✖' : (psClass === 'pay-pending' ? '⏳' : '•'));
+      tdPayStatus.innerHTML = `<span class="pay-badge ${psClass}">${psIcon} ${escapeHtml(psLabel)}</span>`;
 
       const tdPayMethod = document.createElement('td');
       const pmLabel = (a.payment_method || a.paymentMethod || a.forma_pagamento || a.payment_method || '-');
@@ -3349,9 +3370,10 @@ Qualquer dúvida, estou à disposição.`;
       // Pagamento + Forma (mesmo conteúdo da lista)
       const lPay = document.createElement('div');
       lPay.className = 'agenda-line';
-      const psLabel = String(a.payment_status || '').trim() || '—';
-      const psClass = classPayment(psLabel);
-      const psIcon = (psClass === 'pay-paid') ? '✔' : (psClass === 'pay-unpaid' ? '✖' : '•');
+      const psRaw = String(a.payment_status || '').trim();
+      const psLabel = paymentLabel(psRaw);
+      const psClass = classPayment(psRaw);
+      const psIcon = (psClass === 'pay-paid') ? '✔' : (psClass === 'pay-rejected' ? '✖' : (psClass === 'pay-pending' ? '⏳' : '•'));
       lPay.innerHTML = `<span class="agenda-key">Pagamento:</span> <span class="pay-badge ${psClass}">${psIcon} ${escapeHtml(psLabel)}</span>`;
 
       const lForma = document.createElement('div');

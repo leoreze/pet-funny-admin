@@ -6,8 +6,97 @@ const cors = require('cors');
 const db = require('./db');
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
+
+// =========================
+// Mercado Pago (PIX)
+// =========================
+const MP_API_BASE = 'https://api.mercadopago.com';
+
+const crypto = require('crypto');
+
+function makeMpIdempotencyKey(seed) {
+  // Mercado Pago requires a non-null string header value for X-Idempotency-Key.
+  // We generate a stable key per booking to avoid duplicate Pix charges on retries.
+  const s = String(seed || '');
+  if (!s) return crypto.randomUUID();
+  return crypto.createHash('sha256').update(s).digest('hex').slice(0, 32);
+}
+
+
+function getMpAccessToken() {
+  const t = process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN || '';
+  return String(t || '').trim();
+}
+
+async function mpFetch(path, options = {}) {
+  const token = getMpAccessToken();
+  if (!token) {
+    const err = new Error('MERCADOPAGO_ACCESS_TOKEN não configurado no servidor.');
+    err.statusCode = 500;
+    throw err;
+  }
+  const url = path.startsWith('http') ? path : `${MP_API_BASE}${path}`;
+  const fetchFn = (typeof fetch === 'function') ? fetch : (await import('node-fetch')).default;
+  const res = await fetchFn(url, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+
+  if (!res.ok) {
+    // Friendly mapping for common Mercado Pago PIX integration errors
+    const mpMessage = (data && (data.message || data.error || data.cause?.[0]?.description)) ? String(data.message || data.error || data.cause?.[0]?.description) : '';
+    const mpCode = data && data.cause && data.cause[0] && data.cause[0].code ? Number(data.cause[0].code) : null;
+
+    // 13253: Collector user without key enabled for QR render (Pix key not registered/enabled)
+    if (mpCode === 13253 || /Collector user without key enabled for QR render/i.test(mpMessage)) {
+      const e = new Error('Sua conta do Mercado Pago ainda não tem uma chave Pix habilitada para gerar QR Code. Abra o app/site do Mercado Pago e cadastre/ative uma chave Pix (CPF/CNPJ, e-mail, celular ou aleatória) e habilite o recebimento via Pix. Depois tente novamente.');
+      e.statusCode = res.status;
+      e.payload = data;
+      e.mp_code = mpCode;
+      throw e;
+    }
+
+    const e = new Error(mpMessage || `Erro Mercado Pago (${res.status})`);
+    e.statusCode = res.status;
+    e.payload = data;
+    e.mp_code = mpCode;
+    throw e;
+  }
+  return data;
+}
+
+
+
+
+function isValidHttpUrl(u) {
+  try {
+    const x = new URL(String(u || '').trim());
+    return x.protocol === 'http:' || x.protocol === 'https:';
+  } catch (_) {
+    return false;
+  }
+}
+
+function isLocalhostUrl(u) {
+  try {
+    const x = new URL(String(u || '').trim());
+    return ['localhost', '127.0.0.1', '::1'].includes(x.hostname);
+  } catch (_) {
+    return false;
+  }
+}
+
 
 // Static files (admin.html, index.html, assets)
 app.use(express.static(__dirname));
@@ -856,6 +945,44 @@ app.get('/api/bookings', async (req, res) => {
   }
 });
 
+// Retorna um booking específico (usado para polling do pagamento)
+app.get('/api/bookings/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    const { rows } = await db.query('SELECT * FROM bookings WHERE id = $1', [id]);
+    const booking = rows[0] || null;
+    if (!booking) return res.status(404).json({ error: 'Agendamento não encontrado.' });
+
+    // recuperar nome do cliente/pet para usar na descrição (aparece no extrato)
+    let customerName = '';
+    let petName = '';
+    try {
+      const info = await db.query(
+        `SELECT c.name AS customer_name, p.name AS pet_name
+           FROM bookings b
+      LEFT JOIN customers c ON c.id = b.customer_id
+      LEFT JOIN pets p ON p.id = b.pet_id
+          WHERE b.id = $1
+          LIMIT 1`,
+        [booking_id]
+      );
+      if (info.rows && info.rows[0]) {
+        customerName = info.rows[0].customer_name || '';
+        petName = info.rows[0].pet_name || '';
+      }
+    } catch (e) {
+      // não bloqueia a criação do Pix
+    }
+
+
+    res.json({ booking });
+  } catch (err) {
+    console.error('Erro ao buscar booking:', err);
+    res.status(500).json({ error: 'Erro interno ao buscar agendamento.' });
+  }
+});
 
 app.post('/api/bookings', async (req, res) => {
   try {
@@ -940,6 +1067,235 @@ app.post('/api/bookings', async (req, res) => {
   } catch (err) {
     console.error('Erro ao criar booking:', err);
     res.status(500).json({ error: 'Erro interno ao salvar agendamento.' });
+  }
+});
+
+/* =========================
+   PAYMENTS (Mercado Pago - PIX)
+========================= */
+
+// Cria cobrança Pix no Mercado Pago para um booking
+app.post('/api/payments/mercadopago/pix', async (req, res) => {
+  try {
+    const booking_id = Number(req.body.booking_id);
+    if (!booking_id) return res.status(400).json({ error: 'booking_id inválido.' });
+
+    // buscar booking e valor
+    const { rows } = await db.query('SELECT * FROM bookings WHERE id = $1', [booking_id]);
+    const booking = rows[0];
+    if (!booking) return res.status(404).json({ error: 'Agendamento não encontrado.' });
+
+    // recuperar nome do cliente/pet para usar na descrição (aparece no extrato)
+    let customerName = '';
+    let petName = '';
+    try {
+      const info = await db.query(
+        `SELECT c.name AS customer_name, p.name AS pet_name
+           FROM bookings b
+      LEFT JOIN customers c ON c.id = b.customer_id
+      LEFT JOIN pets p ON p.id = b.pet_id
+          WHERE b.id = $1
+          LIMIT 1`,
+        [booking_id]
+      );
+      if (info.rows && info.rows[0]) {
+        customerName = info.rows[0].customer_name || '';
+        petName = info.rows[0].pet_name || '';
+      }
+    } catch (e) {
+      // não bloqueia a criação do Pix
+    }
+
+
+    // valor em centavos: preferir totals já salvos, senão somar services_json
+    let valueCents = booking.service_value_cents;
+    if (valueCents == null) {
+      try {
+        const arr = Array.isArray(booking.services_json) ? booking.services_json : (booking.services_json ? JSON.parse(booking.services_json) : []);
+        if (Array.isArray(arr) && arr.length) {
+          valueCents = arr.reduce((acc, it) => acc + Number(it.value_cents || 0), 0);
+        }
+      } catch {}
+    }
+    if (!valueCents || Number(valueCents) <= 0) {
+      return res.status(400).json({ error: 'Valor do serviço não definido para este agendamento.' });
+    }
+
+    // payer email (Mercado Pago exige)
+    const payerEmail = (req.body.payer_email && String(req.body.payer_email).includes('@'))
+      ? String(req.body.payer_email).trim()
+      // Mercado Pago valida apenas o formato do e-mail. Use um domínio "válido" (com TLD) mesmo que o cliente não informe e-mail.
+      : `cliente_${booking.customer_id || 'pf'}@petfunny.com.br`;
+
+    // Webhook callback (notification_url)
+    // IMPORTANTE: o Mercado Pago rejeita URLs não públicas (ex.: localhost). Para DEV use um túnel (ngrok)
+    // e configure MP_WEBHOOK_URL; se não estiver configurado, omitimos o campo e você pode usar o webhook padrão do painel.
+    let notificationUrl = process.env.MP_WEBHOOK_URL ? String(process.env.MP_WEBHOOK_URL).trim() : '';
+    if (notificationUrl && (!isValidHttpUrl(notificationUrl) || isLocalhostUrl(notificationUrl))) {
+      notificationUrl = '';
+    }
+
+    const payload = {
+      transaction_amount: Number(valueCents) / 100,
+      description: `PetFunny - ${customerName || 'Cliente'}${petName ? ' / ' + petName : ''} - Agendamento #${booking_id}`,
+      payment_method_id: 'pix',
+      payer: { email: payerEmail },
+      external_reference: String(booking_id)
+    };
+    if (notificationUrl) payload.notification_url = notificationUrl;
+
+    const payment = await mpFetch('/v1/payments', {
+      method: 'POST',
+      headers: {
+        // Idempotency avoids duplicate Pix charges if the user retries.
+        'X-Idempotency-Key': makeMpIdempotencyKey(`booking:${booking_id}`)
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const tx = payment && payment.point_of_interaction && payment.point_of_interaction.transaction_data
+      ? payment.point_of_interaction.transaction_data
+      : {};
+
+    const mp_payment_id = payment.id ? String(payment.id) : null;
+    const mp_status = payment.status ? String(payment.status) : null;
+    const mp_qr_code = tx.qr_code ? String(tx.qr_code) : null;
+    const mp_qr_code_base64 = tx.qr_code_base64 ? String(tx.qr_code_base64) : null;
+
+    await db.query(
+      `UPDATE bookings
+         SET payment_method = 'pix',
+             payment_status = CASE WHEN payment_status = 'Pago' THEN payment_status ELSE 'Aguardando pagamento' END,
+             mp_payment_id = $2,
+             mp_status = $3,
+             mp_qr_code = $4,
+             mp_qr_code_base64 = $5
+       WHERE id = $1`,
+      [booking_id, mp_payment_id, mp_status, mp_qr_code, mp_qr_code_base64]
+    );
+
+    res.json({
+      booking_id,
+      mp_payment_id,
+      status: mp_status,
+      qr_code: mp_qr_code,
+      qr_code_base64: mp_qr_code_base64
+    });
+  } catch (err) {
+    console.error('Erro ao criar Pix Mercado Pago:', err);
+    res.status(err.statusCode || 500).json({ error: err.message || 'Erro ao criar Pix.', mp_code: err.mp_code || null });
+  }
+});
+
+
+// Sincroniza status do Pix (útil em DEV/local quando webhook não chega)
+app.get('/api/payments/mercadopago/bookings/:id/sync', async (req, res) => {
+  try {
+    const bookingId = Number(req.params.id);
+    if (!bookingId) return res.status(400).json({ error: 'id inválido.' });
+
+    const { rows } = await db.query('SELECT * FROM bookings WHERE id = $1', [bookingId]);
+    const booking = rows[0];
+    if (!booking) return res.status(404).json({ error: 'Agendamento não encontrado.' });
+
+    // se não existe pagamento, apenas retorna booking
+    if (!booking.mp_payment_id) return res.json({ booking });
+
+    const payment = await mpFetch(`/v1/payments/${booking.mp_payment_id}`, { method: 'GET' });
+    const status = payment && payment.status ? String(payment.status) : '';
+
+    const isApproved = status === 'approved';
+    const isPending = status === 'pending' || status === 'in_process';
+    const isRejected = status === 'rejected' || status === 'cancelled';
+
+    const payment_status = isApproved ? 'Pago'
+      : isRejected ? 'Recusado'
+      : isPending ? 'Aguardando pagamento'
+      : (status ? status : (booking.payment_status || 'Aguardando pagamento'));
+
+    const booking_status = isApproved ? 'Confirmado' : (booking.status || 'agendado');
+
+    await db.query(
+      `UPDATE bookings
+         SET mp_status = $2,
+               payment_method = COALESCE(payment_method, 'pix'),
+             payment_status = $3,
+             status = $4,
+             payment_method = COALESCE(payment_method, 'pix'),
+             mp_paid_at = CASE WHEN $5 THEN NOW() ELSE mp_paid_at END
+       WHERE id = $1`,
+      [bookingId, status, payment_status, booking_status, isApproved]
+    );
+
+    const { rows: rows2 } = await db.query('SELECT * FROM bookings WHERE id = $1', [bookingId]);
+    res.json({ booking: rows2[0] });
+  } catch (err) {
+    console.error('Erro ao sincronizar pagamento Mercado Pago:', err);
+    res.status(500).json({ error: 'Erro ao sincronizar pagamento.' });
+  }
+});
+
+// Webhook Mercado Pago (pagamentos)
+app.post('/api/webhooks/mercadopago', async (req, res) => {
+  try {
+    // Webhook padrão: { data: { id }, type/topic: 'payment'/'payments' }
+    // IPN: querystring ?id=...&topic=payment
+    const paymentId =
+      (req.body && req.body.data && (req.body.data.id || req.body.data.payment_id)) ||
+      (req.query && (req.query.id || req.query['data.id']));
+
+    if (!paymentId) {
+      return res.status(200).json({ ok: true });
+    }
+
+    const payment = await mpFetch(`/v1/payments/${paymentId}`, { method: 'GET' });
+    const status = payment && payment.status ? String(payment.status) : '';
+    const externalRef = payment && payment.external_reference ? String(payment.external_reference) : null;
+
+    // localizar booking por mp_payment_id (preferível) ou external_reference
+    let booking = null;
+    let bookingId = null;
+
+    const byMp = await db.query('SELECT * FROM bookings WHERE mp_payment_id = $1 LIMIT 1', [String(paymentId)]);
+    booking = byMp.rows[0] || null;
+
+    if (!booking && externalRef && String(externalRef).match(/^\d+$/)) {
+      const byExt = await db.query('SELECT * FROM bookings WHERE id = $1 LIMIT 1', [Number(externalRef)]);
+      booking = byExt.rows[0] || null;
+    }
+
+    if (booking) {
+      bookingId = booking.id;
+
+      const isApproved = status === 'approved';
+      const isPending = status === 'pending' || status === 'in_process';
+      const isRejected = status === 'rejected' || status === 'cancelled';
+
+      const payment_status = isApproved ? 'Pago'
+        : isRejected ? 'Recusado'
+        : isPending ? 'Aguardando pagamento'
+        : (status ? status : 'Aguardando pagamento');
+
+      const booking_status = isApproved ? 'Confirmado'
+        : (booking.status || 'agendado');
+
+      await db.query(
+        `UPDATE bookings
+           SET mp_status = $2,
+               payment_method = COALESCE(payment_method, 'pix'),
+               payment_status = $3,
+               status = $4,
+               mp_paid_at = CASE WHEN $5 THEN NOW() ELSE mp_paid_at END
+         WHERE id = $1`,
+        [bookingId, status, payment_status, booking_status, isApproved]
+      );
+    }
+
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('Erro no webhook Mercado Pago:', err);
+    // Mercado Pago recomenda responder 200 para não ficar repetindo indefinidamente
+    res.status(200).json({ ok: true });
   }
 });
 

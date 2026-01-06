@@ -267,6 +267,15 @@ await query(`
   await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS services_json JSONB NOT NULL DEFAULT '[]'::jsonb;`);
 
 
+  // ===== Mercado Pago (Pix) =====
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS mp_payment_id TEXT;`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS mp_status TEXT;`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS mp_qr_code TEXT;`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS mp_qr_code_base64 TEXT;`);
+  await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS mp_paid_at TIMESTAMPTZ;`);
+
+
+
 
   // ===== bookings: campos de pagamento =====
   await query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'Não Pago';`);
