@@ -94,6 +94,8 @@ async function initDb() {
   await query("CREATE INDEX IF NOT EXISTS customers_phone_idx ON customers (phone);");
   // Automação WhatsApp: opt-out
   await query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS opt_out_whatsapp BOOLEAN NOT NULL DEFAULT FALSE;`);
+  // PATCH: fotos (cliente/pet) como DataURL (base64) - 2026-01-06
+  await query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS photo_data TEXT;`);
 
 
   await query(`
@@ -111,6 +113,8 @@ async function initDb() {
     );
   `);
   await query("CREATE INDEX IF NOT EXISTS pets_customer_idx ON pets (customer_id);");
+  await query(`ALTER TABLE pets ADD COLUMN IF NOT EXISTS photo_data TEXT;`);
+
 /* -------------------------
    dog_breeds (Raças de Cães)
 ------------------------- */
@@ -574,6 +578,29 @@ await query(`
   `);
   await query("CREATE INDEX IF NOT EXISTS package_sales_customer_idx ON package_sales (customer_id);");
   await query("CREATE INDEX IF NOT EXISTS package_sales_pet_idx ON package_sales (pet_id);");
+
+  /* -------------------------
+     FINANCEIRO: lançamentos manuais
+     Passo 1: finance_entries
+  ------------------------- */
+  await query(`
+    CREATE TABLE IF NOT EXISTS finance_entries (
+      id SERIAL PRIMARY KEY,
+      date TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'Lançamento',
+      category TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      amount_cents INTEGER NOT NULL DEFAULT 0,
+      payment_status TEXT NOT NULL DEFAULT 'Aguardando',
+      payment_method TEXT NOT NULL DEFAULT '',
+      customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+      pet_id INTEGER REFERENCES pets(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query("CREATE INDEX IF NOT EXISTS finance_entries_date_idx ON finance_entries (date);");
+  await query("CREATE INDEX IF NOT EXISTS finance_entries_customer_idx ON finance_entries (customer_id);");
+  await query("CREATE INDEX IF NOT EXISTS finance_entries_pet_idx ON finance_entries (pet_id);");
   /* -------------------------
      AUTOMAÇÕES (WhatsApp)
   ------------------------- */

@@ -833,6 +833,7 @@ function normalizeHHMM(t) {
     if (tabId === 'tab-racas') loadBreeds().catch(console.error);
     if (tabId === 'tab-horarios') loadOpeningHours().catch(console.error);
     if (tabId === 'tab-automacao') loadAutomation().catch(console.error);
+    if (tabId === 'tab-financeiro') loadFinance().catch(console.error);
     if (tabId === 'tab-dashboard') {
       loadDashboard().finally(() => {
         setTimeout(() => {
@@ -1101,6 +1102,43 @@ const formStatus = document.getElementById('formStatus');
   const dashPackagesDiscountAvg = document.getElementById('dashPackagesDiscountAvg');
   const tbodyDashPackages = document.getElementById('tbodyDashPackages');
   const dashPackagesEmpty = document.getElementById('dashPackagesEmpty');
+
+  // ===== FINANCEIRO =====
+  const finStart = document.getElementById('finStart');
+  const finEnd = document.getElementById('finEnd');
+  const btnFinHoje = document.getElementById('btnFinHoje');
+  const btnFinMes = document.getElementById('btnFinMes');
+  const btnFinAplicar = document.getElementById('btnFinAplicar');
+  const btnFinNovoLanc = document.getElementById('btnFinNovoLanc');
+  const btnFinExportCSV = document.getElementById('btnFinExportCSV');
+  const finPaid = document.getElementById('finPaid');
+  const finPending = document.getElementById('finPending');
+  const finUnpaid = document.getElementById('finUnpaid');
+  const finRejected = document.getElementById('finRejected');
+  const finTotal = document.getElementById('finTotal');
+  const finOut = document.getElementById('finOut');
+  const tbodyFinance = document.getElementById('tbodyFinance');
+  const finEmpty = document.getElementById('finEmpty');
+
+  // Modal: Novo lançamento (finance_entries)
+  const financeEntryModal = document.getElementById('financeEntryModal');
+  const financeEntryModalClose = document.getElementById('financeEntryModalClose');
+  const financeEntryForm = document.getElementById('financeEntryForm');
+  const finEntryId = document.getElementById('finEntryId');
+  const finEntryDate = document.getElementById('finEntryDate');
+  const finEntryType = document.getElementById('finEntryType');
+  const finEntryAmount = document.getElementById('finEntryAmount');
+  const finEntryMethod = document.getElementById('finEntryMethod');
+  const finEntryStatus = document.getElementById('finEntryStatus');
+  const finEntryCategory = document.getElementById('finEntryCategory');
+  const finEntryDesc = document.getElementById('finEntryDesc');
+  const btnFinEntryCancel = document.getElementById('btnFinEntryCancel');
+  const financeEntryModalSuccess = document.getElementById('financeEntryModalSuccess');
+  const financeEntryModalSuccessMsg = document.getElementById('financeEntryModalSuccessMsg');
+  const financeEntryModalError = document.getElementById('financeEntryModalError');
+
+  let ultimaFinanceLista = [];
+
   let ultimaLista = [];
   let clientesCache = [];
   let clienteSelecionadoId = null;
@@ -2028,6 +2066,154 @@ try { bindServicesEventsOnce(); } catch (_) {}
       e.stopImmediatePropagation();
       closeModalEnsure();
     }, true);
+  }
+})();
+
+// =========================
+// FINANCE_ENTRIES (lançamentos manuais)
+// Passo 1: botão "+ Novo lançamento" + modal (mesmo padrão visual).
+// =========================
+(function () {
+  try {
+    const btnOpen = document.getElementById('btnFinNovoLancamento');
+    const modal = document.getElementById('financeEntryModal');
+    const form = document.getElementById('financeEntryForm');
+    if (!btnOpen || !modal || !form) return;
+
+    const btnClose = document.getElementById('financeEntryModalClose');
+    const btnCancel = document.getElementById('financeEntryBtnCancel');
+    const btnSave = document.getElementById('financeEntryBtnSave');
+    const btnFechar = document.getElementById('financeEntryModalBtnFechar');
+
+    const successBox = document.getElementById('financeEntryModalSuccess');
+    const errorBox = document.getElementById('financeEntryFormError');
+
+    const elId = document.getElementById('finEntryId');
+    const elDate = document.getElementById('finEntryDate');
+    const elType = document.getElementById('finEntryType');
+    const elCategory = document.getElementById('finEntryCategory');
+    const elAmount = document.getElementById('finEntryAmount');
+    const elDesc = document.getElementById('finEntryDescription');
+    const elPayMethod = document.getElementById('finEntryPayMethod');
+    const elPayStatus = document.getElementById('finEntryPayStatus');
+    const elNotes = document.getElementById('finEntryNotes');
+
+    function __show() {
+      try {
+        if (typeof __showModal === 'function') return __showModal(modal);
+      } catch (_) {}
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function __hide() {
+      try {
+        if (typeof __hideModal === 'function') return __hideModal(modal);
+      } catch (_) {}
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    function __setError(msg) {
+      if (!errorBox) return;
+      if (!msg) {
+        errorBox.classList.add('hidden');
+        errorBox.textContent = '';
+        return;
+      }
+      errorBox.textContent = String(msg);
+      errorBox.classList.remove('hidden');
+    }
+
+    function __resetForm() {
+      try { form.reset(); } catch (_) {}
+      if (elId) elId.value = '';
+      if (elDate) {
+        const today = (typeof toISODateOnly === 'function') ? toISODateOnly(new Date()) : new Date().toISOString().slice(0, 10);
+        elDate.value = today;
+      }
+      if (elType) elType.value = 'Entrada';
+      if (elPayStatus) elPayStatus.value = 'Pago';
+      if (successBox) successBox.classList.add('hidden');
+      form.classList.remove('hidden');
+      __setError('');
+    }
+
+    btnOpen.addEventListener('click', () => {
+      __resetForm();
+      __show();
+    });
+
+    if (btnClose) btnClose.addEventListener('click', __hide);
+    if (btnCancel) btnCancel.addEventListener('click', __hide);
+    if (btnFechar) btnFechar.addEventListener('click', () => {
+      __hide();
+      try { if (typeof loadFinance === 'function') loadFinance(); } catch (_) {}
+    });
+
+    // click fora para fechar (mesmo padrão)
+    modal.addEventListener('mousedown', (e) => {
+      if (e.target === modal) __hide();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      __setError('');
+      if (btnSave) btnSave.disabled = true;
+
+      try {
+        const date = (elDate && elDate.value) ? String(elDate.value) : '';
+        const entry_type = (elType && elType.value) ? String(elType.value) : 'Entrada';
+        const category = (elCategory && elCategory.value) ? String(elCategory.value).trim() : '';
+        const description = (elDesc && elDesc.value) ? String(elDesc.value).trim() : '';
+        const payment_method = (elPayMethod && elPayMethod.value) ? String(elPayMethod.value).trim() : '';
+        const payment_status = (elPayStatus && elPayStatus.value) ? String(elPayStatus.value) : 'Pago';
+        const notes = (elNotes && elNotes.value) ? String(elNotes.value).trim() : '';
+
+        // valor em cents
+        const raw = (elAmount && elAmount.value != null) ? String(elAmount.value) : '';
+        const val = Number.parseFloat(raw.replace(',', '.'));
+        if (!date) throw new Error('Informe a data.');
+        if (!Number.isFinite(val) || val <= 0) throw new Error('Informe um valor válido maior que zero.');
+        const amount_cents = Math.round(val * 100);
+
+        const payload = {
+          date,
+          entry_type,
+          category,
+          description,
+          amount_cents,
+          payment_method,
+          payment_status,
+          notes,
+        };
+
+        let resp = null;
+        if (typeof apiPost === 'function') {
+          resp = await apiPost('/api/finance-entries', payload);
+        } else {
+          const r = await fetch('/api/finance-entries', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.error || 'Erro ao salvar lançamento.');
+          resp = d;
+        }
+
+        // sucesso
+        form.classList.add('hidden');
+        if (successBox) successBox.classList.remove('hidden');
+        try { if (typeof loadFinance === 'function') loadFinance(); } catch (_) {}
+      } catch (err) {
+        __setError(err && err.message ? err.message : String(err));
+      } finally {
+        if (btnSave) btnSave.disabled = false;
+      }
+    });
+  } catch (e) {
+    console.warn('FinanceEntryModal init falhou:', e);
   }
 })();
 
@@ -2996,19 +3182,27 @@ function getServicesInfoFromBooking(a) {
       // Cliente (clicável -> modal)
       const tdTutor = document.createElement('td');
       tdTutor.classList.add('agenda-bold');
-      if (a.customer_id) {
-        tdTutor.innerHTML = `<span class="pf-linklike" data-open="customer" data-id="${a.customer_id}">${escapeHtml(a.customer_name || '-')}</span>`;
-      } else {
-        tdTutor.textContent = a.customer_name || '-';
+      {
+        const photo = String((a.customer_photo_data || a.customer_photo || a.customer_photo_url || '')).trim();
+        const nameHtml = a.customer_id
+          ? `<span class="pf-linklike" data-open="customer" data-id="${a.customer_id}">${escapeHtml(a.customer_name || '-')}</span>`
+          : escapeHtml(a.customer_name || '-');
+        const nm = String(a.customer_name || '').trim();
+        const initial = nm ? nm.split(/\s+/).filter(Boolean).slice(0,2).map(p => p[0]).join('').toUpperCase() : '—';
+        tdTutor.innerHTML = `<span class="pf-cell-avatar">${photo ? `<img class="pf-avatar-sm" alt="Foto de ${escapeHtml(a.customer_name || 'tutor')}" src="${photo}">` : `<span class="pf-avatar-ph" aria-hidden="true">${escapeHtml(initial || '—')}</span>`}<span class="pf-cell-avatar__text">${nameHtml}</span></span>`;
       }
 
       // Pet (clicável -> modal)
       const tdPet = document.createElement('td');
       tdPet.classList.add('agenda-bold');
-      if (a.pet_id) {
-        tdPet.innerHTML = `<span class="pf-linklike" data-open="pet" data-id="${a.pet_id}">${escapeHtml(a.pet_name || '-')}</span>`;
-      } else {
-        tdPet.textContent = a.pet_name || '-';
+      {
+        const photo = String((a.pet_photo_data || a.pet_photo || a.pet_photo_url || '')).trim();
+        const nameHtml = a.pet_id
+          ? `<span class="pf-linklike" data-open="pet" data-id="${a.pet_id}">${escapeHtml(a.pet_name || '-')}</span>`
+          : escapeHtml(a.pet_name || '-');
+        const nm = String(a.pet_name || '').trim();
+        const initial = nm ? nm.split(/\s+/).filter(Boolean).slice(0,2).map(p => p[0]).join('').toUpperCase() : '—';
+        tdPet.innerHTML = `<span class="pf-cell-avatar">${photo ? `<img class="pf-avatar-sm" alt="Foto de ${escapeHtml(a.pet_name || 'pet')}" src="${photo}">` : `<span class="pf-avatar-ph" aria-hidden="true">${escapeHtml(initial || '—')}</span>`}<span class="pf-cell-avatar__text">${nameHtml}</span></span>`;
       }
 
       const tdTel = document.createElement('td');
@@ -3024,7 +3218,9 @@ function getServicesInfoFromBooking(a) {
       const totalT = String(Number(svcInfo.totalMin || 0)) + ' min';
       const vPart = svcInfo.values ? (svcInfo.values + ' (<strong class="totals">Total: ' + totalV + '</strong>)') : ('<strong class="totals">Total: ' + totalV + '</strong>');
       const tPart = svcInfo.times ? (svcInfo.times + ' (<strong class="totals">Total: ' + totalT + '</strong>)') : ('<strong class="totals">Total: ' + totalT + '</strong>');
-      tdValTempo.innerHTML = vPart + ' | ' + tPart;
+      // Mantém a informação completa e facilita a leitura/encaixe na tabela
+      // (quebra a linha entre valores e tempos em vez de comprimir horizontalmente)
+      tdValTempo.innerHTML = vPart + '<br>' + tPart;
 
       const tdMimo = document.createElement('td');
       tdMimo.textContent = a.prize || '-';
@@ -3033,8 +3229,15 @@ function getServicesInfoFromBooking(a) {
       const tdPayStatus = document.createElement('td');
       const psLabel = (a.payment_status || a.paymentStatus || a.pagamento || a.payment || '-');
       const psClass = classPayment(psLabel);
-      const psIcon = (psClass === 'pay-paid') ? '✔' : (psClass === 'pay-unpaid' ? '✖' : '•');
-      tdPayStatus.innerHTML = `<span class="pay-badge ${psClass}">${psIcon} ${psLabel}</span>`;
+      const psNorm = String(psLabel || '').toLowerCase();
+      const psShort = (psNorm.includes('aguardando pagamento') || psNorm.includes('pending') || psNorm.includes('in_process') || psNorm.includes('in process'))
+        ? '...'
+        : (psNorm.includes('pago') || psNorm.includes('paid') || psNorm.includes('approved'))
+          ? '✔'
+          : (psNorm.includes('não pago') || psNorm.includes('nao pago') || psNorm.includes('unpaid') || psNorm.includes('recusado') || psNorm.includes('rejected') || psNorm.includes('cancel'))
+            ? 'X'
+            : '•';
+      tdPayStatus.innerHTML = `<span class="pay-badge ${psClass}" title="${escapeHtml(String(psLabel || ''))}">${psShort}</span>`;
 
       const tdPayMethod = document.createElement('td');
       const pmLabel = (a.payment_method || a.paymentMethod || a.forma_pagamento || a.payment_method || '-');
@@ -3348,21 +3551,14 @@ Qualquer dúvida, estou à disposição.`;
       main.appendChild(l4c);
       main.appendChild(l5);
 
-      // Pagamento + Forma (mesmo conteúdo da lista)
-      const lPay = document.createElement('div');
-      lPay.className = 'agenda-line';
-      const psLabel = String(a.payment_status || '').trim() || '—';
-      const psClass = classPayment(psLabel);
-      const psIcon = (psClass === 'pay-paid') ? '✔' : (psClass === 'pay-unpaid' ? '✖' : '•');
-      lPay.innerHTML = `<span class="agenda-key">Pagamento:</span> <span class="pay-badge ${psClass}">${psIcon} ${escapeHtml(psLabel)}</span>`;
-
+      
       const lForma = document.createElement('div');
       lForma.className = 'agenda-line';
       const pm = String(a.payment_method || '').trim();
       const pmIcon = iconForMethod(pm);
       lForma.innerHTML = `<span class="agenda-key">Forma:</span> <span class="agenda-muted">${pmIcon ? pmIcon + ' ' : ''}${escapeHtml(pm || '—')}</span>`;
 
-      main.appendChild(lPay);
+
       main.appendChild(lForma);
 
       const notes = document.createElement('div');
@@ -3762,6 +3958,48 @@ const bookingKind = bookingKindEl ? String(bookingKindEl.value || 'avulso') : 'a
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+
+  // ===== FINANCEIRO: export =====
+  function exportFinanceCSV() {
+    try {
+      const rows = Array.isArray(ultimaFinanceLista) ? ultimaFinanceLista : [];
+      if (!filteredRows.length) {
+        alert('Não há lançamentos para exportar neste período.');
+        return;
+      }
+
+      const header = ['Data', 'Tipo', 'Cliente', 'Pet', 'Descrição', 'Método', 'Status', 'Valor'];
+      const lines = [header.join(';')];
+      rows.forEach(r => {
+        const date = String(r.date || r.created_at || '');
+        const tipo = String(r.type || '');
+        const customer = String(r.customer_name || r.customer || '');
+        const pet = String(r.pet_name || r.pet || '');
+        const desc = String(r.description || r.service || '');
+        const method = String(r.payment_method || '');
+        const status = String(r.payment_status || '');
+        const valor = formatBRLFromCents(r.amount_cents || 0);
+
+        const clean = (v) => String(v ?? '').replace(/\n/g, ' ').replace(/;/g, ',');
+        lines.push([date, tipo, customer, pet, desc, method, status, valor].map(clean).join(';'));
+      });
+
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date();
+      const filename = `financeiro_${toISODateOnly(stamp)}.csv`;
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Erro exportFinanceCSV:', e);
+      alert('Erro ao exportar CSV.');
+    }
+  }
   filtroData.addEventListener('change', async () => { await renderTabela(); await loadDashboard(); });
   filtroBusca.addEventListener('input', () => {
     clearTimeout(window.__filtroTimer);
@@ -3807,6 +4045,263 @@ const bookingKind = bookingKindEl ? String(bookingKindEl.value || 'avulso') : 'a
     });
   }
   if (dashApply) dashApply.addEventListener('click', (e) => { e.preventDefault(); loadDashboard(); });
+
+  // ===== FINANCEIRO (listeners) =====
+  function __finSetToday() {
+    const today = toISODateOnly(new Date());
+    if (finStart) finStart.value = today;
+    if (finEnd) finEnd.value = today;
+  }
+  function __finSetMonth() {
+    const d = new Date();
+    const start = new Date(d.getFullYear(), d.getMonth(), 1);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    if (finStart) finStart.value = toISODateOnly(start);
+    if (finEnd) finEnd.value = toISODateOnly(end);
+  }
+  if (btnFinHoje) btnFinHoje.addEventListener('click', (e) => { e.preventDefault(); __finSetToday(); loadFinance(); });
+  if (btnFinMes) btnFinMes.addEventListener('click', (e) => { e.preventDefault(); __finSetMonth(); loadFinance(); });
+  if (btnFinAplicar) btnFinAplicar.addEventListener('click', (e) => { e.preventDefault(); loadFinance(); });
+  if (btnFinNovoLanc) btnFinNovoLanc.addEventListener('click', (e) => { e.preventDefault(); openFinanceEntryModal(); });
+  if (btnFinExportCSV) btnFinExportCSV.addEventListener('click', (e) => { e.preventDefault(); exportFinanceCSV(); });
+
+  // ===== FINANCEIRO: filtros por coluna (clique no header) =====
+  const finTableFilterHeaders = document.querySelectorAll('#tab-financeiro thead th.fin-th-filter');
+  const financeFilters = {}; // { col: term }
+  function __setFinHeaderActive(col, active){
+    try{
+      finTableFilterHeaders.forEach(th=>{
+        if (!th) return;
+        const c = th.getAttribute('data-fin-col');
+        if (c !== col) return;
+        if (active) th.classList.add('fin-filter-active');
+        else th.classList.remove('fin-filter-active');
+      });
+    }catch(_){}
+  }
+  function __applyFinanceFilters(rows){
+    const cols = Object.keys(financeFilters || {});
+    if (!cols.length) return rows;
+    return (rows || []).filter((r)=>{
+      for (const col of cols){
+        const term = String(financeFilters[col] || '').trim().toLowerCase();
+        if (!term) continue;
+        let v = '';
+        try{
+          if (col === 'amount_cents'){
+            v = formatBRLFromCents(Number(r.amount_cents || 0));
+          } else if (col === 'date'){
+            v = r.date ? formatDataBr(r.date) : '';
+          } else {
+            v = (r && r[col] != null) ? String(r[col]) : '';
+          }
+        }catch(_){ v = (r && r[col] != null) ? String(r[col]) : ''; }
+        if (!String(v).toLowerCase().includes(term)) return false;
+      }
+      return true;
+    });
+  }
+  if (finTableFilterHeaders && finTableFilterHeaders.length){
+    finTableFilterHeaders.forEach((th)=>{
+      if (!th) return;
+      th.addEventListener('click', ()=>{
+        const col = th.getAttribute('data-fin-col');
+        if (!col) return;
+        const current = financeFilters[col] ? String(financeFilters[col]) : '';
+        const label = th.textContent ? String(th.textContent).trim() : col;
+        const v = window.prompt(`Filtrar por "${label}"\n\nDigite um texto para filtrar (contém) ou deixe em branco para limpar:`, current);
+        if (v == null) return; // cancel
+        const term = String(v || '').trim();
+        if (!term){
+          delete financeFilters[col];
+          __setFinHeaderActive(col, false);
+        } else {
+          financeFilters[col] = term;
+          __setFinHeaderActive(col, true);
+        }
+        try{ loadFinance(); }catch(_){}
+      });
+    });
+  }
+
+
+  // ===== FINANCEIRO: ações (⋯) somente para lançamentos manuais =====
+  if (tbodyFinance && !window.__pf_fin_actions_bound) {
+    window.__pf_fin_actions_bound = true;
+
+    tbodyFinance.addEventListener('click', async (ev) => {
+      const t = ev && ev.target ? ev.target : null;
+      if (!t) return;
+
+      const action = t.getAttribute && t.getAttribute('data-fin-action');
+      const id = t.getAttribute && t.getAttribute('data-fin-id');
+
+      if (!action || !id) return;
+
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      // Open menu
+      if (action === 'open') {
+        const menuEl = document.querySelector(`.pf-menu[data-fin-menu="${CSS.escape(String(id))}"]`);
+        if (typeof togglePfMenu === 'function') togglePfMenu(menuEl, t);
+        return;
+      }
+
+      // fecha menu antes de agir
+      try {
+        const menuEl = document.querySelector(`.pf-menu[data-fin-menu="${CSS.escape(String(id))}"]`);
+        if (menuEl && !menuEl.classList.contains('hidden')) menuEl.classList.add('hidden');
+      } catch (_) {}
+
+      const row = (window.__PF_FINANCE_ENTRY_MAP && window.__PF_FINANCE_ENTRY_MAP[String(id)]) ? window.__PF_FINANCE_ENTRY_MAP[String(id)] : null;
+      if (!row) return;
+
+      if (action === 'edit') {
+        // abre modal em modo edição
+        try { openFinanceEntryModal(); } catch (_) {}
+        try { if (financeEntryModalTitle) financeEntryModalTitle.textContent = 'Editar lançamento'; } catch (_) {}
+        try { if (financeEntryModalSub) financeEntryModalSub.textContent = 'Atualize os dados do lançamento manual.'; } catch (_) {}
+        try { if (finEntryId) finEntryId.value = String(id); } catch (_) {}
+
+        try { if (finEntryDate) finEntryDate.value = String(row.date || '').trim(); } catch (_) {}
+        try { if (finEntryType) finEntryType.value = String(row.type || '').trim(); } catch (_) {}
+        try { if (finEntryMethod) finEntryMethod.value = String(row.payment_method || '').trim(); } catch (_) {}
+        try { if (finEntryStatus) finEntryStatus.value = String(row.payment_status || '').trim(); } catch (_) {}
+        try { if (finEntryCategory) finEntryCategory.value = String(row.category || '').trim(); } catch (_) {}
+        try { if (finEntryDesc) finEntryDesc.value = String(row.description || '').trim(); } catch (_) {}
+        try { if (finEntryAmount) finEntryAmount.value = formatBRLFromCents(Number(row.amount_cents || 0)); } catch (_) {}
+        return;
+      }
+
+      if (action === 'delete') {
+        const ok = window.confirm('Excluir este lançamento? Essa ação não pode ser desfeita.');
+        if (!ok) return;
+        try {
+          await apiDelete(`/api/finance/entries/${encodeURIComponent(String(id))}`);
+          await loadFinance();
+        } catch (e) {
+          console.error('Excluir lançamento erro:', e);
+          window.alert((e && e.message) ? e.message : 'Erro ao excluir lançamento.');
+        }
+        return;
+      }
+    });
+
+    // Fecha menus ao clicar fora (mantém padrão já usado)
+    document.addEventListener('click', (ev) => {
+      const x = ev && ev.target ? ev.target : null;
+      if (!x) return;
+      if (x.closest && x.closest('.pf-menu-wrap')) return;
+      document.querySelectorAll('.pf-menu:not(.hidden)').forEach((m) => { try { m.classList.add('hidden'); } catch (_) {} });
+    });
+  }
+
+
+  // ===== FINANCEIRO: Novo lançamento (finance_entries) =====
+  function openFinanceEntryModal() {
+    if (!financeEntryModal) return;
+    try { financeEntryModal.classList.remove('hidden'); financeEntryModal.setAttribute('aria-hidden', 'false'); } catch (_) {}
+
+    // modo: novo
+    try { if (financeEntryModalTitle) financeEntryModalTitle.textContent = 'Novo lançamento'; } catch (_) {}
+    try { if (financeEntryModalSub) financeEntryModalSub.textContent = 'Registre uma entrada ou saída manual no financeiro.'; } catch (_) {}
+    try { if (finEntryId) finEntryId.value = ''; } catch (_) {}
+
+
+    // reset UI
+    try { if (financeEntryModalSuccess) financeEntryModalSuccess.classList.add('hidden'); } catch (_) {}
+    try { if (financeEntryModalError) { financeEntryModalError.style.display = 'none'; financeEntryModalError.textContent = ''; } } catch (_) {}
+
+    // defaults
+    try { if (finEntryDate && !finEntryDate.value) finEntryDate.value = toISODateOnly(new Date()); } catch (_) {}
+    try { if (finEntryType && !finEntryType.value) finEntryType.value = 'Entrada'; } catch (_) {}
+    try { if (finEntryStatus && !finEntryStatus.value) finEntryStatus.value = 'Pago'; } catch (_) {}
+    try { if (finEntryMethod && !finEntryMethod.value) finEntryMethod.value = 'Dinheiro'; } catch (_) {}
+    try { if (finEntryAmount) finEntryAmount.value = ''; } catch (_) {}
+    try { if (finEntryCategory) finEntryCategory.value = ''; } catch (_) {}
+    try { if (finEntryDesc) finEntryDesc.value = ''; } catch (_) {}
+
+    setTimeout(() => { try { finEntryAmount && finEntryAmount.focus(); } catch (_) {} }, 0);
+  }
+
+  function closeFinanceEntryModal() {
+    if (!financeEntryModal) return;
+    try { financeEntryModal.classList.add('hidden'); financeEntryModal.setAttribute('aria-hidden', 'true'); } catch (_) {}
+  }
+
+  async function saveFinanceEntry(ev) {
+    if (ev) { try { ev.preventDefault(); } catch (_) {} }
+    if (!financeEntryForm) return;
+
+    const date = finEntryDate ? String(finEntryDate.value || '').trim() : '';
+    const type = finEntryType ? String(finEntryType.value || '').trim() : 'Entrada';
+    const payment_method = finEntryMethod ? String(finEntryMethod.value || '').trim() : '';
+    const payment_status = finEntryStatus ? String(finEntryStatus.value || '').trim() : '';
+    const category = finEntryCategory ? String(finEntryCategory.value || '').trim() : '';
+    const description = finEntryDesc ? String(finEntryDesc.value || '').trim() : '';
+    const amount_cents = parseBRLToCents(finEntryAmount ? finEntryAmount.value : '');
+
+    if (!date) {
+      if (financeEntryModalError) { financeEntryModalError.textContent = 'Informe a data do lançamento.'; financeEntryModalError.style.display = 'block'; }
+      return;
+    }
+    if (!amount_cents || amount_cents <= 0) {
+      if (financeEntryModalError) { financeEntryModalError.textContent = 'Informe um valor válido.'; financeEntryModalError.style.display = 'block'; }
+      return;
+    }
+
+    try {
+      if (financeEntryModalError) { financeEntryModalError.style.display = 'none'; financeEntryModalError.textContent = ''; }
+      const payload = {
+        date,
+        type,
+        category,
+        description,
+        amount_cents,
+        payment_method,
+        payment_status
+      };
+      // Se estiver editando, faz PUT; senão, cria (POST)
+      const editId = (finEntryId && finEntryId.value) ? String(finEntryId.value).trim() : '';
+      if (editId) {
+        await apiPut(`/api/finance/entries/${encodeURIComponent(editId)}`, payload);
+      } else {
+        await apiPost('/api/finance/entries', payload);
+      }
+
+      if (financeEntryModalSuccess) financeEntryModalSuccess.classList.remove('hidden');
+      if (financeEntryModalSuccessMsg) financeEntryModalSuccessMsg.textContent = (editId ? 'Lançamento atualizado com sucesso.' : 'Lançamento salvo com sucesso.');
+
+      // Recarrega a lista e fecha depois de um pequeno delay (mantém padrão de feedback dos outros modais)
+      try { await loadFinance(); } catch (_) {}
+      setTimeout(() => closeFinanceEntryModal(), 650);
+    } catch (e) {
+      console.error('saveFinanceEntry erro:', e);
+      const msg = (e && e.message) ? e.message : 'Erro ao salvar lançamento.';
+      if (financeEntryModalError) { financeEntryModalError.textContent = msg; financeEntryModalError.style.display = 'block'; }
+    }
+  }
+
+  if (financeEntryModalClose) financeEntryModalClose.addEventListener('click', (e) => { try { e.preventDefault(); } catch (_) {} closeFinanceEntryModal(); });
+  if (btnFinEntryCancel) btnFinEntryCancel.addEventListener('click', (e) => { try { e.preventDefault(); } catch (_) {} closeFinanceEntryModal(); });
+  if (financeEntryForm) financeEntryForm.addEventListener('submit', saveFinanceEntry);
+  if (financeEntryModal) {
+    financeEntryModal.addEventListener('click', (e) => {
+      const t = e.target;
+      if (!t) return;
+      // fecha ao clicar no backdrop
+      if (t === financeEntryModal) closeFinanceEntryModal();
+      // fecha se clicar em algum elemento com data-close
+      const closeId = t.getAttribute && t.getAttribute('data-close');
+      if (closeId === 'financeEntryModal') closeFinanceEntryModal();
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && financeEntryModal && !financeEntryModal.classList.contains('hidden')) {
+      closeFinanceEntryModal();
+    }
+  });
   btnNovoAgendamento.addEventListener('click', async () => {
     // Toggle: se o formulário já estiver aberto, fecha no mesmo botão.
     try {
@@ -4263,6 +4758,15 @@ const cliState = document.getElementById('cliState') || document.getElementById(
     if (__customerModalIsNew) {
       limparClienteForm();
       clienteSelecionadoId = null;
+      // PATCH: garantir foto zerada no modal
+      try {
+        const f = document.getElementById('cliPhotoFile');
+        const h = document.getElementById('cliPhotoData');
+        const p = document.getElementById('cliPhotoPreview');
+        if (f) f.value = '';
+        if (h) h.value = '';
+        if (p) { p.src = ''; p.classList.add('hidden'); }
+      } catch (_) {}
       try { if (badgeClienteSelecionado) badgeClienteSelecionado.classList.add('hidden'); } catch(_) {}
       // limparClienteForm() esconde o bloco na tela principal; no modal precisamos manter visível
       try { _clienteFormBlock.classList.remove('hidden'); } catch(_) {}
@@ -4277,6 +4781,18 @@ const cliState = document.getElementById('cliState') || document.getElementById(
       if (typeof cliNeighborhood !== 'undefined' && cliNeighborhood) cliNeighborhood.value = customer.neighborhood || '';
       if (typeof cliCity !== 'undefined' && cliCity) cliCity.value = customer.city || '';
       if (typeof cliState !== 'undefined' && cliState) cliState.value = customer.state || '';
+      // PATCH: foto do cliente (preview + hidden)
+      try {
+        const h = document.getElementById('cliPhotoData');
+        const p = document.getElementById('cliPhotoPreview');
+        const f = document.getElementById('cliPhotoFile');
+        if (f) f.value = '';
+        if (h) h.value = customer.photo_data || '';
+        if (p) {
+          if (customer.photo_data) { p.src = customer.photo_data; p.classList.remove('hidden'); }
+          else { p.src = ''; p.classList.add('hidden'); }
+        }
+      } catch (_) {}
     }
 
     __showModal(_customerModal);
@@ -4587,6 +5103,26 @@ const cliState = document.getElementById('cliState') || document.getElementById(
     list.forEach(c => {
       const tr = document.createElement('tr');
       const tdId = document.createElement('td'); tdId.textContent = c.id;
+
+      // Coluna Foto (avatar) – opcional
+      const tdFoto = document.createElement('td');
+      tdFoto.className = 'col-avatar';
+      const photo = (c && (c.photo_data || c.photo || c.photo_url)) ? String((c.photo_data || c.photo || c.photo_url)) : '';
+      if (photo) {
+        const img = document.createElement('img');
+        img.className = 'pf-avatar-sm';
+        img.alt = `Foto de ${c.name || 'tutor'}`;
+        img.src = photo;
+        tdFoto.appendChild(img);
+      } else {
+        const ph = document.createElement('div');
+        ph.className = 'pf-avatar-ph';
+        const nm = String(c.name || '').trim();
+        const initial = nm ? nm.split(/\s+/).filter(Boolean).slice(0,2).map(p => p[0]).join('').toUpperCase() : '—';
+        ph.textContent = initial || '—';
+        tdFoto.appendChild(ph);
+      }
+
       const tdNome = document.createElement('td'); tdNome.textContent = c.name || '-';
       const tdTel = document.createElement('td'); tdTel.textContent = formatTelefone(c.phone);
       const tdPetsCount = document.createElement('td');
@@ -4716,6 +5252,7 @@ const btnHist = document.createElement('button');
       divActions.appendChild(kebabMenu);
       tdAcoes.appendChild(divActions);
       tr.appendChild(tdId);
+      tr.appendChild(tdFoto);
       tr.appendChild(tdNome);
       tr.appendChild(tdTel);
       tr.appendChild(tdPetsCount);
@@ -4728,6 +5265,10 @@ const btnHist = document.createElement('button');
     // limpa campos (defensivo para evitar quebra caso algum elemento não exista)
     try { if (cliPhone) cliPhone.value = ''; } catch (_) {}
     try { if (cliName) cliName.value = ''; } catch (_) {}
+    // PATCH: limpar foto do cliente (inputs opcionais)
+    try { const f = document.getElementById('cliPhotoFile'); if (f) f.value = ''; } catch (_) {}
+    try { const h = document.getElementById('cliPhotoData'); if (h) h.value = ''; } catch (_) {}
+    try { const p = document.getElementById('cliPhotoPreview'); if (p) { p.src = ''; p.classList.add('hidden'); } } catch (_) {}
 
     try { if (typeof cliCep !== 'undefined' && cliCep) cliCep.value = ''; } catch (_) {}
     try { if (typeof cliStreet !== 'undefined' && cliStreet) cliStreet.value = ''; } catch (_) {}
@@ -4769,6 +5310,12 @@ const btnHist = document.createElement('button');
       city: getVal('cliCity'),
       state: getVal('cliState'),
     };
+    // PATCH: foto do cliente (DataURL base64). Se vazio, não envia para não sobrescrever.
+    try {
+      const photoData = getVal('cliPhotoData');
+      if (photoData) payload.photo_data = photoData;
+    } catch (_) {}
+
     if (!payload.phone || payload.phone.length < 10 || !payload.name) {
       cliError.textContent = 'Preencha telefone (com DDD) e nome do tutor.';
       cliError.style.display = 'block';
@@ -4823,6 +5370,26 @@ const btnHist = document.createElement('button');
     petsCache.forEach(p => {
       const tr = document.createElement('tr');
       const tdId = document.createElement('td'); tdId.textContent = p.id;
+
+      // PATCH: coluna Foto (antes do nome) - 2026-01-06
+      const tdFoto = document.createElement('td');
+      tdFoto.className = 'col-avatar';
+      const pPhoto = String((p.photo_data || p.photo || p.photo_url || '')).trim();
+      if (pPhoto) {
+        const img = document.createElement('img');
+        img.className = 'pf-avatar-sm';
+        img.alt = `Foto de ${p.name || 'pet'}`;
+        img.src = pPhoto;
+        tdFoto.appendChild(img);
+      } else {
+        const ph = document.createElement('div');
+        ph.className = 'pf-avatar-ph';
+        const nm = String(p.name || '').trim();
+        const initial = nm ? nm.split(/\s+/).filter(Boolean).slice(0,2).map(s => s[0]).join('').toUpperCase() : '—';
+        ph.textContent = initial || '—';
+        tdFoto.appendChild(ph);
+      }
+
       const tdNome = document.createElement('td'); tdNome.textContent = p.name;
       const tdRaca = document.createElement('td'); tdRaca.textContent = p.breed || '-';
       const tdPorte = document.createElement('td'); tdPorte.textContent = p.size || '-';
@@ -4898,6 +5465,18 @@ const btnHist = document.createElement('button');
         if (petSize) petSize.value = p.size || '';
         if (petCoat) petCoat.value = p.coat || '';
         petInfo.value = (p.notes || p.info) || '';
+        // PATCH: foto do pet (preview + hidden)
+        try {
+          const h = document.getElementById('petPhotoData');
+          const pr = document.getElementById('petPhotoPreview');
+          const f = document.getElementById('petPhotoFile');
+          if (f) f.value = '';
+          if (h) h.value = p.photo_data || '';
+          if (pr) {
+            if (p.photo_data) { pr.src = p.photo_data; pr.classList.remove('hidden'); }
+            else { pr.src = ''; pr.classList.add('hidden'); }
+          }
+        } catch (_) {}
         // Ao editar, garante que o formulário esteja aberto
         try {
           if (petFormBlock) {
@@ -4932,6 +5511,7 @@ const btnHist = document.createElement('button');
       divActions.appendChild(kebabMenu);
       tdAcoes.appendChild(divActions);
       tr.appendChild(tdId);
+      tr.appendChild(tdFoto);
       tr.appendChild(tdNome);
       tr.appendChild(tdRaca);
       tr.appendChild(tdPorte);
@@ -4944,6 +5524,10 @@ const btnHist = document.createElement('button');
   function limparPetsForm() {
     petEditIdLocal = null;
     petName.value = '';
+    // PATCH: limpar foto do pet
+    try { const f = document.getElementById('petPhotoFile'); if (f) f.value = ''; } catch (_) {}
+    try { const h = document.getElementById('petPhotoData'); if (h) h.value = ''; } catch (_) {}
+    try { const p = document.getElementById('petPhotoPreview'); if (p) { p.src = ''; p.classList.add('hidden'); } } catch (_) {}
     petBreed.value = 'SRD (Sem Raça Definida)';
     if (petSize) petSize.value = '';
     if (petCoat) petCoat.value = '';
@@ -4969,10 +5553,14 @@ if (!name || !breed) {
     }
     try {
       if (!petEditIdLocal) {
-        await apiPost('/api/pets', { customer_id: clienteSelecionadoId, name, breed, size, coat, notes });
+        const _petPayload = { customer_id: clienteSelecionadoId, name, breed, size, coat, notes };
+        try { const pd = String((document.getElementById('petPhotoData')||{}).value||'').trim(); if (pd) _petPayload.photo_data = pd; } catch (_) {}
+        await apiPost('/api/pets', _petPayload);
         showHint('Pet cadastrado com sucesso!', 'success', 'Pets');
       } else {
-        await apiPut('/api/pets/' + petEditIdLocal, { name, breed, size, coat, notes });
+        const _petPayload = { name, breed, size, coat, notes };
+        try { const pd = String((document.getElementById('petPhotoData')||{}).value||'').trim(); if (pd) _petPayload.photo_data = pd; } catch (_) {}
+        await apiPut('/api/pets/' + petEditIdLocal, _petPayload);
         showHint('Pet alterado com sucesso!', 'success', 'Pets');
       }
       limparPetsForm();
@@ -5003,6 +5591,114 @@ if (!name || !breed) {
   if (btnCliSalvar) btnCliSalvar.addEventListener('click', salvarCliente);
   if (btnPetLimpar) btnPetLimpar.addEventListener('click', limparPetsForm);
   if (btnPetSalvar) btnPetSalvar.addEventListener('click', salvarPet);
+
+  // PATCH: upload de foto (cliente/pet) sem quebrar layout. Converte para DataURL (base64) e salva no hidden.
+  function __bindPhotoInput(fileInputId, hiddenId, previewId, errorId) {
+    const fileEl = document.getElementById(fileInputId);
+    const hiddenEl = document.getElementById(hiddenId);
+    const previewEl = document.getElementById(previewId);
+    const errEl = errorId ? document.getElementById(errorId) : null;
+    if (!fileEl || !hiddenEl) return;
+
+    // Converte a imagem selecionada em JPEG (qualidade 0.75) e redimensiona para no máximo 800px
+    // (mantendo proporção). Mantém UX transparente: mesmo input file + hidden com DataURL.
+    const MAX_DIM = 800;
+    const JPEG_QUALITY = 0.75;
+
+    function __loadImg(dataUrl) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = (e) => reject(e);
+        img.src = dataUrl;
+      });
+    }
+
+    function __fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    fileEl.addEventListener('change', async () => {
+      try {
+        if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+        if (!fileEl.files || !fileEl.files[0]) return;
+
+        const f = fileEl.files[0];
+
+        if (!/^image\//i.test(f.type)) {
+          if (errEl) { errEl.textContent = 'Arquivo inválido. Selecione uma imagem.'; errEl.style.display = 'block'; }
+          fileEl.value = '';
+          return;
+        }
+
+        // Limite "bruto" (antes de converter) para evitar travar o navegador em imagens gigantes.
+        // Após a conversão + resize, o payload tende a ficar bem menor.
+        if (f.size > 8 * 1024 * 1024) {
+          if (errEl) { errEl.textContent = 'Imagem muito grande. Use uma foto menor (até 8MB).'; errEl.style.display = 'block'; }
+          fileEl.value = '';
+          return;
+        }
+
+        const originalDataUrl = await __fileToDataUrl(f);
+        const img = await __loadImg(originalDataUrl);
+
+        const w = img.naturalWidth || img.width || 0;
+        const h = img.naturalHeight || img.height || 0;
+        if (!w || !h) throw new Error('Não foi possível ler o tamanho da imagem.');
+
+        const scale = Math.min(1, MAX_DIM / Math.max(w, h));
+        const outW = Math.max(1, Math.round(w * scale));
+        const outH = Math.max(1, Math.round(h * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = outW;
+        canvas.height = outH;
+
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (!ctx) throw new Error('Canvas não suportado.');
+
+        // Preenche fundo branco para evitar "preto" em PNG com transparência ao converter para JPEG.
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, outW, outH);
+        ctx.drawImage(img, 0, 0, outW, outH);
+
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+
+        // Guarda no hidden (é isso que vai pro backend)
+        hiddenEl.value = jpegDataUrl;
+
+        if (previewEl) {
+          previewEl.src = jpegDataUrl;
+          previewEl.classList.remove('hidden');
+        }
+
+        // Opcional: se ainda ficou enorme, avisa (sem bloquear por padrão).
+        // 1 char ~ 1 byte em base64; aqui usamos um limite conservador (~1.2MB).
+        if (jpegDataUrl.length > 1_200_000) {
+          if (errEl) {
+            errEl.textContent = 'Aviso: a foto ainda ficou grande. Se der erro ao salvar, use uma imagem menor.';
+            errEl.style.display = 'block';
+          }
+        } else {
+          if (errEl) { errEl.style.display = 'none'; }
+        }
+      } catch (e) {
+        console.error('Falha ao carregar/convertar foto:', e);
+        if (errEl) {
+          errEl.textContent = 'Falha ao processar a imagem. Tente outra foto.';
+          errEl.style.display = 'block';
+        }
+      }
+    });
+  }
+
+  __bindPhotoInput('cliPhotoFile', 'cliPhotoData', 'cliPhotoPreview', 'cliError');
+  __bindPhotoInput('petPhotoFile', 'petPhotoData', 'petPhotoPreview', 'petError');
 
   function __toggleNovoPetForm() {
     // Toggle: abre/fecha SOMENTE o formulário (mantém a listagem sempre visível no modal)
@@ -5067,6 +5763,128 @@ if (!name || !breed) {
     }
   });
   if (dashPeriod && dashPeriod.value === 'custom') dashCustomRange.classList.remove('hidden');
+  /* ===== FINANCEIRO (menu) ===== */
+  async function loadFinance() {
+    // Evita falhas silenciosas se o DOM do Financeiro não estiver presente
+    if (!tbodyFinance || !finStart || !finEnd) return;
+
+    // Se ainda não tiver intervalo, default: mês atual
+    if (!finStart.value || !finEnd.value) {
+      try {
+        const d = new Date();
+        finStart.value = finStart.value || toISODateOnly(new Date(d.getFullYear(), d.getMonth(), 1));
+        finEnd.value = finEnd.value || toISODateOnly(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+      } catch (_) {}
+    }
+
+    const params = {
+      from: finStart.value,
+      to: finEnd.value
+    };
+
+    // UI loading state
+    tbodyFinance.innerHTML = '<tr><td colspan="9" class="muted">Carregando…</td></tr>';
+    if (finEmpty) finEmpty.classList.add('hidden');
+
+    try {
+      const [summary, tx] = await Promise.all([
+        apiGet('/api/finance/summary', params),
+        apiGet('/api/finance/transactions', params)
+      ]);
+
+      // Summary
+      const s = summary || {};
+      const paidC = Number(s.paid_cents || 0);
+      const pendingC = Number(s.pending_cents || 0);
+      const unpaidC = Number(s.unpaid_cents || 0);
+      const rejectedC = Number(s.rejected_cents || 0);
+      const totalC = Number(s.total_cents || (paidC + pendingC + unpaidC + rejectedC));
+      if (finPaid) finPaid.textContent = formatBRLFromCents(paidC);
+      if (finPending) finPending.textContent = formatBRLFromCents(pendingC);
+      if (finUnpaid) finUnpaid.textContent = formatBRLFromCents(unpaidC);
+      if (finRejected) finRejected.textContent = formatBRLFromCents(rejectedC);
+      if (finTotal) finTotal.textContent = formatBRLFromCents(totalC);
+
+      // Transactions
+      const rows = Array.isArray(tx) ? tx : (Array.isArray(tx?.rows) ? tx.rows : []);
+      ultimaFinanceLista = rows;
+
+      // Saídas (somente lançamentos do tipo Saída)
+      try{
+        const outCents = rows.reduce((acc, r)=>{
+          const isOut = /sa[ií]da/i.test(String(r.type || ''));
+          return acc + (isOut ? Number(r.amount_cents || 0) : 0);
+        }, 0);
+        if (finOut) finOut.textContent = formatBRLFromCents(outCents);
+      }catch(_){}
+
+      // Aplica filtros por coluna (se houver)
+      const filteredRows = (typeof __applyFinanceFilters === 'function') ? __applyFinanceFilters(rows) : rows;
+      try{ window.__PF_FINANCE_ENTRY_MAP = {}; }catch(_){ }
+
+
+      if (!rows.length) {
+        tbodyFinance.innerHTML = '';
+        if (finEmpty) finEmpty.classList.remove('hidden');
+        return;
+      }
+
+      tbodyFinance.innerHTML = filteredRows.map(r => {
+        const date = r.date ? formatDataBr(r.date) : (r.created_at ? formatDateTimeBr(r.created_at) : '');
+        const tipo = escapeHtml(r.type || '');
+        const cliente = escapeHtml(r.customer_name || '');
+        const pet = escapeHtml(r.pet_name || '');
+        const desc = escapeHtml(r.description || '');
+        const method = escapeHtml(r.payment_method || '');
+        const status = escapeHtml(r.payment_status || '');
+        const valor = formatBRLFromCents(r.amount_cents || 0);
+
+        const isOut = /sa[ií]da/i.test(String(r.type || ''));
+        const isManual = /^(Entrada|Sa[ií]da)$/i.test(String(r.type || ''));
+        const showActions = !!(isManual && r.ref_id);
+
+        const tipoTd = `<td class="${isOut ? 'fin-type-out' : ''}">${tipo}</td>`;
+        const valorTxt = isOut ? `- ${valor}` : valor;
+        const valorTd = `<td class="${isOut ? 'fin-value-out' : ''}" style="text-align:right;white-space:nowrap;">${valorTxt}</td>`;
+
+        // index para ações
+        try{
+          if (!window.__PF_FINANCE_ENTRY_MAP) window.__PF_FINANCE_ENTRY_MAP = {};
+          if (showActions) window.__PF_FINANCE_ENTRY_MAP[String(r.ref_id)] = r;
+        }catch(_){}
+
+        const actionsTd = showActions ? `
+          <td class="fin-actions">
+            <div class="pf-menu-wrap" style="position:relative;display:inline-block;">
+              <button class="fin-actions-btn" type="button" data-fin-action="open" data-fin-id="${escapeHtml(String(r.ref_id))}" aria-label="Ações">⋯</button>
+              <div class="pf-menu hidden" data-fin-menu="${escapeHtml(String(r.ref_id))}">
+                <button class="pf-menu-item" type="button" data-fin-action="edit" data-fin-id="${escapeHtml(String(r.ref_id))}">Editar</button>
+                <button class="pf-menu-item pf-danger" type="button" data-fin-action="delete" data-fin-id="${escapeHtml(String(r.ref_id))}">Excluir</button>
+              </div>
+            </div>
+          </td>` : `<td class="fin-actions"></td>`;
+
+        return `
+          <tr>
+            <td>${date}</td>
+            ${tipoTd}
+            <td>${cliente}</td>
+            <td>${pet}</td>
+            <td>${desc}</td>
+            <td>${method}</td>
+            <td>${status}</td>
+            ${valorTd}
+            ${actionsTd}
+          </tr>
+        `;
+      }).join('');
+
+    } catch (e) {
+      console.error('loadFinance erro:', e);
+      tbodyFinance.innerHTML = '<tr><td colspan="9" class="muted">Erro ao carregar o financeiro.</td></tr>';
+    }
+  }
+
   /* ===== DASHBOARD: inclui financeiro por serviço ===== */
   async function loadDashboard() {
     let period = dashPeriod ? dashPeriod.value : 'today';

@@ -8,7 +8,10 @@ const db = require('./db');
 const app = express();
 app.set('trust proxy', 1);
 app.use(cors());
-app.use(express.json());
+// PATCH: aumenta limite do body para permitir foto (DataURL base64) em customers/pets
+// - default do Express é ~100kb e pode estourar facilmente
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // =========================
 // Mercado Pago (PIX)
@@ -900,7 +903,9 @@ app.get('/api/bookings', async (req, res) => {
         c.name AS customer_name,
         c.phone AS customer_phone,
         c.phone AS phone,
+        c.photo_data AS customer_photo_data,
         pet.name AS pet_name,
+        pet.photo_data AS pet_photo_data,
 
         ps.package_id AS package_id,
         -- serviço único (compatível com snapshot no booking)
@@ -1408,6 +1413,296 @@ app.delete('/api/bookings/:id', async (req, res) => {
   } catch (err) {
     console.error('Erro ao deletar booking:', err);
     res.status(500).json({ error: 'Erro interno ao excluir agendamento.' });
+  }
+});
+
+// =========================
+// FINANCEIRO (Admin)
+// MVP: consolida recebíveis a partir de Agendamentos (bookings) e Vendas de Pacotes (package_sales)
+// Não altera nenhuma regra de negócio existente; apenas leitura.
+// =========================
+
+function _normalizePayStatus(s) {
+  const v = String(s || '').trim();
+  // Mantém compatibilidade com diferentes grafias no banco/UI
+  if (!v) return 'Aguardando';
+  if (/pago/i.test(v)) return 'Pago';
+  if (/n[aã]o\s*pago|não\s*pago|nao\s*pago|não pago/i.test(v)) return 'Não Pago';
+  if (/aguardando/i.test(v) || /pendente/i.test(v) || /^\.\.\.$/.test(v)) return 'Aguardando';
+  if (/recusado|rejeitado|falhou|cancelado/i.test(v)) return 'Recusado';
+  return v;
+}
+
+function _financeRangeWhere(alias, from, to, params, col = 'date') {
+  // alias: tabela alias que possui a coluna de data (YYYY-MM-DD)
+  // col: nome da coluna de data (default: 'date')
+  const parts = [];
+  if (from) { params.push(from); parts.push(`${alias}.${col} >= $${params.length}`); }
+  if (to) { params.push(to); parts.push(`${alias}.${col} <= $${params.length}`); }
+  return parts.length ? ('WHERE ' + parts.join(' AND ')) : '';
+}
+
+app.get('/api/finance/transactions', async (req, res) => {
+  try {
+    const from = (req.query.from ? String(req.query.from) : '').trim();
+    const to = (req.query.to ? String(req.query.to) : '').trim();
+
+    const params = [];
+    const whereBookings = _financeRangeWhere('b', from, to, params, 'date');
+    const whereSales = _financeRangeWhere('ps', from, to, params, 'start_date');
+    const whereEntries = _financeRangeWhere('fe', from, to, params, 'date');
+
+    const sql = `
+      SELECT
+        b.date AS date,
+        'Agendamento' AS type,
+        c.name AS customer_name,
+        p.name AS pet_name,
+        COALESCE(b.service, '') AS description,
+         '' AS category,
+        COALESCE(b.payment_method, '') AS payment_method,
+        COALESCE(b.payment_status, 'Aguardando') AS payment_status,
+        COALESCE(
+        b.service_value_cents,
+        (SELECT COALESCE(SUM(NULLIF((x->>'value_cents'), '')::int),0) FROM jsonb_array_elements(COALESCE(b.services_json,'[]'::jsonb)) x),
+        0
+      ) AS amount_cents,
+        b.id AS ref_id
+      FROM bookings b
+      LEFT JOIN customers c ON c.id = b.customer_id
+      LEFT JOIN pets p ON p.id = b.pet_id
+      ${whereBookings}
+
+      UNION ALL
+
+      SELECT
+        ps.start_date AS date,
+        'Pacote' AS type,
+        c2.name AS customer_name,
+        p2.name AS pet_name,
+        COALESCE(sp.title, 'Pacote') AS description,
+         '' AS category,
+        COALESCE(ps.payment_method, '') AS payment_method,
+        COALESCE(ps.payment_status, 'Aguardando') AS payment_status,
+        COALESCE(ps.total_cents, 0) AS amount_cents,
+        ps.id AS ref_id
+      FROM package_sales ps
+      LEFT JOIN customers c2 ON c2.id = ps.customer_id
+      LEFT JOIN pets p2 ON p2.id = ps.pet_id
+      LEFT JOIN service_packages sp ON sp.id = ps.package_id
+      ${whereSales}
+
+      UNION ALL
+
+      SELECT
+        fe.date AS date,
+        COALESCE(fe.type, 'Lançamento') AS type,
+        c3.name AS customer_name,
+        p3.name AS pet_name,
+        COALESCE(NULLIF(TRIM(fe.description), ''), NULLIF(TRIM(fe.category), ''), 'Lançamento') AS description,
+         COALESCE(fe.category,'') AS category,
+        COALESCE(fe.payment_method, '') AS payment_method,
+        COALESCE(fe.payment_status, 'Aguardando') AS payment_status,
+        COALESCE(fe.amount_cents, 0) AS amount_cents,
+        fe.id AS ref_id
+      FROM finance_entries fe
+      LEFT JOIN customers c3 ON c3.id = fe.customer_id
+      LEFT JOIN pets p3 ON p3.id = fe.pet_id
+      ${whereEntries}
+
+      ORDER BY date DESC, ref_id DESC
+      LIMIT 1000;
+    `;
+
+    const r = await db.query(sql, params);
+    const rows = (r && r.rows) ? r.rows : [];
+    // normaliza status (para bater com UI)
+    rows.forEach(row => { row.payment_status = _normalizePayStatus(row.payment_status); });
+    res.json(rows);
+  } catch (e) {
+    console.error('GET /api/finance/transactions error:', e);
+    res.status(500).json({ error: 'Erro ao carregar transações do financeiro.' });
+  }
+});
+
+app.get('/api/finance/summary', async (req, res) => {
+  try {
+    const from = (req.query.from ? String(req.query.from) : '').trim();
+    const to = (req.query.to ? String(req.query.to) : '').trim();
+
+    const params = [];
+    const whereBookings = _financeRangeWhere('b', from, to, params, 'date');
+    const whereSales = _financeRangeWhere('ps', from, to, params, 'start_date');
+    const whereEntries = _financeRangeWhere('fe', from, to, params, 'date');
+
+    const sql = `
+      WITH tx AS (
+        SELECT
+          COALESCE(b.payment_status, 'Aguardando') AS payment_status,
+          COALESCE(
+        b.service_value_cents,
+        (SELECT COALESCE(SUM(NULLIF((x->>'value_cents'), '')::int),0) FROM jsonb_array_elements(COALESCE(b.services_json,'[]'::jsonb)) x),
+        0
+      ) AS amount_cents
+        FROM bookings b
+        ${whereBookings}
+
+        UNION ALL
+
+        SELECT
+          COALESCE(ps.payment_status, 'Aguardando') AS payment_status,
+          COALESCE(ps.total_cents, 0) AS amount_cents
+        FROM package_sales ps
+        ${whereSales}
+
+        UNION ALL
+
+        SELECT
+          COALESCE(fe.payment_status, 'Aguardando') AS payment_status,
+          COALESCE(fe.amount_cents, 0) AS amount_cents
+        FROM finance_entries fe
+        ${whereEntries}
+      )
+      SELECT
+        SUM(CASE WHEN payment_status ILIKE '%Pago%' THEN amount_cents ELSE 0 END) AS paid_cents,
+        SUM(CASE WHEN payment_status ILIKE '%Aguardando%' OR payment_status ILIKE '%Pendente%' OR payment_status = '...' THEN amount_cents ELSE 0 END) AS pending_cents,
+        SUM(CASE WHEN payment_status ILIKE '%Não Pago%' OR payment_status ILIKE '%Nao Pago%' THEN amount_cents ELSE 0 END) AS unpaid_cents,
+        SUM(CASE WHEN payment_status ILIKE '%Recus%' OR payment_status ILIKE '%Rejeit%' OR payment_status ILIKE '%Falh%' THEN amount_cents ELSE 0 END) AS rejected_cents,
+        SUM(amount_cents) AS total_cents
+      FROM tx;
+    `;
+
+    const r = await db.query(sql, params);
+    const row = (r && r.rows && r.rows[0]) ? r.rows[0] : {};
+    res.json(row);
+  } catch (e) {
+    console.error('GET /api/finance/summary error:', e);
+    res.status(500).json({ error: 'Erro ao carregar resumo do financeiro.' });
+  }
+});
+
+// =========================
+// FINANCEIRO: lançamentos manuais (finance_entries)
+// Passo 1 da evolução: criar lançamento via modal no Admin.
+// =========================
+
+app.get('/api/finance/entries', async (req, res) => {
+  try {
+    const from = (req.query.from ? String(req.query.from) : '').trim();
+    const to = (req.query.to ? String(req.query.to) : '').trim();
+    const params = [];
+    const where = _financeRangeWhere('fe', from, to, params, 'date');
+    const sql = `
+      SELECT
+        fe.*,
+        c.name AS customer_name,
+        p.name AS pet_name
+      FROM finance_entries fe
+      LEFT JOIN customers c ON c.id = fe.customer_id
+      LEFT JOIN pets p ON p.id = fe.pet_id
+      ${where}
+      ORDER BY fe.date DESC, fe.id DESC
+      LIMIT 1000;
+    `;
+    const r = await db.query(sql, params);
+    const rows = (r && r.rows) ? r.rows : [];
+    rows.forEach(row => { row.payment_status = _normalizePayStatus(row.payment_status); });
+    res.json(rows);
+  } catch (e) {
+    console.error('GET /api/finance/entries error:', e);
+    res.status(500).json({ error: 'Erro ao carregar lançamentos.' });
+  }
+});
+
+app.post('/api/finance/entries', async (req, res) => {
+  try {
+    const date = String(req.body.date || '').trim();
+    const type = String(req.body.type || 'Lançamento').trim();
+    const category = String(req.body.category || '').trim();
+    const description = String(req.body.description || '').trim();
+    const payment_method = String(req.body.payment_method || '').trim();
+    const payment_status = _normalizePayStatus(req.body.payment_status);
+    const amount_cents = Number(req.body.amount_cents || 0);
+    const customer_id = (req.body.customer_id == null || req.body.customer_id === '') ? null : Number(req.body.customer_id);
+    const pet_id = (req.body.pet_id == null || req.body.pet_id === '') ? null : Number(req.body.pet_id);
+
+    if (!date) return res.status(400).json({ error: 'Data é obrigatória.' });
+    if (!Number.isFinite(amount_cents) || amount_cents <= 0) return res.status(400).json({ error: 'Valor inválido.' });
+
+    const sql = `
+      INSERT INTO finance_entries
+        (date, type, category, description, amount_cents, payment_method, payment_status, customer_id, pet_id)
+      VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      RETURNING *;
+    `;
+    const params = [date, type, category, description, Math.round(amount_cents), payment_method, payment_status, customer_id, pet_id];
+    const r = await db.query(sql, params);
+    res.json({ ok: true, entry: (r && r.rows && r.rows[0]) ? r.rows[0] : null });
+  } catch (e) {
+    console.error('POST /api/finance/entries error:', e);
+    res.status(500).json({ error: 'Erro ao salvar lançamento.' });
+  }
+});
+
+
+
+// Atualizar lançamento manual
+app.put('/api/finance/entries/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    const date = String(req.body.date || '').trim();
+    const type = String(req.body.type || 'Lançamento').trim();
+    const category = String(req.body.category || '').trim();
+    const description = String(req.body.description || '').trim();
+    const payment_method = String(req.body.payment_method || '').trim();
+    const payment_status = _normalizePayStatus(req.body.payment_status);
+    const amount_cents = Number(req.body.amount_cents || 0);
+
+    if (!date) return res.status(400).json({ error: 'Data é obrigatória.' });
+    if (!Number.isFinite(amount_cents) || amount_cents <= 0) return res.status(400).json({ error: 'Valor inválido.' });
+
+    const sql = `
+      UPDATE finance_entries
+      SET
+        date=$2,
+        type=$3,
+        category=$4,
+        description=$5,
+        amount_cents=$6,
+        payment_method=$7,
+        payment_status=$8
+      WHERE id=$1
+      RETURNING *;
+    `;
+    const params = [id, date, type, category, description, Math.round(amount_cents), payment_method, payment_status];
+    const r = await db.query(sql, params);
+    const row = (r && r.rows && r.rows[0]) ? r.rows[0] : null;
+    if (!row) return res.status(404).json({ error: 'Lançamento não encontrado.' });
+
+    res.json({ ok: true, entry: row });
+  } catch (e) {
+    console.error('PUT /api/finance/entries/:id error:', e);
+    res.status(500).json({ error: 'Erro ao atualizar lançamento.' });
+  }
+});
+
+// Excluir lançamento manual
+app.delete('/api/finance/entries/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    const r = await db.query('DELETE FROM finance_entries WHERE id=$1 RETURNING id', [id]);
+    const row = (r && r.rows && r.rows[0]) ? r.rows[0] : null;
+    if (!row) return res.status(404).json({ error: 'Lançamento não encontrado.' });
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/finance/entries/:id error:', e);
+    res.status(500).json({ error: 'Erro ao excluir lançamento.' });
   }
 });
 

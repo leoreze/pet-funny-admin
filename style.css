@@ -45,15 +45,15 @@
       padding: 22px 20px 18px;
     }
     .login-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: #16363c; }
-    .login-subtitle { font-size: 14px; color: #607d8b; margin-bottom: 16px; }
+    .login-subtitle { font-size: 12px; color: #607d8b; margin-bottom: 16px; }
     .login-field { margin-bottom: 10px; }
-    .login-label { font-size: 14px; font-weight: 500; margin-bottom: 4px; color: #455a64; }
+    .login-label { font-size: 12px; font-weight: 500; margin-bottom: 4px; color: #455a64; }
     .login-input {
       width: 100%;
       border-radius: 12px;
       border: 1px solid #d4dde0;
       padding: 8px 10px;
-      font-size: 14px;
+      font-size: 12px;
       transition: border-color 0.12s ease, box-shadow 0.12s ease;
       font-family: inherit;
     }
@@ -75,7 +75,7 @@
       border: none;
       background: linear-gradient(135deg, var(--turquesa), var(--coral));
       color: white;
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       text-transform: uppercase;
@@ -106,10 +106,10 @@
       text-transform: none;
       letter-spacing: 0.04em;
     }
-    .btn-small { font-size: 14px; padding: 4px 8px; box-shadow: none; }
+    .btn-small { font-size: 12px; padding: 4px 8px; box-shadow: none; }
 
-    .login-footer-hint { font-size: 14px; color: #90a4ae; margin-top: 10px; }
-    .login-error { font-size: 14px; color: #c62828; margin-top: 6px; }
+    .login-footer-hint { font-size: 12px; color: #90a4ae; margin-top: 10px; }
+    .login-error { font-size: 12px; color: #c62828; margin-top: 6px; }
 
     /* ADMIN APP */
     #adminApp { flex: 1; display: none; padding: 12px 16px 16px; }
@@ -141,20 +141,20 @@
       color: var(--turquesa);
     }
     .logo-sub {
-      font-size: 14px;
+      font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.14em;
       color: #777;
     }
 
     .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .filters-group { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+    .filters-group { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 
     /* Toolbars por aba */
     .agenda-filters {
    background: #f7fbfc;
   border: 1px solid #e0edf0;
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 10px 12px;
     }
     .tab-toolbar {
@@ -184,7 +184,7 @@ textarea {
   margin-bottom: 0px;    /* espaçamento externo entre campos */
   border-radius: 10px;
   border: 1px solid #d7dde0;
-  font-size: 14px;
+  font-size: 12px;
   min-width: 120px;
   font-family: inherit;
 }
@@ -233,7 +233,7 @@ input[type="number"]::-webkit-inner-spin-button {
       background: transparent;
       padding: 6px 10px;
       border-radius: 999px;
-      font-size: 14px;
+      font-size: 12px;
       cursor: pointer;
       color: #607d8b;
       display: inline-flex;
@@ -275,7 +275,7 @@ input[type="number"]::-webkit-inner-spin-button {
     .form-row-2 { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
     .form-group { display: flex; flex-direction: column; gap: 3px; }
     #adminApp label {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 800;
       letter-spacing: 0.02em;
       color: #37474f;
@@ -317,9 +317,9 @@ label::before {
     textarea { min-height: 48px; resize: vertical; }
 
     .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-    .error-msg { font-size: 14px; color: #c62828; margin-top: 4px; }
+    .error-msg { font-size: 12px; color: #c62828; margin-top: 4px; }
 
-    .stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; font-size: 14px; }
+    .stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 8px; font-size: 12px; }
     .stats-item {
       background: #f7fbfc;
       border-radius: 14px;
@@ -338,7 +338,7 @@ label::before {
       overflow: hidden;
       background: #fdfefe;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
     thead { background: #f2f7f8; }
     th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid #ecf1f3; }
     th { font-weight: 600; color: #555; white-space: nowrap; }
@@ -347,15 +347,14 @@ label::before {
     tbody tr:hover { background: #eef7f8; }
 
     .td-mimo { font-weight: 600; color: var(--turquesa); }
-    .td-obs { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .td-obs { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .td-status {
       font-weight: 600;
-      font-size: 14px;
+      font-size: 12px;
       padding: 4px 8px;
       border-radius: 999px;
       display: inline-block;
-      text-transform: uppercase;
       letter-spacing: 0.05em;
     }
 
@@ -368,11 +367,11 @@ label::before {
     .status-cancelado { background: #ffebee; color: #c62828; }
 
     .actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .empty { padding: 18px; text-align: center; font-size: 14px; color: #777; }
+    .empty { padding: 18px; text-align: center; font-size: 12px; color: #777; }
 
     .footer {
       margin-top: 12px;
-      font-size: 14px;
+      font-size: 12px;
       color: #888;
       display: flex;
       justify-content: space-between;
@@ -388,7 +387,7 @@ label::before {
       border: 1px solid #e1e8eb;
     }
     .subcard-title {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
       margin-bottom: 6px;
       color: #37474f;
@@ -408,7 +407,7 @@ label::before {
       max-height: 260px;
       overflow-y: auto;
     }
-    .subtable-wrapper table { font-size: 14px; }
+    .subtable-wrapper table { font-size: 12px; }
 
     .badge-mini {
       display: inline-flex;
@@ -418,7 +417,7 @@ label::before {
       border-radius: 999px;
       background: rgba(1,173,183,0.1);
       color: #015d63;
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
     }
@@ -438,7 +437,7 @@ label::before {
       border: none;
       background: transparent;
       padding: 12px 12px;
-      font-size: 14px;
+      font-size: 12px;
       cursor: pointer;
       color: #607d8b;
       display: inline-flex;
@@ -506,7 +505,7 @@ label::before {
       display: grid;
       grid-template-columns: 1fr;
       gap: 6px;
-      font-size: 14px;
+      font-size: 12px;
       color: #37474f;
     }
     .agenda-line {
@@ -516,7 +515,7 @@ label::before {
       flex-wrap: wrap;
     }
     .agenda-key {
-      font-size: 14px;
+      font-size: 12px;
       color: #78909c;
       min-width: 72px;
     }
@@ -533,7 +532,7 @@ label::before {
       border: 1px dashed #d7e9ec;
       border-radius: 12px;
       padding: 8px;
-      font-size: 14px;
+      font-size: 12px;
       color: #455a64;
       min-height: 38px;
     }
@@ -583,14 +582,14 @@ label::before {
     }
     .footer-logo { max-width: 140px; height: auto; }
     .footer-info {
-      font-size: 14px;
+      font-size: 12px;
       color: #455a64;
       display: flex;
       flex-direction: column;
       gap: 2px;
     }
-    .footer-info strong { font-size: 14px; color: #263238; }
-    .footer-bottom { font-size: 14px; color: #78909c; text-align: center; margin-top: 4px; }
+    .footer-info strong { font-size: 12px; color: #263238; }
+    .footer-bottom { font-size: 12px; color: #78909c; text-align: center; margin-top: 4px; }
 
     /* Inputs datetime no mesmo padrão visual */
   .dt-input {
@@ -788,14 +787,14 @@ label::before {
 
 /* Texto MENU */
 .menu-text{
-  font-size: 14px;
+  font-size: 12px;
   letter-spacing: .03em;
   text-transform: uppercase;
 }
 
 /* Logo-sub inline */
 .logo-inline{
-  font-size: 14px;
+  font-size: 12px;
   opacity: .75;
   white-space: nowrap;
 }
@@ -861,7 +860,7 @@ label::before {
 /* ===== Stats - Mimos dinâmicos ===== */
 .stats-mimos-list{
   margin-top:6px;
-  font-size:14px;
+  font-size:12px;
   line-height:1.35;
   white-space:pre-line;
 }
@@ -921,7 +920,7 @@ label::before {
 
 .pf-hint-title {
   font-weight: 800;
-  font-size: 14px;
+  font-size: 12px;
   letter-spacing: .2px;
   text-transform: uppercase;
   color: rgba(0,0,0,.90);
@@ -930,7 +929,7 @@ label::before {
 
 .pf-hint-msg {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.35;
   color: rgba(0,0,0,.90);
   white-space: pre-line;
@@ -997,7 +996,7 @@ label::before {
 
 /* PF: notas pequenas em formulários */
 #adminApp .pf-field-note{
-  font-size: 14px;
+  font-size: 12px;
   color: #78909c;
   margin-top: 2px;
 }
@@ -1054,7 +1053,7 @@ label::before {
 
 .pf-hint p {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   color: #1AB1BB;
   opacity: .95;
 }
@@ -1191,7 +1190,7 @@ input[name="duration_min"],
   gap: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
   color: #37474f;
   white-space: nowrap;
@@ -1240,10 +1239,10 @@ input[name="duration_min"],
   display:flex;
   align-items:center;
   gap:8px;
-  font-size:14px;
+  font-size:12px;
 }
 .economy-preview{
-  font-size:14px;
+  font-size:12px;
   line-height:1.5;
 }
 .economy-preview .kpi{
@@ -1258,7 +1257,7 @@ input[name="duration_min"],
   background:#E0F4F6;
   color:#1AB1BB;
   font-weight:700;
-  font-size:14px;
+  font-size:12px;
 }
 
 
@@ -1275,13 +1274,27 @@ input[name="duration_min"],
 .row-soon-red { background: rgba(244, 67, 54, 0.14) !important; }
 
 /* Subtexto na data (dia da semana) */
-.td-sub { font-size: 14px; opacity: 0.75; margin-top: 2px; text-transform: capitalize; }
+.td-sub { font-size: 12px; opacity: 0.75; margin-top: 2px; text-transform: capitalize; }
 
 /* Link WhatsApp no telefone */
 .wa-link { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 
 /* Pagamento (badge) */
-.pay-badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 14px; font-weight: 700; line-height: 1; }
+.pay-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:26px;
+  height:26px;
+  min-width:26px;
+  padding:0;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:800;
+  line-height:1;
+  box-sizing:border-box;
+  vertical-align:middle;
+}
 .pay-paid { background: rgba(0, 200, 83, 0.18); color: #0b6b2f; }
 .pay-pending { background: rgba(255, 193, 7, 0.22); color: #6a4b00; }
 .pay-rejected { background: rgba(244, 67, 54, 0.18); color: #b71c1c; }
@@ -1290,7 +1303,7 @@ input[name="duration_min"],
 
 /* Forma de pagamento com ícone */
 .pay-method { display: inline-flex; gap: 6px; align-items: center; }
-.pay-icon { font-size: 14px; line-height: 1; }
+.pay-icon { font-size: 12px; line-height: 1; }
 
 /* Menu kebab (se ainda não existir no CSS base) */
 .actions-kebab { display: flex; justify-content: flex-end; align-items: center; width: 100%; }
@@ -1462,7 +1475,7 @@ input[name="duration_min"],
 }
 .pf-modal-sub{
   margin:3px 0 0;
-  font-size:14px;
+  font-size:12px;
   opacity:.75;
   line-height:1.2;
 }
@@ -1503,7 +1516,7 @@ input[name="duration_min"],
   display:grid;
   grid-template-columns: 160px 1fr;
   gap: 8px 12px;
-  font-size:14px;
+  font-size:12px;
 }
 .pf-info-grid .k{ font-weight:800; color:#014C5F; }
 .pf-info-grid .v{ color:#263238; word-break: break-word; }
@@ -1531,7 +1544,7 @@ input[name="duration_min"],
 .calendar-mini-item{ background:#f7fbfc; border:1px solid #e1e8eb; border-radius:14px; padding:10px; display:flex; justify-content:space-between; gap:10px; margin-bottom:8px; }
 .calendar-mini-left{ display:flex; flex-direction:column; gap:2px; }
 .calendar-mini-time{ font-weight:900; color:#16363c; }
-.calendar-mini-main{ font-size:14px; color:#37474f; }
+.calendar-mini-main{ font-size:12px; color:#37474f; }
 .calendar-mini-muted{ font-size:13px; color:#607d8b; }
 
 
@@ -1542,7 +1555,7 @@ td.td-actions { text-align: right; }
 
 /* ===== Agenda (Admin): destaque por status + colunas em negrito ===== */
 #tbodyAgenda td.agenda-bold { font-weight: 700; }
-#tbodyAgenda td.agenda-bold-date > div:first-child { font-weight: 700; }
+#tbodyAgenda td.agenda-bold-date > div:first-child { font-weight: 700; vertical-align: middle; }
 
 /* Linha com background por status (mantém layout, apenas cor de fundo) */
 #tbodyAgenda tr.status-agendado { background: #fff3cd66; }
@@ -1565,12 +1578,12 @@ td.td-actions { text-align: right; }
 
 /* ===== PetFunny: faixa de status na primeira coluna (Agendamentos) ===== */
 #agendaListWrapper table thead th.status-strip-col {
-  width: 8px;
+  width: 5px;
   padding: 0;
 }
 #tbodyAgenda td.status-strip {
-  width: 8px;
-  min-width: 8px;
+  width: 5px;
+  min-width: 5px;
   padding: 0;
 }
 #tbodyAgenda td.status-strip.status-agendado { background: #fff3cd; }
@@ -1592,6 +1605,71 @@ td.td-actions { text-align: right; }
   background: transparent !important;
 }
 
+/* ===== Agenda (Admin): tabela sem abreviações + quebra automática =====
+   Objetivo: evitar "sumir" colunas quando há textos longos, sem usar barra horizontal.
+   Estratégia: table-layout: fixed + larguras mínimas + quebra de linha controlada.
+*/
+
+#agendaListWrapper table{
+  width: 100%;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+#agendaListWrapper th,
+#agendaListWrapper td{
+  padding: 6px 8px;
+  vertical-align: middle;
+  white-space: normal;            /* permite quebrar */
+  overflow-wrap: anywhere;        /* quebra palavras longas */
+  word-break: break-word;
+}
+
+/* Larguras: (1) faixa status, (2) Data, (3) Hora, ... */
+#agendaListWrapper th.status-strip-col{ padding: 0; }
+
+/* Data um pouco maior (sem quebrar) */
+#agendaListWrapper th:nth-child(2),
+#agendaListWrapper td:nth-child(2){
+  width: 92px;
+  white-space: nowrap;
+}
+
+/* Hora menor (sem quebrar) */
+#agendaListWrapper th:nth-child(3),
+#agendaListWrapper td:nth-child(3){
+  width: 58px;
+  white-space: nowrap;
+}
+
+/* Telefone não quebra linha */
+#agendaListWrapper th:nth-child(6),
+#agendaListWrapper td:nth-child(6){
+  white-space: nowrap;
+}
+
+/* Obs. menor, mas sempre visível (quebrando) */
+#agendaListWrapper th:nth-child(12),
+#agendaListWrapper td:nth-child(12){
+  width: 140px;
+}
+
+/* Pagamento + Status: chips compactos, mas SEM abreviar texto */
+#agendaListWrapper .pay-badge,
+#agendaListWrapper .td-status{
+  font-size: 120px;
+  padding: 2px;
+  line-height: 1.1;
+}
+
+/* Obs. deve quebrar e mostrar tudo */
+#agendaListWrapper .td-obs{
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 
 /* Clientes e Pets: lista de clientes sem rolagem (deixa crescer) */
 #clientesListWrapper{
@@ -1599,3 +1677,144 @@ td.td-actions { text-align: right; }
   overflow-y: visible;
   overflow: visible;
 }
+
+/* Clientes (Admin): avatar do tutor na listagem */
+#clientesListWrapper th.col-avatar,
+#clientesListWrapper td.col-avatar{
+  width: 44px;
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.pf-avatar-sm{
+  width: 32px;
+  height: 32px; margin-right: 5px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(1,173,183,0.08);
+}
+
+.pf-avatar-ph{
+  width: 32px;
+  height: 32px; margin-right: 5px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #015f66;
+  background: rgba(1,173,183,0.12);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+
+
+/* ===== Agenda (Admin): avatar + texto alinhados (middle) ===== */
+.pf-cell-avatar{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pf-cell-avatar__img{
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(1,173,183,0.08);
+}
+.pf-cell-avatar__text{
+  display: inline-block;
+  vertical-align: middle;
+  min-width: 0;
+}
+
+.pf-cell-avatar .pf-avatar-sm{
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0; /* gap já controla */
+}
+.pf-cell-avatar .pf-avatar-ph{
+  margin-right: 0;
+}
+
+
+/* força alinhamento vertical no meio nas colunas Tutor/Pet */
+#agendaListWrapper td:nth-child(4),
+#agendaListWrapper td:nth-child(5){
+  vertical-align: middle;
+}
+
+/* Pagamento (Pg): dá folga para não cortar o badge */
+#agendaListWrapper th:nth-child(10),
+#agendaListWrapper td:nth-child(10){
+  width: 64px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Pets (Admin): avatar do pet na listagem (modal Pets) */
+.subtable-wrapper th.col-avatar,
+.subtable-wrapper td.col-avatar{
+  width: 44px;
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+
+/* ===== FINANCEIRO (UI upgrades) ===== */
+.fin-th-filter{
+  cursor:pointer;
+  user-select:none;
+}
+.fin-th-filter:hover{
+  text-decoration: underline;
+}
+.fin-th-filter.fin-filter-active{
+  text-decoration: underline;
+  opacity: 0.95;
+}
+
+.stats-value.stats-negative{
+  color: #d32f2f;
+}
+
+.fin-type-out{
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+.fin-value-out{
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+.fin-actions{
+  text-align:right;
+  white-space:nowrap;
+}
+
+.fin-actions-btn{
+  width:32px;
+  height:32px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+  cursor:pointer;
+}
+.fin-actions-btn:hover{
+  background: rgba(255,255,255,0.08);
+}
+

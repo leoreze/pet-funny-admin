@@ -7,6 +7,76 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <link rel="stylesheet" href="/style.css" />
+
+    <!-- PATCH: Ajuste de colunas da tabela de Agendamentos (sem rolagem horizontal). 2026-01-06 -->
+    <style>
+      /* Mantém a tabela mais estável sem alterar layout geral do admin */
+      #agendaListWrapper table { font-size: 12px; }
+      #agendaListWrapper th, #agendaListWrapper td { padding: 6px 8px; vertical-align: middle; }
+
+      /* Tutor(a): permitir quebrar linha para manter nome completo */
+      #agendaListWrapper td:nth-child(3),
+      #agendaListWrapper th:nth-child(3) { white-space: normal; word-break: break-word; }
+
+      /* Telefone: nunca quebrar linha */
+      #agendaListWrapper td:nth-child(5),
+      #agendaListWrapper th:nth-child(5) { white-space: nowrap; }
+
+      /* Serviços / Valores / Obs: permitir quebra */
+      #agendaListWrapper td:nth-child(6),
+      #agendaListWrapper td:nth-child(7),
+      #agendaListWrapper td:nth-child(13) { white-space: normal; word-break: break-word; }
+
+      /* Pagamento e Status: compactos (mesmo “tamanho de tag”) */
+      #agendaListWrapper th:nth-child(9),  #agendaListWrapper td:nth-child(9),
+      #agendaListWrapper th:nth-child(10), #agendaListWrapper td:nth-child(10) { width: 76px; }
+
+      #agendaListWrapper th:nth-child(13), #agendaListWrapper td:nth-child(13) { width: 120px; }
+
+      /* Badges compactos */
+      #agendaListWrapper .pay-badge,
+      #agendaListWrapper .td-status {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 66px;
+        padding: 2px 6px;
+        font-size: 11px;
+        line-height: 1.2;
+        text-align: center;
+      }
+
+      /* Status pode ser maior, mas mantém comportamento compacto */
+      #agendaListWrapper .td-status { white-space: normal; }
+    
+/* ===== PATCH TABELA AGENDAMENTOS (compactação sem abreviação) ===== */
+#agendaListWrapper table {
+  table-layout: fixed;
+}
+
+#agendaListWrapper th:nth-child(2),
+#agendaListWrapper td:nth-child(2) {
+  /* Coluna Hora */
+  width: 70px;
+  white-space: nowrap;
+}
+
+#agendaListWrapper th:nth-child(13),
+#agendaListWrapper td:nth-child(13) {
+  /* Coluna Obs */
+  width: 140px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+#agendaListWrapper td,
+#agendaListWrapper th {
+  font-size: 12px;
+  vertical-align: middle;
+}
+/* ===== /PATCH ===== */
+
+</style>
 </head>
 <body>
 
@@ -93,6 +163,7 @@
           <button class="tab-btn" data-tab="tab-servicos" type="button"><span>🧼</span> Serviços</button>
           <button class="tab-btn" data-tab="tab-pacotes" type="button"><span>📦</span> Pacotes</button>
       <button class="tab-btn" data-tab="tab-mimos" type="button"><span>🎁</span> Mimos</button>
+          <button class="tab-btn" data-tab="tab-financeiro" type="button"><span>💰</span> Financeiro</button>
           <button class="tab-btn" data-tab="tab-horarios" type="button"><span>⏱️</span> Horário de Funcionamento</button>
           <button class="tab-btn" data-tab="tab-automacao" type="button"><span>⚙️</span> Automação</button>
           <button class="tab-btn" data-tab="tab-dashboard" type="button"><span>📊</span> Dashboard</button>
@@ -329,9 +400,9 @@
             <th>Pet</th>
             <th>Telefone</th>
             <th>Serviço(s)</th>
-            <th>Valores e tempo(s)</th>
+            <th>Valores</th>
             <th>Mimo</th>
-            <th>Pagamento</th>
+            <th>Pg</th>
             <th>Forma</th>
                         <th>Obs.</th>
             <th>Status</th>
@@ -413,6 +484,14 @@
               <label for="cliName">Nome do tutor</label>
               <input type="text" id="cliName" placeholder="Nome completo" />
             </div>
+            <!-- PATCH: Foto do cliente (opcional). 2026-01-06 -->
+            <div class="form-group">
+              <label for="cliPhotoFile">Foto do cliente (opcional)</label>
+              <input type="file" id="cliPhotoFile" accept="image/*" />
+              <input type="hidden" id="cliPhotoData" />
+              <img id="cliPhotoPreview" alt="Prévia da foto do cliente" class="hidden" style="margin-top:8px; max-width:120px; max-height:120px; border-radius:10px; border:1px solid rgba(0,0,0,0.08);" />
+            </div>
+
         <!-- PATCH: add customer address fields (CEP, rua, etc) - 2025-12-24 -->
         <div class="form-group">
           <label for="cliCep">CEP</label>
@@ -460,6 +539,7 @@
               <thead>
               <tr>
                 <th>ID</th>
+                <th class="col-avatar">Foto</th>
                 <th>Tutor</th>
                 <th>Telefone</th>
                 <th>Pets</th>
@@ -484,6 +564,14 @@
             <label for="petName">Nome do pet</label>
             <input type="text" id="petName" placeholder="Nome do pet" />
           </div>
+          <!-- PATCH: Foto do pet (opcional). 2026-01-06 -->
+          <div class="form-group">
+            <label for="petPhotoFile">Foto do pet (opcional)</label>
+            <input type="file" id="petPhotoFile" accept="image/*" />
+            <input type="hidden" id="petPhotoData" />
+            <img id="petPhotoPreview" alt="Prévia da foto do pet" class="hidden" style="margin-top:8px; max-width:120px; max-height:120px; border-radius:10px; border:1px solid rgba(0,0,0,0.08);" />
+          </div>
+
           <div class="form-group">
             <label for="petBreed">Raça</label>
             <select id="petBreed"></select>
@@ -524,6 +612,7 @@
             <thead>
             <tr>
               <th>ID</th>
+              <th class="col-avatar">Foto</th>
               <th>Nome</th>
               <th>Raça</th>
               <th>Porte</th>
@@ -901,7 +990,7 @@
                 </tr>
               </thead>
               <tbody id="tbodyAutomationRules">
-                <tr><td colspan="8" class="muted">Carregando…</td></tr>
+                <tr><td colspan="9" class="muted">Carregando…</td></tr>
               </tbody>
             </table>
           </div>
@@ -960,7 +1049,7 @@
                 </tr>
               </thead>
               <tbody id="tbodyQueue">
-                <tr><td colspan="8" class="muted">Carregando…</td></tr>
+                <tr><td colspan="9" class="muted">Carregando…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1005,7 +1094,7 @@
                 </tr>
               </thead>
               <tbody id="tbodyQueue">
-                <tr><td colspan="8" class="muted">Carregando…</td></tr>
+                <tr><td colspan="9" class="muted">Carregando…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1050,7 +1139,7 @@
                 </tr>
               </thead>
               <tbody id="tbodyQueue">
-                <tr><td colspan="8" class="muted">Carregando…</td></tr>
+                <tr><td colspan="9" class="muted">Carregando…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1191,9 +1280,160 @@
       </div>
     </section>
 
+    <!-- TAB: FINANCEIRO -->
+    <section id="tab-financeiro" class="tab-view">
+      <div class="section-title-row">
+        <div class="section-title"><span>💰</span> Financeiro</div>
+      </div>
+
+      <div class="form-panel">
+        <div class="form-row-3">
+          <div class="form-group">
+            <label for="finStart">De</label>
+            <input type="date" id="finStart" />
+          </div>
+          <div class="form-group">
+            <label for="finEnd">Até</label>
+            <input type="date" id="finEnd" />
+          </div>
+          <div class="form-group" style="align-items:flex-end;">
+            <label style="opacity:0;">Ações</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+              <button class="btn btn-light" id="btnFinHoje" type="button">Hoje</button>
+              <button class="btn btn-light" id="btnFinMes" type="button">Mês atual</button>
+              <button class="btn" id="btnFinAplicar" type="button">Aplicar</button>
+              <button class="btn" id="btnFinNovoLanc" type="button">+ Novo lançamento</button>
+              <button class="btn btn-secondary" id="btnFinExportCSV" type="button">Exportar CSV</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats" id="finStats">
+        <div class="stats-item"><span class="stats-label">Recebidos:</span> <span class="stats-value" id="finPaid">R$ 0,00</span></div>
+        <div class="stats-item"><span class="stats-label">Aguardando:</span> <span class="stats-value" id="finPending">R$ 0,00</span></div>
+        <div class="stats-item"><span class="stats-label">Não pago:</span> <span class="stats-value" id="finUnpaid">R$ 0,00</span></div>
+        <div class="stats-item"><span class="stats-label">Recusado:</span> <span class="stats-value" id="finRejected">R$ 0,00</span></div>
+        <div class="stats-item"><span class="stats-label">Saídas:</span> <span class="stats-value stats-negative" id="finOut">R$ 0,00</span></div>
+        <div class="stats-item"><span class="stats-label">Total:</span> <span class="stats-value" id="finTotal">R$ 0,00</span></div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th class="fin-th-filter" data-fin-col="date">Data</th>
+              <th class="fin-th-filter" data-fin-col="type">Tipo</th>
+              <th class="fin-th-filter" data-fin-col="customer_name">Cliente</th>
+              <th class="fin-th-filter" data-fin-col="pet_name">Pet</th>
+              <th class="fin-th-filter" data-fin-col="description">Descrição</th>
+              <th class="fin-th-filter" data-fin-col="payment_method">Método</th>
+              <th class="fin-th-filter" data-fin-col="payment_status">Status</th>
+              <th class="fin-th-filter" data-fin-col="amount_cents" style="width:120px;">Valor</th>
+              <th style="width:44px;"></th>
+            </tr>
+          </thead>
+          <tbody id="tbodyFinance">
+            <tr><td colspan="9" class="muted">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="empty hidden" id="finEmpty">Nenhum lançamento no período.</div>
+    </section>
+
+
 </div>
 </div>
      
+
+<!-- MODAL: NOVO LANÇAMENTO (Financeiro) -->
+<div id="financeEntryModal" class="pf-modal-overlay hidden" aria-hidden="true" data-close="financeEntryModal">
+  <div class="pf-modal" role="dialog" aria-modal="true" aria-label="Novo lançamento">
+    <div class="pf-modal-head">
+      <div class="pf-modal-left">
+        <div class="pf-modal-ic" aria-hidden="true">💰</div>
+        <div>
+          <p class="pf-modal-title" id="financeEntryModalTitle">Novo lançamento</p>
+          <p class="pf-modal-sub" id="financeEntryModalSub">Registre uma entrada ou saída manual no financeiro.</p>
+        </div>
+      </div>
+      <button class="pf-modal-x" id="financeEntryModalClose" type="button" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="pf-modal-body">
+      <form id="financeEntryForm" class="form-panel" autocomplete="off">
+        <input type="hidden" id="finEntryId" value="" />
+        <div class="form-row-3">
+          <div class="form-group">
+            <label for="finEntryDate">Data</label>
+            <input type="date" id="finEntryDate" required />
+          </div>
+
+          <div class="form-group">
+            <label for="finEntryType">Tipo</label>
+            <select id="finEntryType" required>
+              <option value="Entrada">Entrada</option>
+              <option value="Saída">Saída</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="finEntryAmount">Valor</label>
+            <input type="text" id="finEntryAmount" placeholder="R$ 0,00" required />
+          </div>
+        </div>
+
+        <div class="form-row-3">
+          <div class="form-group">
+            <label for="finEntryMethod">Método</label>
+            <select id="finEntryMethod">
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Pix">Pix</option>
+              <option value="Cartão">Cartão</option>
+              <option value="Transferência">Transferência</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="finEntryStatus">Status</label>
+            <select id="finEntryStatus">
+              <option value="Pago">Pago</option>
+              <option value="Aguardando">Aguardando</option>
+              <option value="Não Pago">Não Pago</option>
+              <option value="Recusado">Recusado</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="finEntryCategory">Categoria</label>
+            <input type="text" id="finEntryCategory" placeholder="Ex: Banho &amp; Tosa / Produto / Aluguel..." />
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group" style="width:100%;">
+            <label for="finEntryDesc">Descrição</label>
+            <input type="text" id="finEntryDesc" placeholder="Detalhe do lançamento" />
+          </div>
+        </div>
+
+        <div class="pf-modal-actions" style="margin-top:14px;">
+          <button class="btn btn-secondary" id="btnFinEntryCancel" type="button">Cancelar</button>
+          <button class="btn" id="btnFinEntrySave" type="submit">Salvar</button>
+        </div>
+
+        <div class="pf-modal-success hidden" id="financeEntryModalSuccess" style="margin-top:12px;">
+          <div class="pf-modal-success-msg" id="financeEntryModalSuccessMsg">Lançamento salvo com sucesso.</div>
+        </div>
+
+        <div class="pf-error" id="financeEntryModalError" style="display:none;margin-top:10px;"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
 
 <footer class="site-footer">
   <div class="footer-inner">
@@ -1444,25 +1684,97 @@
 <style>
   @keyframes pfSpin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
 
-  /* PATCH (2026-01-06): Agenda table resilience
-     - Evita "quebra" da tabela quando algum campo vem muito longo.
-     - Mantém layout existente, apenas habilita scroll horizontal no wrapper.
-  */
-  #agendaListWrapper.table-wrapper{
-    overflow-x: auto;
-    overflow-y: hidden;
-    max-width: 100%;
-    -webkit-overflow-scrolling: touch;
-  }
-  #agendaListWrapper.table-wrapper table{
-    width: 100%;
-    min-width: 1400px; /* garante espaço para todas as colunas */
-  }
-  #agendaListWrapper.table-wrapper th,
-  #agendaListWrapper.table-wrapper td{
-    white-space: nowrap; /* evita colapsar/empurrar colunas */
-  }
+/* PATCH: Agendamentos - tabela compacta sem scroll (2026-01-06)
+   Objetivo: reduzir quebra/estouro de colunas SEM mudar layout estrutural. */
+#agendaListWrapper table{
+  width:100%;
+  table-layout:fixed; /* estabiliza colunas */
+  font-size:12px;     /* diminui fonte (pedido) */
+}
+#agendaListWrapper th, #agendaListWrapper td{
+  box-sizing:border-box;
+  vertical-align:middle;
+  padding:8px 8px;
+}
 
+/* Cabeçalho sempre em 1 linha */
+#agendaListWrapper th{ white-space:nowrap; }
+
+/* Default: evita estourar (reticências) */
+#agendaListWrapper td{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* Larguras por coluna (ajuste fino para caber sem scroll)
+   Obs: a tabela tem uma coluna inicial de faixa de status. */
+#agendaListWrapper th:nth-child(1),  #agendaListWrapper td:nth-child(1){  width:0.5%; } /* Faixa */
+#agendaListWrapper th:nth-child(2),  #agendaListWrapper td:nth-child(2){  width:8.5%; } /* Data (↑ um pouco) */
+#agendaListWrapper th:nth-child(3),  #agendaListWrapper td:nth-child(3){  width:5%; }   /* Hora */
+#agendaListWrapper th:nth-child(4),  #agendaListWrapper td:nth-child(4){  width:12%; }  /* Tutor(a) (com foto) */
+#agendaListWrapper th:nth-child(5),  #agendaListWrapper td:nth-child(5){  width:10%; }  /* Pet (com foto) */
+#agendaListWrapper th:nth-child(6),  #agendaListWrapper td:nth-child(6){  width:8%; }   /* Telefone */
+#agendaListWrapper th:nth-child(7),  #agendaListWrapper td:nth-child(7){  width:10%; }  /* Serviço(s) */
+#agendaListWrapper th:nth-child(8),  #agendaListWrapper td:nth-child(8){  width:11%; }  /* Valores */
+#agendaListWrapper th:nth-child(9),  #agendaListWrapper td:nth-child(9){  width:10%; }  /* Mimo (↑ mais largo) */
+#agendaListWrapper th:nth-child(10), #agendaListWrapper td:nth-child(10){ width:4%; }   /* Pagamento (símbolo) */
+#agendaListWrapper th:nth-child(11), #agendaListWrapper td:nth-child(11){ width:5%; }   /* Forma */
+#agendaListWrapper th:nth-child(12), #agendaListWrapper td:nth-child(12){ width:6%; }   /* Obs (↓ menor) */
+#agendaListWrapper th:nth-child(13), #agendaListWrapper td:nth-child(13){ width:6%; }   /* Status */
+#agendaListWrapper th:nth-child(14), #agendaListWrapper td:nth-child(14){ width:4%; }   /* Ações */
+
+/* Colunas com quebra de linha (pedido) */
+/* Tutor(a) e Pet: não cortar nome, pode quebrar (com avatar) */
+#agendaListWrapper td:nth-child(4),
+#agendaListWrapper td:nth-child(5){
+  white-space:normal;
+  overflow:visible;
+  text-overflow:clip;
+}
+/* Serviços e Valores/tempo(s): permitir quebrar (e já inserimos <br> em valores/tempo) */
+#agendaListWrapper td:nth-child(7),
+#agendaListWrapper td:nth-child(8){
+  white-space:normal;
+}
+/* Obs: largura menor, mas sem cortar texto (quebra linha) */
+#agendaListWrapper td:nth-child(12){
+  white-space:normal;
+  overflow:visible;
+  text-overflow:clip;
+  word-break:break-word;
+}
+/* Telefone: nunca quebrar linha */
+#agendaListWrapper td:nth-child(6){ white-space:nowrap; }
+
+/* Badges compactos (Pagamento e Status com mesmo "tamanho") */
+#agendaListWrapper .pay-badge,
+#agendaListWrapper .td-status{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  font-size:11px;
+  line-height:1;
+  padding:4px 6px;
+  border-radius:999px;
+  max-width:100%;
+  white-space:nowrap;
+}
+/* Pagamento (Pg): badge circular fixo (evita estourar coluna) */
+#agendaListWrapper .pay-badge{
+  width:26px;
+  height:26px;
+  min-width:26px;
+  padding:0;
+  font-size:12px;
+}
+/* garante que o badge de status não "estoure" a célula */
+#agendaListWrapper td:nth-child(13) .td-status{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
 </style>
 
 
