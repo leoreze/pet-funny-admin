@@ -1895,8 +1895,8 @@ try { bindServicesEventsOnce(); } catch (_) {}
     if (bk) bk.disabled = true;
     if (formPetSelect) formPetSelect.disabled = true;
     if (formPrize) formPrize.disabled = true;
-    if (formPaymentStatus) formPaymentStatus.disabled = true;
-    if (formPaymentMethod) formPaymentMethod.disabled = true;
+    if (formPaymentStatus) formPaymentStatus.disabled = false;
+    if (formPaymentMethod) formPaymentMethod.disabled = false;
     if (formNotes) formNotes.disabled = false;
 
     // Serviços não editáveis (e normalmente ocultos no modo pacote)

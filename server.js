@@ -1396,6 +1396,21 @@ const svcTotalsMin = (service_duration_min != null) ? service_duration_min : (se
         JSON.stringify(services_json)
       ]
     );
+    // Se este agendamento pertence a um pacote (package_sale_id), mantém pagamento consistente no pacote
+    try {
+      const rSale = await db.query('SELECT package_sale_id FROM bookings WHERE id = $1', [id]);
+      const saleId = rSale && rSale.rows && rSale.rows[0] ? rSale.rows[0].package_sale_id : null;
+      if (saleId) {
+        await db.query(
+          'UPDATE package_sales SET payment_status = $1, payment_method = $2 WHERE id = $3',
+          [payment_status, payment_method, saleId]
+        );
+      }
+    } catch (e) {
+      // não bloqueia a edição do agendamento caso a atualização do pacote falhe
+      console.warn('Aviso: não foi possível sincronizar pagamento do pacote:', e && e.message ? e.message : e);
+    }
+
     res.json({ booking: row });
   } catch (err) {
     console.error('Erro ao atualizar booking:', err);
