@@ -102,7 +102,8 @@ function isLocalhostUrl(u) {
 
 
 // Static files (admin.html, index.html, assets)
-app.use(express.static(__dirname));
+app.use(express.static(__dirname, { index: false }));
+
 
 // PATCH: serve admin-prefixed static assets (avoid 404 on /admin/* when files live at project root)
 app.get('/admin/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
@@ -117,23 +118,16 @@ app.get(['/admin', '/admin/'], (req, res) => {
   return res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-// =========================
-// LANDING PAGE (ROOT)
-// =========================
-app.get('/', (req, res) => {
-  return res.sendFile(
-    path.join(__dirname, 'petfunny_landing', 'index.html')
-  );
+// HOME -> Landing
+app.get(['/', '/index.html'], (req, res) => {
+  return res.sendFile(path.join(__dirname, 'petfunny_landing', 'index.html'));
 });
 
-// =========================
-// ROLETA DE MIMOS
-// =========================
-app.get('/roleta', (req, res) => {
-  return res.sendFile(
-    path.join(__dirname, 'index.html')
-  );
+// ROLETA
+app.get(['/roleta', '/roleta/'], (req, res) => {
+  return res.sendFile(path.join(__dirname, 'index.html'));
 });
+
 
 
 
