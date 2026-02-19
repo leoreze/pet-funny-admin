@@ -1895,8 +1895,8 @@ try { bindServicesEventsOnce(); } catch (_) {}
     if (bk) bk.disabled = true;
     if (formPetSelect) formPetSelect.disabled = true;
     if (formPrize) formPrize.disabled = true;
-    if (formPaymentStatus) formPaymentStatus.disabled = false;
-    if (formPaymentMethod) formPaymentMethod.disabled = false;
+    if (formPaymentStatus) formPaymentStatus.disabled = true;
+    if (formPaymentMethod) formPaymentMethod.disabled = true;
     if (formNotes) formNotes.disabled = false;
 
     // Serviços não editáveis (e normalmente ocultos no modo pacote)
@@ -6806,8 +6806,14 @@ async function deletePackage(id){
   if (!id) return;
   if (!confirm('Excluir este pacote?')) return;
   try {
-    await apiDelete(`/api/packages/${id}`);
-    showHint('Pacote excluido com sucesso!', 'success');
+    const resp = await apiDelete(`/api/packages/${id}`);
+
+    if (resp && resp.deactivated) {
+      showHint((resp.message || 'Pacote possui vendas e foi desativado.'), 'info');
+    } else {
+      showHint('Pacote excluido com sucesso!', 'success');
+    }
+
     await loadPackages();
   } catch (e) {
     showHint(e && e.message ? e.message : 'Erro ao excluir pacote.', 'error');
@@ -7592,4 +7598,3 @@ async function refreshPackageSelectForBooking(){
     }
   } catch (_) {}
 })();
-

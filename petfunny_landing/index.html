@@ -1,0 +1,1151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pet Funny • Banho & Tosa em Ribeirão Preto</title>
+  <meta name="description" content="Banho & Tosa com carinho de verdade. Agende pelo WhatsApp. Rua Virgílio de Carvalho Neves Neto, 794 – Ribeirão Preto/SP." />
+  <meta name="theme-color" content="#01ADB7" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Pet Funny • Banho & Tosa" />
+  <meta property="og:description" content="Seu pet limpo, cheiroso e feliz. Agende pelo WhatsApp e aproveite promoções e pacotes." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="assets/foto-3.jpg" />
+
+  <style>
+    :root {
+      --teal: #01ADB7;
+      --coral:#F9A197;
+      --bg:   #FAFAFA;
+      --ink:  #0F172A; /* slate-900 */
+      --muted:#475569; /* slate-600 */
+      --line: rgba(15, 23, 42, .10);
+      --card: #FFFFFF;
+      --shadow: 0 18px 60px rgba(15, 23, 42, .10);
+      --shadow2: 0 10px 30px rgba(15, 23, 42, .08);
+
+      --radius-xl: 24px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+      --radius-sm: 12px;
+
+      --max: 1120px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      line-height: 1.4;
+      letter-spacing: .2px;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; }
+    button { font: inherit; }
+
+    .wrap { width: min(var(--max), calc(100% - 40px)); margin: 0 auto; }
+
+    /* Topbar (clean, Cobasi-like) */
+    .topbar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,250,250,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+    }
+    .nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0;
+      gap: 14px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 0;
+    }
+    .brand img {
+      width: 120px; height: 120px;
+      border-radius: 0;
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
+    .brand .t { display: flex; flex-direction: column; line-height: 1.05; }
+    .brand .t strong { font-size: 14px; }
+    .brand .t span { font-size: 12px; color: var(--muted); }
+
+    .navlinks {
+      display: flex; gap: 8px; align-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .navlinks a {
+      padding: 10px 12px;
+      border-radius: 12px;
+      transition: background .16s ease, color .16s ease;
+    }
+    .navlinks a:hover {
+      background: rgba(1,173,183,.10);
+      color: var(--ink);
+    }
+
+    .nav-cta { display: flex; gap: 10px; align-items: center; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      padding: 12px 14px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease, background .14s ease;
+      user-select: none;
+      white-space: nowrap;
+      box-shadow: 0 8px 16px rgba(15,23,42,.05);
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(1,173,183,.35);
+      box-shadow: 0 12px 26px rgba(15,23,42,.08);
+    }
+    .btn.primary {
+      border: none;
+      background: var(--teal);
+      color: #fff;
+      box-shadow: 0 16px 36px rgba(1,173,183,.25);
+      font-weight: 800;
+    }
+    .btn.primary:hover {
+      box-shadow: 0 20px 46px rgba(1,173,183,.28);
+    }
+    .btn.soft {
+      border: 1px solid rgba(1,173,183,.22);
+      background: rgba(1,173,183,.10);
+      color: var(--ink);
+    }
+
+    .burger {
+      display: none;
+      width: 44px; height: 44px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fff;
+      align-items: center; justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 8px 16px rgba(15,23,42,.05);
+    }
+    .burger span {
+      width: 18px; height: 2px; background: var(--ink);
+      position: relative;
+      border-radius: 2px;
+      opacity: .85;
+    }
+    .burger span::before, .burger span::after {
+      content: "";
+      position: absolute; left: 0; width: 18px; height: 2px;
+      background: var(--ink); border-radius: 2px; opacity: .85;
+    }
+    .burger span::before { top: -6px; }
+    .burger span::after { top: 6px; }
+
+    .mobileMenu {
+      display: none;
+      padding: 0 0 14px;
+    }
+    .mobileMenu.show { display: block; }
+    .mobileMenu a {
+      display: block;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fff;
+      margin-top: 10px;
+      color: var(--ink);
+      box-shadow: 0 8px 16px rgba(15,23,42,.05);
+    }
+
+    /* Hero (clean) */
+    .hero {
+      padding: 26px 0 8px;
+    }
+    .heroGrid {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 22px;
+      align-items: stretch;
+    }
+    .heroCard {
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .heroContent {
+      padding: 28px 28px 22px;
+    }
+    .pillRow {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(1,173,183,.22);
+      background: rgba(1,173,183,.10);
+      color: var(--ink);
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(30px, 3.7vw, 44px);
+      line-height: 1.05;
+      letter-spacing: -0.6px;
+    }
+    .sub {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 60ch;
+    }
+    .ctaRow {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      margin-top: 8px;
+    }
+    .mini {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .miniItem {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 16px;
+      padding: 12px 12px;
+      box-shadow: 0 8px 16px rgba(15,23,42,.04);
+    }
+    .miniItem b { color: var(--ink); }
+
+    .mediaStack {
+      position: relative;
+      height: 100%;
+      min-height: 360px;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      background: #fff;
+      cursor: pointer;
+    }
+    .mediaStack img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+    }
+    .mediaOverlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,.06) 0%, rgba(0,0,0,.14) 60%, rgba(0,0,0,.34) 100%);
+    }
+    .mediaBadge {
+      position: absolute;
+      left: 16px; bottom: 16px; right: 16px;
+      display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;
+    }
+    .badgeCard {
+      flex: 1;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(255,255,255,.70);
+      border-radius: 18px;
+      padding: 12px 12px;
+      box-shadow: 0 10px 24px rgba(15,23,42,.14);
+    }
+    .badgeCard strong { display: block; font-size: 14px; }
+    .badgeCard span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .playBtn {
+      width: 52px; height: 52px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.65);
+      background: rgba(255,255,255,.92);
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: transform .14s ease, box-shadow .14s ease;
+      box-shadow: 0 10px 24px rgba(15,23,42,.14);
+      flex: 0 0 auto;
+    }
+    .playBtn:hover { transform: translateY(-1px); }
+    .playBtn svg { width: 22px; height: 22px; fill: var(--ink); }
+
+    /* Sections */
+    section {
+      padding: 54px 0;
+    }
+    .sectionHead {
+      display: flex; align-items: flex-end; justify-content: space-between; gap: 14px;
+      margin-bottom: 16px;
+    }
+    .sectionHead h2 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.3px;
+    }
+    .sectionHead p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      max-width: 62ch;
+      font-size: 14px;
+    }
+
+    .grid3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    .card {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      background: var(--card);
+      padding: 18px;
+      box-shadow: var(--shadow2);
+    }
+    .card h3 { margin: 10px 0 6px; font-size: 16px; }
+    .card p { margin: 0; color: var(--muted); font-size: 13px; }
+
+    .icon {
+      width: 44px; height: 44px;
+      border-radius: 16px;
+      background: rgba(1,173,183,.12);
+      border: 1px solid rgba(1,173,183,.22);
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .icon svg { width: 22px; height: 22px; fill: var(--teal); }
+
+    /* Promo (clean highlight) */
+    .promo {
+      border-radius: var(--radius-xl);
+      border: 1px solid rgba(1,173,183,.22);
+      background: linear-gradient(0deg, rgba(1,173,183,.08), rgba(1,173,183,.08)), #fff;
+      padding: 24px;
+      box-shadow: var(--shadow2);
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 16px;
+      align-items: center;
+    }
+    .promo h3 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      letter-spacing: -0.3px;
+    }
+    .promo p { margin: 0; color: var(--muted); font-size: 14px; }
+    .promo .right {
+      display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
+    }
+
+    /* Gallery */
+    .gallery {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 14px;
+      align-items: stretch;
+    }
+    .gMain, .gSide {
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: var(--shadow2);
+      position: relative;
+      cursor: pointer;
+    }
+    .gMain img, .gSide img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transform: scale(1.02);
+    }
+    .gGrid {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 14px;
+    }
+    .gHint {
+      position: absolute; left: 14px; bottom: 14px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(255,255,255,.72);
+      padding: 9px 11px;
+      border-radius: 14px;
+      font-size: 12px;
+      color: var(--ink);
+      box-shadow: 0 10px 24px rgba(15,23,42,.12);
+    }
+
+    /* Testimonials */
+    .testimonials {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .quote {
+      padding: 18px;
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: var(--shadow2);
+    }
+    .quote .stars { letter-spacing: 1px; color: var(--coral); }
+    .quote p { margin: 10px 0 14px; color: var(--muted); font-size: 14px; }
+    .quote .who { color: var(--ink); font-weight: 800; font-size: 13px; }
+
+    /* Footer */
+    footer {
+      padding: 42px 0 60px;
+      border-top: 1px solid var(--line);
+      background: #fff;
+    }
+    .footerGrid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+    .footCard {
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 18px;
+      box-shadow: var(--shadow2);
+    }
+    .footCard h4 { margin: 0 0 10px; font-size: 15px; }
+    .footCard p, .footCard a {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .footLinks {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      margin-top: 12px;
+    }
+    .tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 9px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-size: 12px;
+      color: var(--ink);
+      box-shadow: 0 8px 16px rgba(15,23,42,.05);
+    }
+    .tag:hover {
+      border-color: rgba(1,173,183,.35);
+      background: rgba(1,173,183,.06);
+    }
+
+    /* Floating WhatsApp */
+    .waFloat {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 80;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .waBtn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 14px;
+      border-radius: 18px;
+      border: none;
+      background: var(--coral);
+      color: #2a0b08;
+      box-shadow: 0 18px 44px rgba(249,161,151,.35);
+      font-weight: 900;
+    }
+    .waBtn:hover { transform: translateY(-1px); }
+    .waBtn svg { width: 20px; height: 20px; fill: #2a0b08; }
+    .waSmall {
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      font-size: 12px;
+      box-shadow: 0 10px 24px rgba(15,23,42,.08);
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed; inset: 0;
+      background: rgba(15, 23, 42, .40);
+      backdrop-filter: blur(10px);
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 100;
+      padding: 18px;
+    }
+    .modal.show { display: flex; }
+    .modalCard {
+      width: min(980px, 100%);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: 0 30px 90px rgba(15,23,42,.22);
+      overflow: hidden;
+      position: relative;
+    }
+    .modalClose {
+      position: absolute; top: 12px; right: 12px;
+      width: 44px; height: 44px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      z-index: 2;
+      box-shadow: 0 10px 24px rgba(15,23,42,.10);
+    }
+    .modalClose:hover {
+      border-color: rgba(1,173,183,.35);
+      background: rgba(1,173,183,.06);
+    }
+
+    .modalBody {
+      aspect-ratio: 16 / 9;
+      width: 100%;
+      background: #0b1220;
+    }
+    .modalBody video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #0b1220;
+    }
+    .lightboxBody {
+      width: 100%;
+      max-height: 80vh;
+      display: grid;
+      place-items: center;
+      background: #0b1220;
+    }
+    .lightboxBody img {
+      max-width: 100%;
+      max-height: 80vh;
+      object-fit: contain;
+    }
+    .lbNav {
+      position: absolute; inset: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      pointer-events: none;
+      padding: 0 10px;
+    }
+    .lbNav button {
+      pointer-events: auto;
+      width: 48px; height: 48px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(15,23,42,.10);
+    }
+    .lbNav button:hover {
+      border-color: rgba(1,173,183,.35);
+      background: rgba(1,173,183,.06);
+    }
+
+    /* Small “clean” separators */
+    .divider {
+      height: 1px;
+      background: var(--line);
+      width: 100%;
+      margin: 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 980px) {
+      .heroGrid { grid-template-columns: 1fr; }
+      .mediaStack { min-height: 320px; }
+      .promo { grid-template-columns: 1fr; }
+      .promo .right { align-items: flex-start; }
+      .gallery { grid-template-columns: 1fr; }
+      .grid3 { grid-template-columns: 1fr; }
+      .testimonials { grid-template-columns: 1fr; }
+      .footerGrid { grid-template-columns: 1fr; }
+      .navlinks { display: none; }
+      .burger { display: inline-flex; }
+      .mini { grid-template-columns: 1fr; }
+    }
+  
+    /* Cookie banner */
+    .cookieBanner{
+      position: fixed;
+      left: 16px; right: 16px; bottom: 16px;
+      z-index: 120;
+      display: none;
+    }
+    .cookieBanner.show{ display:block; }
+    .cookieCard{
+      width: min(980px, 100%);
+      margin: 0 auto;
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: 0 22px 60px rgba(15,23,42,.18);
+      padding: 16px 16px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .cookieText{
+      flex: 1 1 520px;
+      min-width: 260px;
+    }
+    .cookieText strong{
+      display:block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .cookieText p{
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .cookieActions{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex: 0 0 auto;
+    }
+
+  
+    /* Banner hero */
+    .bannerHero{
+      position: relative;
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--line);
+      background: #fff;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      min-height: 320px;
+    }
+    .bannerHero img{
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    /* Small gradient to ensure CTAs read well on any banner */
+    .bannerOverlay{
+      position:absolute; inset:0;
+      background: linear-gradient(90deg, rgba(250,250,250,.88) 0%, rgba(250,250,250,.60) 35%, rgba(250,250,250,.12) 70%, rgba(250,250,250,0) 100%);
+      pointer-events:none;
+    }
+    .bannerActions{
+      position:absolute;
+      left: 16px;
+      bottom: 16px;
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      z-index: 2;
+    }
+    .heroInfo{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .heroInfoCard{
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 16px;
+      padding: 12px 12px;
+      box-shadow: 0 8px 16px rgba(15,23,42,.04);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .heroInfoCard b{ color: var(--ink); }
+
+    @media (max-width: 980px){
+      .bannerOverlay{ background: linear-gradient(180deg, rgba(250,250,250,.78) 0%, rgba(250,250,250,.30) 58%, rgba(250,250,250,0) 100%); }
+      .bannerActions{ left: 12px; right: 12px; bottom: 12px; }
+      .heroInfo{ grid-template-columns: 1fr; }
+    }
+
+  
+    /* FULL WIDTH BANNER */
+    .bannerFull{
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+    }
+    .bannerFull img{
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    .bannerButtons{
+        position: absolute;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    @media(max-width: 768px){
+        .bannerButtons{
+            bottom: 15px;
+            gap: 8px;
+        }
+    }
+
+</style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <div class="nav">
+        <a class="brand" href="#top" aria-label="Pet Funny">
+          <img src="assets/logo.svg" alt="Logo Pet Funny" />
+        </a>
+
+        <nav class="navlinks" aria-label="Menu">
+          <a href="#servicos">Serviços</a>
+          <a href="#promocao">Promoção</a>
+          <a href="#galeria">Galeria</a>
+          <a href="#contato">Contato</a>
+        </nav>
+
+        <div class="nav-cta">
+          <a class="btn" href="https://www.google.com/maps/search/?api=1&query=Pet%20Funny%20Banho%20%26%20Tosa%20Ribeir%C3%A3o%20Preto%20Rua%20Virg%C3%ADlio%20de%20Carvalho%20Neves%20Neto%20794" target="_blank" rel="noopener">📍 Como chegar</a>
+          <a class="btn soft" href="https://agendapetfunny.com.br" target="_blank" rel="noopener">🎁 Roleta de Mimos</a>
+          <a class="btn primary" href="https://wa.me/5516981535338?text=Olá!%20Quero%20agendar%20banho/tosa%20no%20Pet%20Funny%20🐾✨" target="_blank" rel="noopener">Agendar no WhatsApp</a>
+          <button class="burger" id="burger" aria-label="Abrir menu">
+            <span></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="mobileMenu" id="mobileMenu" aria-label="Menu mobile">
+        <a href="#servicos">Serviços</a>
+        <a href="#promocao">Promoção</a>
+        <a href="#galeria">Galeria</a>
+        <a href="#contato">Contato</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    
+    
+    <div class="bannerFull">
+        <img src="assets/banner-full.jpg" alt="Banner Pet Funny - Cuidado de Verdade, com Carinho" />
+        <div class="bannerButtons">
+            <a class="btn primary" href="https://wa.me/5516981535338?text=Olá!%20Quero%20agendar%20banho/tosa%20no%20Pet%20Funny%20🐾✨" target="_blank">Agendar no WhatsApp</a>
+            <a class="btn soft" href="https://agendapetfunny.com.br" target="_blank">🎁 Roleta de Mimos</a>
+            <a class="btn" href="https://www.google.com/maps/search/?api=1&query=Pet%20Funny%20Banho%20%26%20Tosa%20Ribeir%C3%A3o%20Preto%20Rua%20Virg%C3%ADlio%20de%20Carvalho%20Neves%20Neto%20794" target="_blank">📍 Como chegar</a>
+        </div>
+    </div>
+<section id="servicos">
+      <div class="wrap">
+        <div class="sectionHead">
+          <div>
+            <h2>Serviços</h2>
+            <p>O essencial para seu pet ficar bem cuidado, com segurança e carinho.</p>
+          </div>
+          <a class="btn" href="https://wa.me/5516981535338?text=Olá!%20Quero%20agendar%20banho/tosa%20no%20Pet%20Funny%20🐾✨" target="_blank" rel="noopener">Falar no WhatsApp</a>
+        </div>
+
+        <div class="grid3">
+          <div class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 2c3.9 0 7 3.1 7 7 0 5.3-7 13-7 13S5 14.3 5 9c0-3.9 3.1-7 7-7zm0 9.5A2.5 2.5 0 1 0 12 6.5a2.5 2.5 0 0 0 0 5z"/></svg>
+            </div>
+            <h3>Banho completo</h3>
+            <p>Higienização caprichada, secagem e finalização para seu pet sair confortável e cheiroso.</p>
+          </div>
+
+          <div class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 2l2 2-3 3 3 3-2 2-5-5 5-5zm10 0l5 5-5 5-2-2 3-3-3-3 2-2zM9 22l6-20 2 .6-6 20-2-.6z"/></svg>
+            </div>
+            <h3>Tosa (higiênica ou completa)</h3>
+            <p>Corte profissional respeitando o bem-estar do pet e o estilo que você prefere.</p>
+          </div>
+
+          <div class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            </div>
+            <h3>Pacotes e recorrência</h3>
+            <p>Para manter seu pet sempre em dia: rotina fácil, economia e horários garantidos.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="promocao">
+      <div class="wrap">
+        <div class="promo">
+          <div>
+            <h3>Promoção de Segunda a Quarta</h3>
+            <p>Valores especiais no agendamento do banho e condições melhores nos pacotes. Chama no WhatsApp e garante seu horário.</p>
+          </div>
+          <div class="right">
+            <a class="btn primary" href="https://wa.me/5516981535338?text=Olá!%20Quero%20agendar%20banho/tosa%20no%20Pet%20Funny%20🐾✨" target="_blank" rel="noopener">Agendar com desconto</a>
+            <a class="btn" href="#contato">Ver endereço e horários</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="galeria">
+      <div class="wrap">
+        <div class="sectionHead">
+          <div>
+            <h2>Galeria</h2>
+            <p>Fotos reais do Pet Funny: pets, loja e aquele clima de cuidado.</p>
+          </div>
+          <button class="btn" id="openGallery">Abrir galeria</button>
+        </div>
+
+        <div class="gallery">
+          <div class="gMain" data-lb="0" aria-label="Abrir foto 1" title="Clique para ampliar">
+            <img src="assets/foto-1.jpg" alt="Pet fofo no Pet Funny" />
+            <div class="gHint">Clique para ampliar</div>
+          </div>
+          <div class="gGrid">
+            <div class="gSide" data-lb="1" aria-label="Abrir foto 2" title="Clique para ampliar">
+              <img src="assets/foto-6.jpg" alt="Pet no Pet Funny" />
+            </div>
+            <div class="gSide" data-lb="2" aria-label="Abrir foto 3" title="Clique para ampliar">
+              <img src="assets/foto-4.jpg" alt="Interior do Pet Funny" />
+            </div>
+          </div>
+        </div>
+
+        <div style="height:14px"></div>
+
+        <div class="grid3">
+          <div class="card" style="padding:0; overflow:hidden;">
+            <img src="assets/foto-5.jpg" alt="Pet arrumadinho" style="height:220px; width:100%; object-fit:cover;">
+          </div>
+          <div class="card" style="padding:0; overflow:hidden;">
+            <img src="assets/foto-2.jpg" alt="Uniforme Pet Funny" style="height:220px; width:100%; object-fit:cover;">
+          </div>
+          <div class="card" style="padding:0; overflow:hidden;">
+            <img src="assets/foto-3.jpg" alt="Fachada do Pet Funny" style="height:220px; width:100%; object-fit:cover;">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="depoimentos">
+      <div class="wrap">
+        <div class="sectionHead">
+          <div>
+            <h2>Depoimentos</h2>
+            <p>Modelos prontos para você trocar pelos comentários do Google/Instagram quando quiser.</p>
+          </div>
+          <a class="btn primary" href="https://wa.me/5516981535338?text=Olá!%20Quero%20agendar%20banho/tosa%20no%20Pet%20Funny%20🐾✨" target="_blank" rel="noopener">Quero agendar</a>
+        </div>
+
+        <div class="testimonials">
+          <div class="quote">
+            <div class="stars">★★★★★</div>
+            <p>“Atendimento super carinhoso. Meu pet saiu limpinho e cheirosinho, com muita paciência.”</p>
+            <div class="who">— Cliente Pet Funny</div>
+          </div>
+          <div class="quote">
+            <div class="stars">★★★★★</div>
+            <p>“Ambiente caprichado e organizado. Dá pra ver que cuidam de verdade. Recomendo!”</p>
+            <div class="who">— Cliente Pet Funny</div>
+          </div>
+          <div class="quote">
+            <div class="stars">★★★★★</div>
+            <p>“Agendamento rápido no WhatsApp e pontualidade. Meu pet ama ir no Pet Funny.”</p>
+            <div class="who">— Cliente Pet Funny</div>
+          </div>
+          <div class="quote">
+            <div class="stars">★★★★★</div>
+            <p>“A tosa ficou perfeita! E o carinho com os pets é o que mais conquista.”</p>
+            <div class="who">— Cliente Pet Funny</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contato">
+      <div class="wrap">
+        <div class="sectionHead">
+          <div>
+            <h2>Contato e localização</h2>
+            <p>Agende pelo WhatsApp ou clique em “Como chegar”.</p>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a class="btn" href="https://www.google.com/maps/search/?api=1&query=Pet%20Funny%20Banho%20%26%20Tosa%20Ribeir%C3%A3o%20Preto%20Rua%20Virg%C3%ADlio%20de%20Carvalho%20Neves%20Neto%20794" target="_blank" rel="noopener">📍 Como chegar</a>
+            <a class="btn primary" href="https://wa.me/5516981535338?text=Olá!%20Quero%20agendar%20banho/tosa%20no%20Pet%20Funny%20🐾✨" target="_blank" rel="noopener">Agendar no WhatsApp</a>
+          </div>
+        </div>
+
+        <div class="footerGrid">
+          <div class="footCard">
+            <h4>Pet Funny • Banho &amp; Tosa</h4>
+            <p>
+              Rua Virgílio de Carvalho Neves Neto, 794<br/>
+              Ribeirão Preto / SP
+            </p>
+            <p style="margin-top:10px;">
+              <b style="color:var(--ink);">Horário:</b><br/>
+              Seg–Sex: 08:30 às 17:30<br/>
+              Sábado: 08:30 às 17:00
+            </p>
+
+            <div class="footLinks">
+              <a class="tag" href="https://wa.me/5516981535338?text=Olá!%20Quero%20agendar%20banho/tosa%20no%20Pet%20Funny%20🐾✨" target="_blank" rel="noopener">💬 WhatsApp</a>
+              <a class="tag" href="https://www.instagram.com/petfunnybanhoetosa/" target="_blank" rel="noopener">📸 Instagram</a>
+              <a class="tag" href="https://www.facebook.com/petfunnyrp" target="_blank" rel="noopener">👍 Facebook</a>
+              <a class="tag" href="https://www.youtube.com/@petfunnyrp" target="_blank" rel="noopener">▶️ YouTube</a>
+            </div>
+          </div>
+
+          <div class="footCard">
+            <h4>Atalho rápido</h4>
+            <p>Clique abaixo e já vai com uma mensagem pronta:</p>
+            <div style="height:12px"></div>
+            <a class="btn primary" href="https://wa.me/5516981535338?text=Olá!%20Quero%20agendar%20banho/tosa%20no%20Pet%20Funny%20🐾✨" target="_blank" rel="noopener">🐾 Quero agendar banho/tosa</a>
+            <div style="height:12px"></div>
+            <a class="btn" href="https://www.google.com/maps/search/?api=1&query=Pet%20Funny%20Banho%20%26%20Tosa%20Ribeir%C3%A3o%20Preto%20Rua%20Virg%C3%ADlio%20de%20Carvalho%20Neves%20Neto%20794" target="_blank" rel="noopener">📍 Abrir no Google Maps</a>
+            <div style="height:14px"></div>
+            <p style="color:rgba(71,85,105,.9); font-size:12px;">
+              Quer deixar ainda mais “Cobasi style”? Eu posso colocar um topo com “categorias” e um bloco de vantagens (sem poluir).
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div style="display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+        <div style="display:flex; gap:12px; align-items:center;">
+          <img src="assets/logo.svg" alt="Pet Funny" style="width:54px; height:54px; border-radius:0; padding:0; background:transparent; border:none; box-shadow:none;" />
+          <div>
+            <div style="font-weight:900;">Pet Funny</div>
+          </div>
+        </div>
+        <div style="color:var(--muted); font-size:12px;">
+          © <span id="year"></span> Pet Funny • Todos os direitos reservados
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Floating WhatsApp -->
+  <div class="waFloat" aria-label="Atalho WhatsApp">
+    <div class="waSmall">Agende em 1 clique 👇</div>
+    <a class="waBtn" href="https://wa.me/5516981535338?text=Olá!%20Quero%20agendar%20banho/tosa%20no%20Pet%20Funny%20🐾✨" target="_blank" rel="noopener" aria-label="Agendar no WhatsApp">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.52 3.48A11.9 11.9 0 0 0 12 0C5.38 0 .02 5.36.02 11.98c0 2.11.55 4.17 1.6 5.99L0 24l6.18-1.62a11.9 11.9 0 0 0 5.8 1.48h.01c6.62 0 11.98-5.36 11.98-11.98 0-3.2-1.25-6.2-3.45-8.4ZM12 21.8h-.01a9.9 9.9 0 0 1-5.05-1.39l-.36-.21-3.67.96.98-3.58-.24-.37A9.86 9.86 0 0 1 2.2 11.98C2.2 6.47 6.49 2.2 12 2.2c2.65 0 5.14 1.03 7.01 2.9a9.84 9.84 0 0 1 2.9 6.98c0 5.51-4.29 9.72-9.9 9.72Zm5.43-7.27c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.95 1.17-.17.2-.35.22-.65.07-.3-.15-1.27-.47-2.42-1.5-.89-.79-1.49-1.77-1.67-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.48-.5-.67-.5h-.57c-.2 0-.52.07-.8.37-.27.3-1.05 1.02-1.05 2.5s1.07 2.9 1.22 3.1c.15.2 2.11 3.22 5.12 4.52.72.31 1.28.5 1.72.64.72.23 1.38.2 1.9.12.58-.09 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35Z"/></svg>
+      WhatsApp
+    </a>
+  </div>
+
+  <!-- Video Modal -->
+  <div class="modal" id="videoModal" aria-hidden="true">
+    <div class="modalCard" role="dialog" aria-label="Vídeo Pet Funny">
+      <button class="modalClose" data-close="videoModal" aria-label="Fechar">✕</button>
+      <div class="modalBody">
+        <video id="petVideo" src="assets/video.mp4" controls playsinline></video>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox Modal -->
+  <div class="modal" id="lightbox" aria-hidden="true">
+    <div class="modalCard" role="dialog" aria-label="Galeria Pet Funny" style="max-width:1100px;">
+      <button class="modalClose" data-close="lightbox" aria-label="Fechar">✕</button>
+      <div class="lightboxBody">
+        <img id="lbImg" alt="Foto ampliada da galeria" src="" />
+      </div>
+      <div class="lbNav" aria-hidden="false">
+        <button id="lbPrev" aria-label="Anterior">‹</button>
+        <button id="lbNext" aria-label="Próxima">›</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+    $("#year").textContent = new Date().getFullYear();
+
+    // Mobile menu
+    const burger = $("#burger");
+    const mobileMenu = $("#mobileMenu");
+    burger?.addEventListener("click", () => mobileMenu.classList.toggle("show"));
+    $$("#mobileMenu a").forEach(a => a.addEventListener("click", () => mobileMenu.classList.remove("show")));
+
+    // Smooth scroll
+    $$('.navlinks a, .mobileMenu a, a[href^="#"]').forEach(a => {
+      a.addEventListener("click", (e) => {
+        const href = a.getAttribute("href") || "";
+        if (!href.startsWith("#") || href.length < 2) return;
+        const el = document.querySelector(href);
+        if (!el) return;
+        e.preventDefault();
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+
+    // Video modal
+    const videoModal = $("#videoModal");
+    const petVideo = $("#petVideo");
+
+    function openModal(modalEl) {
+      if (!modalEl) return;
+      modalEl.classList.add("show");
+      modalEl.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+    }
+    function closeModal(modalEl) {
+      if (!modalEl) return;
+      modalEl.classList.remove("show");
+      modalEl.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    }
+    function openVideo() {
+      openModal(videoModal);
+      try { petVideo?.play(); } catch (e) {}
+    }
+    $("#openVideo")?.addEventListener("click", openVideo);
+    $("#openVideo2")?.addEventListener("click", openVideo);
+
+    // Gallery lightbox
+    const lightbox = $("#lightbox");
+    const lbImg = $("#lbImg");
+    const galleryImgs = [
+      "assets/foto-1.jpg",
+      "assets/foto-6.jpg",
+      "assets/foto-4.jpg",
+      "assets/foto-5.jpg",
+      "assets/foto-2.jpg",
+      "assets/foto-3.jpg",
+    ];
+    let lbIndex = 0;
+
+    function openLightbox(i=0) {
+      lbIndex = (i + galleryImgs.length) % galleryImgs.length;
+      lbImg.src = galleryImgs[lbIndex];
+      openModal(lightbox);
+    }
+    function stepLightbox(dir) {
+      lbIndex = (lbIndex + dir + galleryImgs.length) % galleryImgs.length;
+      lbImg.src = galleryImgs[lbIndex];
+    }
+
+    $("#openGallery")?.addEventListener("click", () => openLightbox(0));
+
+    $$("[data-lb]").forEach(el => {
+      el.addEventListener("click", () => openLightbox(parseInt(el.getAttribute("data-lb"), 10) || 0));
+      el.addEventListener("keypress", (e) => {
+        if (e.key === "Enter" || e.key === " ") openLightbox(parseInt(el.getAttribute("data-lb"), 10) || 0);
+      });
+    });
+
+    $("#lbPrev")?.addEventListener("click", () => stepLightbox(-1));
+    $("#lbNext")?.addEventListener("click", () => stepLightbox(1));
+
+    // Close buttons
+    $$("[data-close]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-close");
+        const modalEl = document.getElementById(id);
+        if (id === "videoModal") {
+          try { petVideo?.pause(); petVideo.currentTime = 0; } catch (e) {}
+        }
+        closeModal(modalEl);
+      });
+    });
+
+    // Backdrop + ESC
+    [videoModal, lightbox].forEach(modalEl => {
+      modalEl?.addEventListener("click", (e) => {
+        if (e.target === modalEl) {
+          if (modalEl.id === "videoModal") {
+            try { petVideo?.pause(); petVideo.currentTime = 0; } catch (e) {}
+          }
+          closeModal(modalEl);
+        }
+      });
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (videoModal?.classList.contains("show")) {
+          try { petVideo?.pause(); petVideo.currentTime = 0; } catch (e2) {}
+          closeModal(videoModal);
+        }
+        if (lightbox?.classList.contains("show")) closeModal(lightbox);
+      }
+      if (lightbox?.classList.contains("show")) {
+        if (e.key === "ArrowLeft") stepLightbox(-1);
+        if (e.key === "ArrowRight") stepLightbox(1);
+      }
+    });
+
+    $("#heroImage")?.addEventListener("click", () => openLightbox(5));
+  
+    // Cookie banner
+    const cookieKey = "petfunny_cookie_consent_v1";
+    const cookieBanner = $("#cookieBanner");
+    const consent = localStorage.getItem(cookieKey);
+    if (!consent && cookieBanner) {
+      cookieBanner.classList.add("show");
+    }
+    $("#cookieAccept")?.addEventListener("click", () => {
+      localStorage.setItem(cookieKey, "accepted");
+      cookieBanner?.classList.remove("show");
+    });
+    $("#cookieReject")?.addEventListener("click", () => {
+      localStorage.setItem(cookieKey, "dismissed");
+      cookieBanner?.classList.remove("show");
+    });
+
+  </script>
+
+  <!-- Cookie Banner -->
+  <div class="cookieBanner" id="cookieBanner" aria-live="polite" aria-label="Aviso de cookies">
+    <div class="cookieCard">
+      <div class="cookieText">
+        <strong>Valorizamos sua privacidade</strong>
+        <p>
+          Utilizamos cookies para aprimorar sua experiência de navegação, exibir anúncios ou conteúdo personalizado e analisar nosso tráfego.
+          Ao clicar em “Aceitar”, você concorda com nosso uso de cookies.
+        </p>
+      </div>
+      <div class="cookieActions">
+        <button class="btn" id="cookieReject" type="button">Agora não</button>
+        <button class="btn primary" id="cookieAccept" type="button">Aceitar</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

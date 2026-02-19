@@ -117,6 +117,25 @@ app.get(['/admin', '/admin/'], (req, res) => {
   return res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
+// =========================
+// LANDING PAGE (ROOT)
+// =========================
+app.get('/', (req, res) => {
+  return res.sendFile(
+    path.join(__dirname, 'petfunny_landing', 'index.html')
+  );
+});
+
+// =========================
+// ROLETA DE MIMOS
+// =========================
+app.get('/roleta', (req, res) => {
+  return res.sendFile(
+    path.join(__dirname, 'index.html')
+  );
+});
+
+
 
 /* =========================
    HELPERS
@@ -693,9 +712,38 @@ app.delete('/api/packages/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'ID inválido.' });
+
+    // Se houver vendas vinculadas, não pode excluir fisicamente (FK RESTRICT).
+    // Para não perder histórico, fazemos "desativação" do pacote.
+    const ref = await db.get('SELECT COUNT(1)::int AS cnt FROM package_sales WHERE package_id = $1', [id]);
+    const cnt = ref && Number(ref.cnt || 0) ? Number(ref.cnt || 0) : 0;
+
+    if (cnt > 0) {
+      await db.run('UPDATE service_packages SET is_active = false WHERE id = $1', [id]);
+      return res.json({
+        ok: true,
+        deleted: false,
+        deactivated: true,
+        message: 'Pacote possui vendas registradas e foi desativado (não pode ser excluído).'
+      });
+    }
+
     await db.run('DELETE FROM service_packages WHERE id = $1', [id]);
-    res.json({ ok: true });
+    res.json({ ok: true, deleted: true });
   } catch (err) {
+    // Fallback: caso haja corrida e o FK dispare no DELETE
+    if (err && (err.code === '23001' || err.constraint === 'package_sales_package_id_fkey')) {
+      try {
+        const id = Number(req.params.id);
+        if (id) await db.run('UPDATE service_packages SET is_active = false WHERE id = $1', [id]);
+        return res.json({
+          ok: true,
+          deleted: false,
+          deactivated: true,
+          message: 'Pacote possui vendas registradas e foi desativado (não pode ser excluído).'
+        });
+      } catch (_) {}
+    }
     console.error('Erro ao deletar package:', err);
     res.status(500).json({ error: 'Erro interno ao excluir pacote.' });
   }
@@ -1396,21 +1444,6 @@ const svcTotalsMin = (service_duration_min != null) ? service_duration_min : (se
         JSON.stringify(services_json)
       ]
     );
-    // Se este agendamento pertence a um pacote (package_sale_id), mantém pagamento consistente no pacote
-    try {
-      const rSale = await db.query('SELECT package_sale_id FROM bookings WHERE id = $1', [id]);
-      const saleId = rSale && rSale.rows && rSale.rows[0] ? rSale.rows[0].package_sale_id : null;
-      if (saleId) {
-        await db.query(
-          'UPDATE package_sales SET payment_status = $1, payment_method = $2 WHERE id = $3',
-          [payment_status, payment_method, saleId]
-        );
-      }
-    } catch (e) {
-      // não bloqueia a edição do agendamento caso a atualização do pacote falhe
-      console.warn('Aviso: não foi possível sincronizar pagamento do pacote:', e && e.message ? e.message : e);
-    }
-
     res.json({ booking: row });
   } catch (err) {
     console.error('Erro ao atualizar booking:', err);
