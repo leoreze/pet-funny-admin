@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pet Funny • Banho & Tosa em Ribeirão Preto</title>
-  <meta name="description" content="Banho & Tosa com carinho de verdade. Agende pelo WhatsApp. Rua Virgílio de Carvalho Neves Neto, 794 – Ribeirão Preto/SP." />
+  <title>Pet Funny Banho e Tosa em Ribeirão Preto | Cuidado com Carinho</title>
+  <meta name="description" content="Pet Funny Banho e Tosa em Ribeirão Preto. Atendimento próximo, carinho de verdade e agendamento rápido pelo WhatsApp. Rua Virgílio de Carvalho Neves Neto, 794.">
   <meta name="theme-color" content="#01ADB7" />
 
   <!-- Open Graph -->
@@ -94,12 +94,13 @@
     .nav-cta { display: flex; gap: 10px; align-items: center; }
 
     .btn {
+      padding-bottom: 18px;
       display: inline-flex; align-items: center; justify-content: center;
       gap: 10px;
       border: 1px solid var(--line);
       background: #fff;
       color: var(--ink);
-      padding: 12px 14px;
+      padding: 12px 14px 16px;
       border-radius: 14px;
       cursor: pointer;
       transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease, background .14s ease;
@@ -113,16 +114,19 @@
       box-shadow: 0 12px 26px rgba(15,23,42,.08);
     }
     .btn.primary {
+      padding-bottom: 18px;
       border: none;
       background: var(--teal);
       color: #fff;
-      box-shadow: 0 16px 36px rgba(1,173,183,.25);
+      box-shadow: 0 16px 36px #F9A197;
       font-weight: 800;
     }
     .btn.primary:hover {
+      padding-bottom: 18px;
       box-shadow: 0 20px 46px rgba(1,173,183,.28);
     }
     .btn.soft {
+      padding-bottom: 18px;
       border: 1px solid rgba(1,173,183,.22);
       background: rgba(1,173,183,.10);
       color: var(--ink);
@@ -522,20 +526,20 @@
     .modalBody {
       aspect-ratio: 16 / 9;
       width: 100%;
-      background: #0b1220;
+      background: #FFFFFF
     }
     .modalBody video {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      background: #0b1220;
+      background: #FFFFFF;
     }
     .lightboxBody {
       width: 100%;
       max-height: 80vh;
       display: grid;
       place-items: center;
-      background: #0b1220;
+      background:#FFFFFF;
     }
     .lightboxBody img {
       max-width: 100%;
@@ -550,17 +554,16 @@
     }
     .lbNav button {
       pointer-events: auto;
+      border-width: 0;
       width: 48px; height: 48px;
       border-radius: 18px;
-      border: 1px solid var(--line);
-      background: #fff;
       color: var(--ink);
       cursor: pointer;
       box-shadow: 0 10px 24px rgba(15,23,42,.10);
     }
     .lbNav button:hover {
-      border-color: rgba(1,173,183,.35);
-      background: rgba(1,173,183,.06);
+      border-color:  #fff;
+      background: #fff;
     }
 
     /* Small “clean” separators */
@@ -715,6 +718,27 @@
     }
 
 </style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "PetShop",
+  "name": "Pet Funny Banho e Tosa",
+  "image": "https://petfunnyrp.com.br/assets/banner-full.jpg",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "Rua Virgílio de Carvalho Neves Neto, 794",
+    "addressLocality": "Ribeirão Preto",
+    "addressRegion": "SP",
+    "postalCode": "14092-440",
+    "addressCountry": "BR"
+  },
+  "telephone": "+55 16 98153-5338",
+  "openingHours": "Mo-Fr 08:30-17:30 Sa 08:30-17:00",
+  "url": "https://petfunnyrp.com.br"
+}
+</script>
+
 </head>
 
 <body>
@@ -764,6 +788,11 @@
     </div>
 <section id="servicos">
       <div class="wrap">
+       
+  <div class="sectionHead" style="text-align: center; justify-content: center;">
+         <h1>Banho e Tosa em Ribeirão Preto <br />com Cuidado de Verdade</h1>
+         </div>
+
         <div class="sectionHead">
           <div>
             <h2>Serviços</h2>
@@ -985,8 +1014,8 @@
         <img id="lbImg" alt="Foto ampliada da galeria" src="" />
       </div>
       <div class="lbNav" aria-hidden="false">
-        <button id="lbPrev" aria-label="Anterior">‹</button>
-        <button id="lbNext" aria-label="Próxima">›</button>
+        <button id="lbPrev" aria-label="Anterior"><</button>
+        <button id="lbNext" aria-label="Próxima">></button>
       </div>
     </div>
   </div>
