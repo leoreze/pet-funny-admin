@@ -1055,6 +1055,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
   </div>
 
+  <script type="module">
+import Chatbox from 'https://cdn.jsdelivr.net/npm/@chatvolt/embeds@latest/dist/chatbox/index.js';
+
+const widget = await Chatbox.initBubble({
+  agentId: 'cmml0xtpj0619nhmukgxfc26a',
+});
+</script>
+
   <script>
     const $ = (sel, root=document) => root.querySelector(sel);
     const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
