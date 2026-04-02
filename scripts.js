@@ -1066,6 +1066,10 @@ attachCepMaskIfPresent();
 const formStatus = document.getElementById('formStatus');
   const formPaymentStatus = document.getElementById('formPaymentStatus');
   const formPaymentMethod = document.getElementById('formPaymentMethod');
+  function forceEnableBookingPaymentFields() {
+    try { if (formPaymentStatus) { formPaymentStatus.disabled = false; formPaymentStatus.removeAttribute('disabled'); } } catch (_) {}
+    try { if (formPaymentMethod) { formPaymentMethod.disabled = false; formPaymentMethod.removeAttribute('disabled'); } } catch (_) {}
+  }
   // cache de pets carregados para o agendamento atual (para descobrir o porte)
   let bookingPetsCache = [];
   let currentPetSize = '';
@@ -1891,12 +1895,12 @@ try { bindServicesEventsOnce(); } catch (_) {}
       if (pkgSel) pkgSel.disabled = true;
     }
 
-    // Travas: tudo travado exceto Data, Horário e Status
+    // Travas: mantém tipo/pet/serviços do pacote protegidos, mas libera pagamento/forma
     if (bk) bk.disabled = true;
     if (formPetSelect) formPetSelect.disabled = true;
     if (formPrize) formPrize.disabled = true;
-    if (formPaymentStatus) formPaymentStatus.disabled = true;
-    if (formPaymentMethod) formPaymentMethod.disabled = true;
+    if (formPaymentStatus) formPaymentStatus.disabled = false;
+    if (formPaymentMethod) formPaymentMethod.disabled = false;
     if (formNotes) formNotes.disabled = false;
 
     // Serviços não editáveis (e normalmente ocultos no modo pacote)
@@ -1923,6 +1927,7 @@ try { bindServicesEventsOnce(); } catch (_) {}
     if (formStatus) formStatus.disabled = false;
   }
 
+  forceEnableBookingPaymentFields();
   // Após preencher data, recalcula estado do horário (habilita/valida capacidade)
   refreshBookingDateTimeState(id ? Number(id) : null);
 }
@@ -6886,6 +6891,38 @@ function updateBookingKindUI(kind){
     if (st && !isEditing) st.value = 'confirmado';
   }
 }
+
+async function loadPackageDetailsForBooking(packageId, opts = {}) {
+  const pkgId = Number(packageId || 0);
+  if (!pkgId) return [];
+  try {
+    const data = await apiGet(`/api/packages/${pkgId}`);
+    const pkg = data && data.package ? data.package : null;
+    if (!pkg) return [];
+    const seq = Number(opts && opts.package_seq ? opts.package_seq : 1);
+    const services = [];
+    if (pkg.bath_service_id) {
+      const bath = getServiceById(pkg.bath_service_id) || (Array.isArray(servicesCache) ? servicesCache.find(s => String(s.id) === String(pkg.bath_service_id)) : null);
+      if (bath) services.push(bath);
+    }
+    let includes = [];
+    try { includes = Array.isArray(pkg.includes_json) ? pkg.includes_json : (pkg.includes_json ? JSON.parse(pkg.includes_json) : []); } catch (_) { includes = []; }
+    if (seq === 1 && Array.isArray(includes)) {
+      includes.forEach((item) => {
+        const sid = item && item.service_id != null ? item.service_id : null;
+        const svc = sid ? (getServiceById(sid) || (Array.isArray(servicesCache) ? servicesCache.find(s => String(s.id) === String(sid)) : null)) : null;
+        if (svc) services.push(Object.assign({}, svc, { value_cents: 0 }));
+      });
+    }
+    selectedServiceIds = services.map(s => String(s.id));
+    try { refreshSelectedServicesUI(); } catch (_) {}
+    return services;
+  } catch (err) {
+    console.warn('Falha ao carregar detalhes do pacote no agendamento:', err);
+    return [];
+  }
+}
+window.loadPackageDetailsForBooking = loadPackageDetailsForBooking;
 
 async function refreshPackageSelectForBooking(){
   const kindEl = document.getElementById('formBookingKind');

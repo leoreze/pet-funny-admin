@@ -299,12 +299,21 @@ await query(`
     );
   `);
 
-  // Migração automática: converte o serviço legado (bookings.service_id) em linhas em booking_services
+  // Migração automática segura: converte o serviço legado (bookings.service_id) em linhas em booking_services
+  // sem quebrar quando houver registros antigos apontando para services removidos.
+  await run(`
+    UPDATE bookings b
+       SET service_id = NULL
+     WHERE b.service_id IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM services s WHERE s.id = b.service_id);
+  `);
+
   await run(`
     INSERT INTO booking_services (booking_id, service_id, qty)
     SELECT b.id, b.service_id, 1
-    FROM bookings b
-    WHERE b.service_id IS NOT NULL
+      FROM bookings b
+     WHERE b.service_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM services s WHERE s.id = b.service_id)
     ON CONFLICT (booking_id, service_id) DO NOTHING;
   `);
 

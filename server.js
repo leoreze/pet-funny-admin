@@ -105,13 +105,23 @@ function isLocalhostUrl(u) {
 app.use(express.static(__dirname, { index: false }));
 
 
-// PATCH: serve admin-prefixed static assets (avoid 404 on /admin/* when files live at project root)
+// PATCH: aliases estáticos do admin (sem regressão)
 app.get('/admin/style.css', (req, res) => res.sendFile(path.join(__dirname, 'style.css')));
-app.get('/admin/js/bootstrap.js', (req, res) => res.sendFile(path.join(__dirname, 'bootstrap.js')));
-app.get('/admin/js/modules/mimos.js', (req, res) => res.sendFile(path.join(__dirname, 'mimos.js')));
-app.get('/admin/js/modules/services.js', (req, res) => res.sendFile(path.join(__dirname, 'services.js')));
-// (Opcional) logo no prefixo /admin, caso o HTML esteja com caminhos relativos
+app.get('/admin/scripts.js', (req, res) => res.sendFile(path.join(__dirname, 'scripts.js')));
+app.get('/admin/js/bootstrap.js', (req, res) => res.sendFile(path.join(__dirname, 'admin', 'js', 'bootstrap.js')));
+app.get('/admin/js/modules/mimos.js', (req, res) => res.sendFile(path.join(__dirname, 'admin', 'js', 'modules', 'mimos.js')));
+app.get('/admin/js/modules/services.js', (req, res) => res.sendFile(path.join(__dirname, 'admin', 'js', 'modules', 'services.js')));
 app.get('/admin/pet-funny-logo.svg', (req, res) => res.sendFile(path.join(__dirname, 'pet-funny-logo.svg')));
+
+app.get('/api/health', async (req, res) => {
+  try {
+    const now = await db.get('SELECT NOW() AS now');
+    res.json({ ok: true, db: true, now: now && now.now ? now.now : null });
+  } catch (err) {
+    console.error('Erro em /api/health:', err);
+    res.status(500).json({ ok: false, db: false, error: 'Falha de conexão com o banco.' });
+  }
+});
 
 
 app.get(['/admin', '/admin/'], (req, res) => {
